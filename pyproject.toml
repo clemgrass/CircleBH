@@ -1,0 +1,26 @@
+[project]
+name = "circlebh"
+version = "0.0.0"
+description = "Juego survivors en Python con pygame-ce: todo se dibuja con código y las armas son curvas matemáticas."
+authors = [{ name = "clemgrass" }]
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.14"
+dependencies = [
+    "pygame-ce==2.5.8",
+]
+
+[project.scripts]
+circlebh = "circlebh.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+# ADR 0002 y 0015: la misma versión de uv en todas las máquinas y en la CI.
+required-version = "==0.13.7"
+# ADR 0002 y 0011: una versión recién publicada no entra antes de 7 días.
+exclude-newer = "7 days"
+# ADR 0002: falla cualquier dependencia que no traiga wheel.
+no-build = true

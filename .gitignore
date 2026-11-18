@@ -25,5 +25,6 @@ htmlcov/
 
 # Configuración local, nunca versionada
 .claude/settings.local.json
+mise.local.toml
 .env
 .env.*
