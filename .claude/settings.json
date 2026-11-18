@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
+  },
+  "permissions": {
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push * --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * -f*)",
+      "Bash(git push * +*)",
+
+      "Bash(git * --no-verify*)",
+      "Bash(git commit -n *)",
+      "Bash(git commit * -n *)",
+      "Bash(git commit * -n)",
+
+      "Bash(gh pr merge *)",
+      "Bash(gh repo delete *)",
+
+      "Bash(uv add *)",
+      "Bash(uv remove *)",
+      "Bash(uv lock --upgrade*)",
+      "Bash(uv lock * --upgrade*)",
+      "Bash(uv lock -U*)",
+      "Bash(uv lock * -U*)",
+      "Bash(uv sync --upgrade*)",
+      "Bash(uv sync * --upgrade*)",
+      "Bash(uv pip install *)",
+      "Bash(uv python install *)",
+      "Bash(uv tool install *)",
+      "Bash(pip install *)",
+      "Bash(python -m pip install *)",
+
+      "Read(**/.env*)",
+      "Read(~/.ssh/**)",
+      "Read(~/.config/gh/**)"
+    ],
+    "ask": [
+      "Edit(/.claude/**)",
+      "Edit(/.github/**)",
+      "Edit(/.pre-commit-config.yaml)",
+      "Edit(/pyproject.toml)",
+      "Bash(gh pr create *)",
+      "Bash(gh release *)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/stop-poe-fast.sh",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}

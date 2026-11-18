@@ -1,0 +1,12 @@
+# ADR 0012: antes de cada commit, de la persona o de la IA, corre `uv run poe fast`.
+# Si poe fast corrige formato o lint, el commit falla: revisa los cambios, agrégalos y vuelve a hacer commit.
+repos:
+  - repo: local
+    hooks:
+      - id: poe-fast
+        name: uv run poe fast
+        entry: uv run poe fast
+        # `unsupported` es el nombre nuevo de `system` desde pre-commit 4.4.0: usa el entorno de uv, no uno propio.
+        language: unsupported
+        pass_filenames: false
+        always_run: true
