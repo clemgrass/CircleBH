@@ -74,9 +74,9 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 | `uv run poe capturas` | evidencia en la sesión |
 | `uv run poe medios` | regenerar las imágenes del README |
 
-## Arquitectura (ADR 0003 a 0006)
+## Arquitectura (ADR 0003 a 0006, 0016)
 - En `src/circlebh/`, las importaciones van en una sola dirección: `scenes` → `render` → `world` → `balance`. `lint-imports` lo verifica.
-- `world/` es lógica pura: no tiene `draw()` ni usa `pygame.display` ni `pygame.draw`. De Pygame solo usa `Vector2`.
+- `world/` es lógica pura: no tiene `draw()` ni usa `pygame.display` ni `pygame.draw`. De Pygame solo usa `Vector2`. La regla `TID251` de ruff lo verifica, y solo `render/`, `scenes/` y `__main__.py` tienen la excepción.
 - `world` usa coordenadas matemáticas: Y hacia arriba y ángulos antihorarios en radianes. Solo la cámara las pasa a pantalla. Cada curva se escribe como su fórmula.
 - Clases simples con herencia y funciones cortas. Sin ECS, sin metaclases y sin `pygame.sprite`.
 - Enemigos y armas se definen por parámetros en `balance.py`, con dataclasses, y se reflejan en `balance.json`, dentro del paquete y leído con `importlib.resources`.
