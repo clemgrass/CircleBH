@@ -26,11 +26,13 @@ class FixedStepClock:
         - `real_dt` se topa en `MAX_FRAME` antes de sumarlo.
         - Devuelve la cantidad de pasos completos que caben en el acumulador.
         - El resto (menos de un paso) queda guardado para la próxima llamada.
-
-        Ejercicio pendiente: ver `tests/test_clock.py`.
         """
-        # TODO(ejercicio): implementa el acumulador en 5 a 10 líneas.
-        raise NotImplementedError
+        self._accumulator += min(real_dt, MAX_FRAME)
+        steps = 0
+        while self._accumulator >= STEP:
+            self._accumulator -= STEP
+            steps += 1
+        return steps
 
 
 def capture_steps(times: Iterable[float]) -> list[int]:

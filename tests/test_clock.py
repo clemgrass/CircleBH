@@ -1,32 +1,22 @@
 """Tests del reloj de pasos fijos y de los pasos de captura (ADR 0005)."""
 
-import pytest
-
 from circlebh.world.clock import FixedStepClock, capture_steps
 
-EJERCICIO = pytest.mark.xfail(
-    strict=True, reason="ejercicio pendiente: FixedStepClock.advance"
-)
 
-
-@EJERCICIO
 def test_advance_un_paso() -> None:
     assert FixedStepClock().advance(1 / 60) == 1
 
 
-@EJERCICIO
 def test_advance_acumula_el_resto() -> None:
     clock = FixedStepClock()
     assert clock.advance(1 / 120) == 0
     assert clock.advance(1 / 120) == 1
 
 
-@EJERCICIO
 def test_advance_un_cuarto_de_segundo() -> None:
     assert FixedStepClock().advance(0.25) == 15
 
 
-@EJERCICIO
 def test_advance_topa_una_pausa_larga() -> None:
     # Una pausa de 10 s no debe hacer correr 600 pasos de golpe.
     assert FixedStepClock().advance(10) == 15
