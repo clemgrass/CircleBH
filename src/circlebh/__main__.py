@@ -14,7 +14,7 @@ import pygame
 
 from circlebh.cli import RunOptions, parse_args
 from circlebh.render.plane import draw_empty_plane
-from circlebh.world.clock import FixedStepClock, capture_steps
+from circlebh.world.clock import STEP, FixedStepClock, capture_steps
 
 WINDOW_SIZE = (1280, 720)
 FPS = 60
@@ -46,19 +46,19 @@ def run_capture(options: RunOptions) -> None:
     screen = pygame.display.set_mode(WINDOW_SIZE)
     CAPTURE_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Varios tiempos pueden caer en el mismo paso: se guardan todos.
-    times_by_step: dict[int, list[float]] = {}
-    for t, step in zip(options.capture, capture_steps(options.capture), strict=True):
-        times_by_step.setdefault(step, []).append(t)
+    # Varios tiempos pueden caer en el mismo paso: ese paso se captura una sola vez.
+    steps = set(capture_steps(options.capture))
 
-    for step in range(max(times_by_step) + 1):
-        # Cuando exista `world`, aquí va `world.update(STEP)`, antes de dibujar.
-        if step in times_by_step:
+    for step in range(max(steps) + 1):
+        if step in steps:
             draw_empty_plane(screen)
-            for t in times_by_step[step]:
-                path = capture_path(options.scenario, options.seed, t)
-                pygame.image.save(screen, path)
-                print(path)
+            # El nombre lleva el tiempo del paso capturado, no el pedido: como un paso
+            # (1/60 s) es más que 0,01 s, dos pasos distintos nunca comparten nombre.
+            path = capture_path(options.scenario, options.seed, step * STEP)
+            pygame.image.save(screen, path)
+            print(path)
+        # Cuando exista `world`, aquí va `world.update(STEP)`, después de capturar:
+        # así el paso 0 es el estado inicial.
 
 
 def run_window(options: RunOptions) -> None:
@@ -71,9 +71,9 @@ def run_window(options: RunOptions) -> None:
 
     running = True
     while running:
-        real_dt = clock.tick(FPS) / 1000 * options.speed
+        real_dt = clock.tick(FPS) / 1000
         # Todavía no hay `world` que actualizar, así que los pasos se descartan.
-        step_clock.advance(real_dt)
+        step_clock.advance(real_dt, options.speed)
         for event in pygame.event.get():
             if event.type == pygame.QUIT or (
                 event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE

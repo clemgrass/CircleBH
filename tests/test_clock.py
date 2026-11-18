@@ -22,6 +22,13 @@ def test_advance_topa_una_pausa_larga() -> None:
     assert FixedStepClock().advance(10) == 15
 
 
+def test_advance_multiplica_por_la_velocidad_despues_del_tope() -> None:
+    # El tope es del tiempo real (ADR 0005): un frame normal a 20× da 20 pasos, no 15.
+    assert FixedStepClock().advance(1 / 60, speed=20) == 20
+    # Una pausa larga se topa en 0,25 s reales y recién ahí se multiplica: 15 × 2.
+    assert FixedStepClock().advance(10, speed=2) == 30
+
+
 def test_capture_steps_segundos_enteros() -> None:
     assert capture_steps([0, 1, 2]) == [0, 60, 120]
 

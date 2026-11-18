@@ -35,7 +35,7 @@ Las decisiones de esta sección son propuestas de Claude, salvo el enfoque A.
 `parse_args(argv)` devuelve un `RunOptions` (dataclass congelada) o termina con el error de `argparse` (código 2).
 
 **Reloj de pasos fijos** (`circlebh/world/clock.py`, ADR 0005):
-- `FixedStepClock.advance(real_dt) -> int`: suma el tiempo real al acumulador, topado en 0,25 s, y devuelve cuántos pasos de 1/60 s corresponden, guardando el resto.
+- `FixedStepClock.advance(real_dt, speed=1.0) -> int`: topa el tiempo real en 0,25 s, **después** lo multiplica por `speed`, lo suma al acumulador y devuelve cuántos pasos de 1/60 s corresponden, guardando el resto. *Corregido tras la revisión:* multiplicar antes del tope limitaba `--speed` a 15× sin avisar.
 - **Ejercicio del usuario** (modo enseñanza): el cuerpo de `advance`, de 5 a 10 líneas. Claude escribe los tests y los muestra fallando, marcados con `xfail(strict=True, reason="ejercicio pendiente: …")`.
 
 **Pasos de captura** (`circlebh/world/clock.py`): `capture_steps(times) -> list[int]` convierte cada tiempo al paso más cercano, `round(t * 60)`. Así, `t = 1` es el paso 60.
@@ -50,6 +50,7 @@ Las decisiones de esta sección son propuestas de Claude, salvo el enfoque A.
 3. Termina después de la última captura e imprime la ruta de cada archivo.
 
 **Archivos:** `.capturas/<escenario>-seed<N>-t<segundos con 2 decimales>.png`, por ejemplo `plano-vacio-seed1-t1.00.png`. Si ya existe, se sobrescribe.
+- *Corregido tras la revisión:* el tiempo del nombre es el **del paso capturado** (`paso × 1/60`), no el pedido. Como un paso dura más que 0,01 s, dos pasos distintos nunca comparten nombre. Si varios tiempos caen en el mismo paso, ese paso se captura e imprime una sola vez.
 
 **`poe capturas`:** `circlebh --demo --scenario plano-vacio --seed 1 --capture 0,1,2`.
 

@@ -19,15 +19,16 @@ class FixedStepClock:
     def __init__(self) -> None:
         self._accumulator = 0.0
 
-    def advance(self, real_dt: float) -> int:
-        """Suma `real_dt` segundos y devuelve cuántos pasos de `STEP` hay que dar ahora.
+    def advance(self, real_dt: float, speed: float = 1.0) -> int:
+        """Suma `real_dt` segundos reales y devuelve cuántos pasos de `STEP` hay que dar ahora.
 
         Contrato:
-        - `real_dt` se topa en `MAX_FRAME` antes de sumarlo.
+        - `real_dt` se topa en `MAX_FRAME` y recién después se multiplica por `speed`:
+          el tope es del tiempo real (ADR 0005), así que `--speed` no queda limitado por él.
         - Devuelve la cantidad de pasos completos que caben en el acumulador.
         - El resto (menos de un paso) queda guardado para la próxima llamada.
         """
-        self._accumulator += min(real_dt, MAX_FRAME)
+        self._accumulator += min(real_dt, MAX_FRAME) * speed
         steps = 0
         while self._accumulator >= STEP:
             self._accumulator -= STEP

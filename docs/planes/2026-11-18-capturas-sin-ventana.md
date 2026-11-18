@@ -24,7 +24,7 @@
 
 1. `--capture inf` o `--capture nan`: debe dar un error de código 2. Con `inf`, el modo captura no terminaría nunca. → Tarea 2, test `test_capture_rechaza_tiempos_no_finitos`.
 2. `--capture "0, 1"`, con espacios después de la coma: debe aceptarse como `(0.0, 1.0)`. → Tarea 2, test `test_capture_acepta_espacios`.
-3. Dos tiempos que caen en el mismo paso (`0` y `0.001`): se guardan los dos archivos, cada uno con su nombre, y no se pierde ninguno. → Tarea 3, test `test_captura_dos_tiempos_en_el_mismo_paso`.
+3. Dos tiempos que caen en el mismo paso (`0` y `0.001`): ese paso se captura e imprime una vez. Dos tiempos en pasos distintos (`0.005` y `0.009`) dan dos archivos, porque el nombre lleva el tiempo del paso. → Tarea 3, tests `test_captura_dos_tiempos_en_el_mismo_paso` y `test_tiempos_en_pasos_distintos_no_se_pisan`. *Corregido tras la revisión: la versión anterior se contradecía con el test de la tarea 3.*
 4. `.capturas/` no existe: se crea. → Tarea 3, lo cubre el test de punta a punta, que corre en una carpeta vacía.
 5. El modo captura deja pygame inicializado y contamina otros tests: `main` siempre llama a `pygame.quit()`. → Tarea 3, `test_captura_deja_pygame_cerrado`.
 
