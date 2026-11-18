@@ -37,6 +37,9 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.17.4",
 ]
+release = [
+    "pyinstaller>=6.22.3",
+]
 
 # --- Tareas (ADR 0008) ---
 
