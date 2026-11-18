@@ -63,8 +63,8 @@ sequence = [
 ]
 
 [tool.poe.tasks.capturas]
-help = "Evidencia en la sesión (ADR 0013). Pendiente: llega con la tarea 8."
-cmd = "python -c \"raise SystemExit('poe capturas: pendiente, llega con la tarea 8 (#8)')\""
+help = "Evidencia en la sesión (ADR 0013): tres PNG sin ventana en .capturas/."
+cmd = "circlebh --demo --scenario plano-vacio --seed 1 --capture 0,1,2"
 
 [tool.poe.tasks.medios]
 help = "Regenera las imágenes del README en docs/media/ (ADR 0013). Pendiente."

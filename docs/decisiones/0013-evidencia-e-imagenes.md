@@ -49,6 +49,7 @@ Un cambio que se ve en pantalla necesita evidencia más allá de los tests. El j
 - El control de imágenes corre en `poe check` y en la CI.
 - `poe medios` regenera `docs/media/` desde el código.
 - Pendiente de verificar al armar: el nombre exacto del driver `dummy`.
+  - Verificado el 2026-11-18: es `SDL_VIDEODRIVER=dummy`. SDL 2.32.10 lo define en `src/video/dummy/SDL_nullvideo.c` (`#define DUMMYVID_DRIVER_NAME "dummy"`, https://github.com/libsdl-org/SDL/blob/release-2.32.10/src/video/dummy/SDL_nullvideo.c). `uv run poe capturas` lo usa en Linux; Windows y macOS se prueban en el workflow de release.
 
 ## Pros y contras de las opciones
 
