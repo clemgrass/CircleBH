@@ -59,8 +59,9 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 ### Continuidad
 - Deja el estado al día en el issue en curso: qué quedó a medias y cuál es el próximo paso concreto. Actualízalo antes de quedarte sin contexto.
 
-## Stack (ADR 0001, 0002)
-- Python 3.14.10 (en `.python-version`), pygame-ce 2.5.8 y uv 0.13.4 (en `required-version`).
+## Stack (ADR 0001, 0002, 0015)
+- Python 3.14.10 (en `.python-version`), pygame-ce 2.5.8 y uv 0.13.7 (en `required-version`).
+- Python y uv se suben juntos: el release de uv tiene que agregar el parche de Python que se fija.
 - `uv.lock` fija versiones exactas, con `exclude-newer = "7 days"` y `no-build = true`.
 - Las dependencias se actualizan a mano al empezar cada milestone.
 

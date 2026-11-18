@@ -1,5 +1,5 @@
 ---
-estado: aceptado
+estado: aceptado; la versión de uv la reemplaza el ADR 0015
 fecha: 2026-11-18
 ---
 
