@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Entorno de uv
+.venv/
+
+# Caches de las herramientas
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+
+# Capturas de evidencia (ADR 0013); se regeneran con `uv run poe capturas`
+.capturas/
+
+# Espacio de trabajo local de Superpowers
+.superpowers/
+
+# Configuración local, nunca versionada
+.claude/settings.local.json
+.env
+.env.*
