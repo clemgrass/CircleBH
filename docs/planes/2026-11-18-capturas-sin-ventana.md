@@ -45,7 +45,7 @@
 - [ ] **Paso 1: tests de `capture_steps`**
   - `test_capture_steps_segundos_enteros`: `capture_steps([0, 1, 2]) == [0, 60, 120]`.
   - `test_capture_steps_medio_segundo`: `capture_steps([0.5]) == [30]`.
-  - `test_capture_steps_redondea_al_paso_mas_cercano`: `capture_steps([0.1]) == [6]`, porque `0.1 * 60` en flotante es `6.000000000000001`; y `capture_steps([1 / 60 * 0.4]) == [0]`.
+  - `test_capture_steps_redondea_al_paso_mas_cercano`: `capture_steps([2.05]) == [123]`, porque `2.05 / (1/60)` en flotante es `122.99999999999999` y truncar daría 122; además, `capture_steps([1 / 60 * 0.4]) == [0]` y `capture_steps([1 / 60 * 0.6]) == [1]`.
   - `test_capture_steps_vacio`: `capture_steps([]) == []`.
 - [ ] **Paso 2:** correr `uv run pytest tests/test_clock.py -q`. Se espera que falle con `ModuleNotFoundError: circlebh.world.clock`.
 - [ ] **Paso 3:** implementar `capture_steps` con `round(t / STEP)` para cada tiempo, en el mismo orden.

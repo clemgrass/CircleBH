@@ -1,0 +1,41 @@
+"""Reloj de pasos fijos (ADR 0005).
+
+La lógica del juego siempre avanza en pasos de `STEP` segundos, sin importar los FPS.
+El tiempo real se acumula y se convierte en pasos; lo que sobra queda para el frame siguiente.
+"""
+
+from collections.abc import Iterable
+
+STEP = 1 / 60
+"""Duración de un paso de la lógica, en segundos."""
+
+MAX_FRAME = 0.25
+"""Tope del tiempo real de un frame: una pausa larga no hace correr cientos de pasos de golpe."""
+
+
+class FixedStepClock:
+    """Convierte el tiempo real de cada frame en una cantidad entera de pasos de `STEP`."""
+
+    def __init__(self) -> None:
+        self._accumulator = 0.0
+
+    def advance(self, real_dt: float) -> int:
+        """Suma `real_dt` segundos y devuelve cuántos pasos de `STEP` hay que dar ahora.
+
+        Contrato:
+        - `real_dt` se topa en `MAX_FRAME` antes de sumarlo.
+        - Devuelve la cantidad de pasos completos que caben en el acumulador.
+        - El resto (menos de un paso) queda guardado para la próxima llamada.
+
+        Ejercicio pendiente: ver `tests/test_clock.py`.
+        """
+        # TODO(ejercicio): implementa el acumulador en 5 a 10 líneas.
+        raise NotImplementedError
+
+
+def capture_steps(times: Iterable[float]) -> list[int]:
+    """Convierte tiempos en segundos al número del paso más cercano, en el mismo orden.
+
+    Redondea en vez de truncar: 2,05 s son 123 pasos, pero `2.05 / STEP` da 122.99999999999999.
+    """
+    return [round(t / STEP) for t in times]
