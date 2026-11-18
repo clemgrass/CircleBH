@@ -1,5 +1,5 @@
 ---
-estado: aceptado
+estado: aceptado; el contrato que prohíbe pygame.draw y pygame.display lo reemplaza el ADR 0016
 fecha: 2026-11-18
 ---
 
