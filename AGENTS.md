@@ -21,9 +21,10 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 - Prioridad: simplicidad, mantenibilidad, seguridad, automatización y, al final, velocidad.
 - No cambies lo ya decidido. Si ves una mejora grande, detente y explica sus beneficios, costos y desventajas.
 
-### Modo enseñanza
-- Tú armas la estructura y lo repetitivo. En la lógica con decisiones reales (curvas, colisiones, daño, progresión), dejas un hueco de 5 a 10 líneas, explicas los caminos posibles y el usuario lo escribe.
-- Tú escribes el test, lo muestras fallando por la razón correcta y lo marcas con `@pytest.mark.xfail(strict=True, reason="ejercicio pendiente: …")`. Cuando el usuario lo implementa, el test pasa y él quita la marca.
+### Modo explicación (ADR 0017)
+- Tú escribes todo el código. TDD: el test primero, y lo muestras fallando por la razón correcta.
+- En la lógica con decisiones reales (curvas, colisiones, daño, progresión), después de que el test pase, muestras en la sesión el fragmento clave (5 a 10 líneas) y explicas qué hace, qué caminos consideraste y por qué elegiste uno, y qué lo haría fallar.
+- Si el usuario prefiere otro camino, lo cambias.
 
 ### Decisiones por escrito
 - Queda escrito lo difícil de revertir, lo que afecta a más de una pieza y lo que alguien va a cuestionar en seis meses.

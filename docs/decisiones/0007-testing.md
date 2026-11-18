@@ -1,5 +1,5 @@
 ---
-estado: aceptado
+estado: aceptado; la parte de TDD con ejercicios del usuario la reemplaza el ADR 0017
 fecha: 2026-11-18
 ---
 

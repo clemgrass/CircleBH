@@ -1,5 +1,5 @@
 ---
-estado: aceptado
+estado: aceptado; la línea de ejercicios pendientes la reemplaza el ADR 0017
 fecha: 2026-11-18
 ---
 
