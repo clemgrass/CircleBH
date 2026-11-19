@@ -14,30 +14,28 @@ AXIS_WIDTH = 1.0
 """Grosor de los ejes, en unidades del plano: escala con la cámara."""
 
 
-def draw_plane(screen: pygame.Surface, viewport: Viewport) -> None:
-    """Pinta las franjas y el fondo, y dibuja los ejes X e Y, fijos en el plano.
-
-    Los ejes cruzan el área útil de borde a borde. Si el origen queda fuera de la vista,
-    no se ven.
-    """
+def draw_letterbox(screen: pygame.Surface, viewport: Viewport) -> None:
+    """Pinta las franjas y, encima, el fondo del área útil."""
     screen.fill(LETTERBOX)
     screen.fill(BACKGROUND, viewport.rect)
+
+
+def draw_axes(screen: pygame.Surface, viewport: Viewport) -> None:
+    """Dibuja los ejes X e Y, fijos en el plano, de borde a borde del área útil.
+
+    Quien llama recorta al área útil con `set_clip`: así un eje grueso pegado al borde
+    no pinta la franja. Si el origen queda lejos de la vista, no se dibuja nada.
+    """
     left, top, width, height = viewport.rect
     origin_x, origin_y = viewport.to_screen(Vector2(0, 0))
     line_width = viewport.width(AXIS_WIDTH)
-    if top <= origin_y <= top + height:
+    # El margen del grosor deja dibujar el eje cuando su centro cae justo fuera del área
+    # pero su borde todavía se ve.
+    if top - line_width <= origin_y <= top + height + line_width:
         pygame.draw.line(
-            screen,
-            AXIS_COLOR,
-            (left, origin_y),
-            (left + width - 1, origin_y),
-            line_width,
+            screen, AXIS_COLOR, (left, origin_y), (left + width, origin_y), line_width
         )
-    if left <= origin_x <= left + width:
+    if left - line_width <= origin_x <= left + width + line_width:
         pygame.draw.line(
-            screen,
-            AXIS_COLOR,
-            (origin_x, top),
-            (origin_x, top + height - 1),
-            line_width,
+            screen, AXIS_COLOR, (origin_x, top), (origin_x, top + height), line_width
         )

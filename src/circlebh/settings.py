@@ -50,6 +50,11 @@ class CameraSettings:
             raise DataFileError(
                 "camera.fov", f"debe ser un número finito > 0, llegó {self.fov}"
             )
+        # Con Infinity, `to_screen` da NaN y no se dibuja nada, sin ningún error.
+        if not all(math.isfinite(v) for v in self.offset):
+            raise DataFileError(
+                "camera.offset", f"debe tener números finitos, llegó {self.offset}"
+            )
 
 
 @dataclass(frozen=True)

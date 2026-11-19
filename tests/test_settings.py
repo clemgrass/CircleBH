@@ -98,6 +98,13 @@ def test_fov_no_positivo_o_infinito_nombra_el_campo(
     assert error.field == "camera.fov"
 
 
+@pytest.mark.parametrize("offset", [[math.inf, 0.0], [0.0, math.nan]])
+def test_offset_no_finito_nombra_el_campo(tmp_path: Path, offset: list[float]) -> None:
+    # Con Infinity, `to_screen` da NaN y el jugador desaparece sin ningún error.
+    error = falla_en(escribir(tmp_path, con("camera", "offset", offset)))
+    assert error.field == "camera.offset"
+
+
 def test_offset_con_un_solo_numero_nombra_el_campo(tmp_path: Path) -> None:
     error = falla_en(escribir(tmp_path, con("camera", "offset", [0.0])))
     assert error.field == "camera.offset"

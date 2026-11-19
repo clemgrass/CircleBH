@@ -10,6 +10,11 @@ from pygame.math import Vector2
 ASPECT_WIDTH, ASPECT_HEIGHT = 16, 9
 
 
+def camera_center(target: Vector2, offset: tuple[float, float]) -> Vector2:
+    """El centro de la cámara: el jugador, más el desplazamiento de la configuración."""
+    return target + Vector2(offset)
+
+
 class Viewport:
     """La cámara de un frame: el tamaño de la ventana, el FOV y el centro, ya resueltos."""
 

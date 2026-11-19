@@ -5,7 +5,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.viewport import Viewport
+from circlebh.viewport import Viewport, camera_center
 
 FOV = 720.0
 HD = (1280, 720)
@@ -40,6 +40,21 @@ def test_x_mayor_queda_mas_a_la_derecha() -> None:
 def test_el_plano_se_desplaza_con_el_centro() -> None:
     # El origen queda a la izquierda y abajo de un jugador en (100, 100).
     assert Viewport(HD, FOV, Vector2(100, 100)).to_screen(Vector2(0, 0)) == (540, 460)
+
+
+# --- Centro de la cámara ---
+
+
+def test_sin_desplazamiento_el_centro_es_el_jugador() -> None:
+    assert camera_center(Vector2(30, -40), (0.0, 0.0)) == Vector2(30, -40)
+
+
+def test_el_desplazamiento_se_suma_al_jugador() -> None:
+    assert camera_center(Vector2(30, -40), (10.0, 5.0)) == Vector2(40, -35)
+
+
+def test_desplazamiento_negativo_mueve_el_centro_al_reves() -> None:
+    assert camera_center(Vector2(0, 0), (-10.0, -5.0)) == Vector2(-10, -5)
 
 
 # --- Escala y FOV ---

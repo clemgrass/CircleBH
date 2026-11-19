@@ -6,11 +6,11 @@ from pygame.math import Vector2
 
 from circlebh.controls import axis_to_unit, combine, keyboard_intent, stick_intent
 from circlebh.pilot import pilot_intent
-from circlebh.render.plane import draw_plane
+from circlebh.render.plane import draw_axes, draw_letterbox
 from circlebh.render.world_view import draw_world
 from circlebh.scenes.scenarios import Scenario
 from circlebh.settings import Settings
-from circlebh.viewport import Viewport
+from circlebh.viewport import Viewport, camera_center
 from circlebh.world.game import World
 
 
@@ -105,13 +105,15 @@ class GameScene:
     def viewport(self, screen: pygame.Surface) -> Viewport:
         """La cámara de este frame: el jugador, más el desplazamiento, va al centro."""
         camera = self.settings.camera
-        center = self.world.player.position + Vector2(camera.offset)
+        center = camera_center(self.world.player.position, camera.offset)
         return Viewport(screen.get_size(), camera.fov, center)
 
     def draw(self, screen: pygame.Surface) -> None:
         viewport = self.viewport(screen)
-        draw_plane(screen, viewport)
-        # Lo que cruza el borde del área útil no se dibuja sobre las franjas.
+        draw_letterbox(screen, viewport)
+        # Lo que cruza el borde del área útil, como un eje grueso o un círculo, no se
+        # dibuja sobre las franjas.
         screen.set_clip(viewport.rect)
+        draw_axes(screen, viewport)
         draw_world(screen, self.world, viewport)
         screen.set_clip(None)
