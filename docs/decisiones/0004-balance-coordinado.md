@@ -76,3 +76,4 @@ Elegimos **`balance.py` (dataclasses) y `balance.json`, coordinados**.
 ## Preguntas abiertas
 
 - ¿El import de JSON a Python va en el MVP o cuando llegue el editor? Se decide al planificar las tareas.
+  - Respondida el 2026-11-19: va desde el inicio, en la 0.1.0. El usuario prefiere hacerla ahora porque es más fácil que agregarla después. La importación reescribe los datos, no las clases (spec `docs/specs/2026-11-19-version-0-1-0.md`).
