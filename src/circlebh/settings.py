@@ -12,7 +12,24 @@ from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
-from circlebh.datafile import load
+from circlebh.datafile import DataFileError, load
+
+
+@dataclass(frozen=True)
+class ControlsSettings:
+    """Cómo se lee el control."""
+
+    stick_deadzone: float
+    """Zona muerta del stick, de 0 a 1 sin incluir el 1: lo que se mueve menos que esto
+    no cuenta. Tapa la deriva de un stick suelto, que no vuelve justo al centro."""
+
+    def __post_init__(self) -> None:
+        # Con 1, todo el recorrido sería zona muerta, y `stick_intent` dividiría por 0.
+        if not 0 <= self.stick_deadzone < 1:
+            raise DataFileError(
+                "controls.stick_deadzone",
+                f"debe ser ≥ 0 y < 1, llegó {self.stick_deadzone}",
+            )
 
 
 @dataclass(frozen=True)
@@ -26,6 +43,9 @@ class DebugSettings:
 @dataclass(frozen=True)
 class Settings:
     """Toda la configuración del juego."""
+
+    controls: ControlsSettings
+    """Cómo se lee el control."""
 
     debug: DebugSettings
     """Ayudas para depurar."""

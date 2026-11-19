@@ -8,18 +8,22 @@ Hay dos modos:
 
 import json
 import os
+import random
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 import pygame
 
+from circlebh.balance import BALANCE
 from circlebh.balance_tools import check
 from circlebh.cli import RunOptions, parse_args
 from circlebh.datafile import DataFileError
-from circlebh.render.plane import draw_empty_plane
+from circlebh.scenes.game import GameScene
+from circlebh.scenes.scenarios import SCENARIOS
 from circlebh.settings import Settings, load_settings
 from circlebh.world.clock import STEP, FixedStepClock, capture_steps
+from circlebh.world.game import World
 
 WINDOW_SIZE = (1280, 720)
 FPS = 60
@@ -29,14 +33,13 @@ CAPTURE_DIR = Path(".capturas")
 def main(argv: Sequence[str] | None = None) -> None:
     options = parse_args(argv)
     exit_if_balance_differs()
-    # Todavía nada lee la configuración: por ahora solo se valida al arrancar.
-    load_settings_or_exit()
+    settings = load_settings_or_exit()
     print(f"semilla: {options.seed}")
     try:
         if options.capture:
-            run_capture(options)
+            run_capture(options, settings)
         else:
-            run_window(options)
+            run_window(options, settings)
     finally:
         pygame.quit()
 
@@ -70,48 +73,58 @@ def capture_path(scenario: str, seed: int, t: float) -> Path:
     return CAPTURE_DIR / f"{scenario}-seed{seed}-t{t:.2f}.png"
 
 
-def run_capture(options: RunOptions) -> None:
+def new_scene(options: RunOptions, settings: Settings) -> GameScene:
+    """Una partida con la semilla de `options`. En la demo, el escenario mueve al jugador."""
+    world = World(BALANCE, random.Random(options.seed))
+    demo = SCENARIOS[options.scenario] if options.demo else None
+    return GameScene(world, settings, demo)
+
+
+def run_capture(options: RunOptions, settings: Settings) -> None:
     """Avanza paso a paso, sin reloj real, y guarda un PNG en cada tiempo pedido."""
     # El driver sin ventana de SDL; tiene que fijarse antes de pygame.init().
     os.environ["SDL_VIDEODRIVER"] = "dummy"
     pygame.init()
     screen = pygame.display.set_mode(WINDOW_SIZE)
     CAPTURE_DIR.mkdir(parents=True, exist_ok=True)
+    scene = new_scene(options, settings)
 
     # Varios tiempos pueden caer en el mismo paso: ese paso se captura una sola vez.
     steps = set(capture_steps(options.capture))
 
     for step in range(max(steps) + 1):
         if step in steps:
-            draw_empty_plane(screen)
+            scene.draw(screen)
             # El nombre lleva el tiempo del paso capturado, no el pedido: como un paso
             # (1/60 s) es más que 0,01 s, dos pasos distintos nunca comparten nombre.
             path = capture_path(options.scenario, options.seed, step * STEP)
             pygame.image.save(screen, path)
             print(path)
-        # Cuando exista `world`, aquí va `world.update(STEP)`, después de capturar:
-        # así el paso 0 es el estado inicial.
+        # Después de capturar: así el paso 0 es el estado inicial.
+        scene.step()
 
 
-def run_window(options: RunOptions) -> None:
+def run_window(options: RunOptions, settings: Settings) -> None:
     """Abre la ventana y la mantiene hasta que el jugador la cierra o presiona Escape."""
     pygame.init()
     screen = pygame.display.set_mode(WINDOW_SIZE, pygame.RESIZABLE)
     pygame.display.set_caption("CircleBH")
     clock = pygame.time.Clock()
     step_clock = FixedStepClock()
+    scene = new_scene(options, settings)
 
     running = True
     while running:
         real_dt = clock.tick(FPS) / 1000
-        # Todavía no hay `world` que actualizar, así que los pasos se descartan.
-        step_clock.advance(real_dt, options.speed)
         for event in pygame.event.get():
             if event.type == pygame.QUIT or (
                 event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
             ):
                 running = False
-        draw_empty_plane(screen)
+            scene.handle_event(event)
+        for _ in range(step_clock.advance(real_dt, options.speed)):
+            scene.step()
+        scene.draw(screen)
         pygame.display.flip()
 
 
