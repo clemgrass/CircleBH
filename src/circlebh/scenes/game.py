@@ -6,10 +6,11 @@ from pygame.math import Vector2
 
 from circlebh.controls import axis_to_unit, combine, keyboard_intent, stick_intent
 from circlebh.pilot import pilot_intent
-from circlebh.render.plane import draw_empty_plane
-from circlebh.render.world_view import ToScreen, draw_world
+from circlebh.render.plane import draw_axes, draw_letterbox
+from circlebh.render.world_view import draw_world
 from circlebh.scenes.scenarios import Scenario
 from circlebh.settings import Settings
+from circlebh.viewport import Viewport, camera_center
 from circlebh.world.game import World
 
 
@@ -73,15 +74,6 @@ def keys_intent() -> Vector2:
     )
 
 
-def centered(screen: pygame.Surface) -> ToScreen:
-    """El origen del plano en el centro de la ventana, 1 unidad = 1 píxel, Y invertida.
-
-    Provisorio: la cámara de la tarea 2 (`viewport.py`) lo reemplaza.
-    """
-    width, height = screen.get_size()
-    return lambda p: (width / 2 + p.x, height / 2 - p.y)
-
-
 class GameScene:
     """Una partida. Con `demo`, el escenario manda y no se lee la entrada."""
 
@@ -110,6 +102,18 @@ class GameScene:
         deadzone = self.settings.controls.stick_deadzone
         return combine(keys_intent(), *self.gamepads.intents(deadzone))
 
+    def viewport(self, screen: pygame.Surface) -> Viewport:
+        """La cámara de este frame: el jugador, más el desplazamiento, va al centro."""
+        camera = self.settings.camera
+        center = camera_center(self.world.player.position, camera.offset)
+        return Viewport(screen.get_size(), camera.fov, center)
+
     def draw(self, screen: pygame.Surface) -> None:
-        draw_empty_plane(screen)
-        draw_world(screen, self.world, centered(screen))
+        viewport = self.viewport(screen)
+        draw_letterbox(screen, viewport)
+        # Lo que cruza el borde del área útil, como un eje grueso o un círculo, no se
+        # dibuja sobre las franjas.
+        screen.set_clip(viewport.rect)
+        draw_axes(screen, viewport)
+        draw_world(screen, self.world, viewport)
+        screen.set_clip(None)

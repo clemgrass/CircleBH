@@ -21,6 +21,8 @@ class RunOptions:
     seed: int
     speed: float
     capture: tuple[float, ...]
+    window: tuple[int, int]
+    """Tamaño inicial de la ventana, o de las capturas, en píxeles."""
 
 
 def _seed(text: str) -> int:
@@ -62,6 +64,20 @@ def _capture_times(text: str) -> tuple[float, ...]:
     return tuple(sorted(times))
 
 
+def _window(text: str) -> tuple[int, int]:
+    """`"1600x900"` → `(1600, 900)`, con los dos lados ≥ 1."""
+    parts = text.split("x")
+    try:
+        width, height = (int(part) for part in parts)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(
+            f"se espera ANCHOxALTO, como 1280x720: {text!r}"
+        ) from error
+    if width < 1 or height < 1:
+        raise argparse.ArgumentTypeError(f"cada lado debe ser ≥ 1: {text!r}")
+    return width, height
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="circlebh",
@@ -95,6 +111,13 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="T1,T2,…",
         help="guarda un PNG en cada tiempo, en segundos, sin abrir ventana; exige --demo",
     )
+    parser.add_argument(
+        "--window",
+        type=_window,
+        default=(1280, 720),
+        metavar="ANCHOxALTO",
+        help="tamaño inicial de la ventana, o de las capturas (por defecto: 1280x720)",
+    )
     return parser
 
 
@@ -112,4 +135,5 @@ def parse_args(argv: Sequence[str] | None = None) -> RunOptions:
         seed=seed,
         speed=args.speed,
         capture=args.capture,
+        window=args.window,
     )

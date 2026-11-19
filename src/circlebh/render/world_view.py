@@ -1,19 +1,19 @@
-"""Dibuja lo que hay en `world` sobre el plano."""
-
-from collections.abc import Callable
+"""Dibuja lo que hay en `world` sobre el plano, a través de la cámara."""
 
 import pygame
-from pygame.math import Vector2
 
+from circlebh.viewport import Viewport
 from circlebh.world.game import World
 
 PLAYER_COLOR = pygame.Color("white")
 
-type ToScreen = Callable[[Vector2], tuple[float, float]]
-"""Pasa un punto del plano (Y hacia arriba) a píxeles de la pantalla (Y hacia abajo)."""
 
-
-def draw_world(screen: pygame.Surface, world: World, to_screen: ToScreen) -> None:
-    """Dibuja al jugador como un círculo relleno."""
+def draw_world(screen: pygame.Surface, world: World, viewport: Viewport) -> None:
+    """Dibuja al jugador como un círculo relleno, con su radio escalado por la cámara."""
     player = world.player
-    pygame.draw.circle(screen, PLAYER_COLOR, to_screen(player.position), player.radius)
+    pygame.draw.circle(
+        screen,
+        PLAYER_COLOR,
+        viewport.to_screen(player.position),
+        player.radius * viewport.scale,
+    )

@@ -13,12 +13,14 @@ def falla_con_codigo_2(argv: list[str]) -> None:
 
 def test_opciones_completas() -> None:
     argv = ["--demo", "--scenario", "plano-vacio", "--seed", "7", "--speed", "2"]
-    assert parse_args([*argv, "--capture", "0,1,2"]) == RunOptions(
+    extra = ["--capture", "0,1,2", "--window", "1600x900"]
+    assert parse_args([*argv, *extra]) == RunOptions(
         demo=True,
         scenario="plano-vacio",
         seed=7,
         speed=2.0,
         capture=(0.0, 1.0, 2.0),
+        window=(1600, 900),
     )
 
 
@@ -28,6 +30,7 @@ def test_valores_por_defecto() -> None:
     assert options.scenario == "plano-vacio"
     assert options.speed == 1.0
     assert options.capture == ()
+    assert options.window == (1280, 720)
     assert isinstance(options.seed, int)
     assert options.seed >= 0
 
@@ -69,3 +72,18 @@ def test_capture_rechaza_tiempos_no_finitos(tiempo: str) -> None:
 
 def test_seed_negativa() -> None:
     falla_con_codigo_2(["--seed", "-1"])
+
+
+def test_window_lee_ancho_por_alto() -> None:
+    assert parse_args(["--window", "800x600"]).window == (800, 600)
+
+
+def test_window_minima_vale() -> None:
+    assert parse_args(["--window", "1x1"]).window == (1, 1)
+
+
+@pytest.mark.parametrize(
+    "window", ["0x720", "1280x0", "-1x720", "1280", "axb", "1280x720x3"]
+)
+def test_window_invalida(window: str) -> None:
+    falla_con_codigo_2(["--window", window])
