@@ -1,5 +1,6 @@
 """Tests de la configuración del juego: `settings.json` contra la dataclass (ADR 0018)."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -27,6 +28,13 @@ def test_settings_real_valida() -> None:
 def test_lee_el_valor_del_archivo(tmp_path: Path) -> None:
     path = escribir(tmp_path, '{"debug": {"show_hitboxes": true}}')
     assert load_settings(path) == Settings(debug=DebugSettings(show_hitboxes=True))
+
+
+def test_json_mal_escrito_se_rechaza(tmp_path: Path) -> None:
+    # La coma final es el error típico al editar a mano.
+    path = escribir(tmp_path, '{"debug": {"show_hitboxes": false,}}')
+    with pytest.raises(json.JSONDecodeError):
+        load_settings(path)
 
 
 def test_campo_que_falta_nombra_el_campo(tmp_path: Path) -> None:
