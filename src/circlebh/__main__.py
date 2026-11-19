@@ -6,6 +6,7 @@ Hay dos modos:
   y guarda un PNG en el paso de cada tiempo. La misma semilla da los mismos PNG.
 """
 
+import json
 import os
 import sys
 from collections.abc import Sequence
@@ -15,7 +16,9 @@ import pygame
 
 from circlebh.balance_tools import check
 from circlebh.cli import RunOptions, parse_args
+from circlebh.datafile import DataFileError
 from circlebh.render.plane import draw_empty_plane
+from circlebh.settings import Settings, load_settings
 from circlebh.world.clock import STEP, FixedStepClock, capture_steps
 
 WINDOW_SIZE = (1280, 720)
@@ -26,6 +29,8 @@ CAPTURE_DIR = Path(".capturas")
 def main(argv: Sequence[str] | None = None) -> None:
     options = parse_args(argv)
     exit_if_balance_differs()
+    # Todavía nada lee la configuración: por ahora solo se valida al arrancar.
+    load_settings_or_exit()
     print(f"semilla: {options.seed}")
     try:
         if options.capture:
@@ -47,6 +52,17 @@ def exit_if_balance_differs() -> None:
             file=sys.stderr,
         )
         raise SystemExit(1)
+
+
+def load_settings_or_exit() -> Settings:
+    """ADR 0018: el juego no abre si `settings.json` no calza con `Settings`."""
+    try:
+        return load_settings()
+    except json.JSONDecodeError as error:
+        print(f"settings.json: no es JSON válido: {error}", file=sys.stderr)
+    except DataFileError as error:
+        print(f"settings.json: {error}", file=sys.stderr)
+    raise SystemExit(1)
 
 
 def capture_path(scenario: str, seed: int, t: float) -> Path:

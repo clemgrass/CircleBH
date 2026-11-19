@@ -1,0 +1,44 @@
+"""Configuración del juego: cómo se juega y se ve (ADR 0018).
+
+El valor de cada variable vive solo en `settings.json`, dentro del paquete. Aquí están
+los campos, sus tipos y qué hace cada uno. Al arrancar, el juego valida el archivo contra
+estas clases: si falta un campo, sobra uno o un tipo no calza, no abre y nombra el campo.
+
+Para agregar una variable, escribe el campo en su clase y su valor en `settings.json`.
+"""
+
+import json
+from dataclasses import dataclass
+from importlib import resources
+from pathlib import Path
+
+from circlebh.datafile import load
+
+
+@dataclass(frozen=True)
+class DebugSettings:
+    """Ayudas para depurar."""
+
+    show_hitboxes: bool
+    """Dibuja el círculo de choque de cada cuerpo."""
+
+
+@dataclass(frozen=True)
+class Settings:
+    """Toda la configuración del juego."""
+
+    debug: DebugSettings
+    """Ayudas para depurar."""
+
+
+def load_settings(path: Path | None = None) -> Settings:
+    """Lee y valida `settings.json`: por defecto, el del paquete, con `importlib.resources`.
+
+    Lanza `json.JSONDecodeError` si el archivo no es JSON, y `DataFileError`, con la
+    ruta del campo, si no calza con `Settings`.
+    """
+    if path is None:
+        text = resources.files("circlebh").joinpath("settings.json").read_text("utf-8")
+    else:
+        text = path.read_text(encoding="utf-8")
+    return load(Settings, json.loads(text))
