@@ -8,6 +8,7 @@ Para agregar una variable, escribe el campo en su clase y su valor en `settings.
 """
 
 import json
+import math
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
@@ -33,6 +34,25 @@ class ControlsSettings:
 
 
 @dataclass(frozen=True)
+class CameraSettings:
+    """Qué muestra la cámara (ADR 0005)."""
+
+    fov: float
+    """Altura visible del plano, en unidades. Con 720, en una ventana de 1280×720,
+    una unidad se ve como un píxel."""
+
+    offset: tuple[float, float]
+    """Desplazamiento del centro de la cámara respecto del jugador, en unidades."""
+
+    def __post_init__(self) -> None:
+        # Con 0, la escala dividiría por 0; con infinito, no se vería nada.
+        if not (math.isfinite(self.fov) and self.fov > 0):
+            raise DataFileError(
+                "camera.fov", f"debe ser un número finito > 0, llegó {self.fov}"
+            )
+
+
+@dataclass(frozen=True)
 class DebugSettings:
     """Ayudas para depurar."""
 
@@ -46,6 +66,9 @@ class Settings:
 
     controls: ControlsSettings
     """Cómo se lee el control."""
+
+    camera: CameraSettings
+    """Qué muestra la cámara."""
 
     debug: DebugSettings
     """Ayudas para depurar."""

@@ -35,6 +35,13 @@ def test_captura_de_punta_a_punta() -> None:
         assert pygame.image.load(Path(".capturas") / name).get_size() == (1280, 720)
 
 
+def test_captura_con_ventana_ancha() -> None:
+    main(["--demo", "--seed", "1", "--capture", "0", "--window", "1600x720"])
+
+    imagen = pygame.image.load(Path(".capturas") / "plano-vacio-seed1-t0.00.png")
+    assert imagen.get_size() == (1600, 720)
+
+
 def test_captura_dos_tiempos_en_el_mismo_paso(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
