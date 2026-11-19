@@ -33,6 +33,7 @@ La tabla es el punto de partida. El prototipo puede ajustarla si algo no se lee 
   - **Círculo:** un anillo que se expande y revienta.
   - **Seno:** una onda que avanza ondulando.
   - **Espiral:** proyectiles que salen girando desde el centro.
+- **Las mejoras y las combinaciones salen de ideas matemáticas** *(decisión del autor, 2026-11-19)*: derivar, integrar, componer o sumar curvas, por ejemplo `r(θ, t) = v·t + A·sin(kθ)`, un anillo que ondula. La idea es diferenciarse de los survivors donde dos armas al máximo se fusionan. El mecanismo exacto sigue abierto.
   - **Rosa** (`r = cos(kθ)`): pétalos que orbitan alrededor del jugador.
 - **Al subir de nivel aparecen tres tarjetas.** Cada una muestra la fórmula del arma y el parámetro que cambia, por ejemplo "`y = A·sin(ωx)`: ω sube a 3". Una tarjeta puede dar un arma nueva o mejorar una que ya tienes. No hace falta entender la fórmula para elegir, porque la diferencia se ve en el ataque.
 - **Los enemigos son polígonos, y el número de lados es su vida.** Cada golpe le quita un lado: un hexágono pasa a pentágono, después a cuadrado, a triángulo, a línea y a punto, y desaparece. Los polígonos con más lados llegan más tarde en la partida.
@@ -106,3 +107,4 @@ Sobre el color: el blanco y negro estricto es lo más fiel a la idea, pero cuest
 - El fondo negro o blanco, y el color de acento: se deciden con un prototipo desechable.
 - Los números de equilibrio: los lados de cada polígono y del jefe, la velocidad, la frecuencia de las oleadas y de las protecciones, y la curva de experiencia.
 - Qué parámetro mejora cada tarjeta de cada arma.
+- Cómo se mejoran y se combinan las armas con ideas matemáticas (derivar, integrar, componer), y si las combinaciones entran al MVP o quedan para después.
