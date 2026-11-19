@@ -2,9 +2,11 @@
 
 Uso: `uv run python tools/diagnostico_control.py [segundos] [salida.csv]`
 
-En cada frame (60 por segundo) guarda los ejes crudos y la intención que calcula el
-juego. Al final resume dónde los valores se congelaron, dónde el largo cayó en la
-zona muerta y dónde la dirección de la intención se alejó de la del stick.
+Por defecto graba 15 s en `.capturas/diagnostico_control.csv`, una carpeta que git
+ignora. En cada frame (60 por segundo) guarda los ejes crudos y la intención que
+calcula el juego. Al final resume dónde los valores se congelaron con el stick
+inclinado, dónde el stick inclinado no dio intención y dónde el largo cayó en la zona
+muerta.
 """
 
 import csv
@@ -22,15 +24,16 @@ from circlebh.controls import axis_to_unit, stick_intent
 from circlebh.settings import load_settings
 
 FPS = 60
+DEFAULT_OUT = Path(".capturas/diagnostico_control.csv")
 
 
 def main() -> None:
     seconds = float(sys.argv[1]) if len(sys.argv) > 1 else 15.0
-    out = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("diagnostico_control.csv")
+    out = Path(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_OUT
     deadzone = load_settings().controls.stick_deadzone
 
-    # Sin ventana: el driver `dummy` de SDL, fijado antes de pygame.init(). Los eventos
-    # del control llegan igual, y no se abre pantalla (ADR 0016).
+    # Sin ventana: el driver `dummy` de SDL, fijado antes de pygame.init(), como en el
+    # modo captura (ADR 0013). Los eventos del control llegan igual.
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     pygame.init()
     sdl_controller.init()
@@ -69,6 +72,7 @@ def main() -> None:
     if not rows:
         print("no llegó ningún control")
         return
+    out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0]))
         writer.writeheader()

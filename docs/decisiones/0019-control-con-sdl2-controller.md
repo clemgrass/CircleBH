@@ -1,5 +1,5 @@
 ---
-estado: propuesto
+estado: aceptado
 fecha: 2026-11-19
 ---
 
@@ -34,14 +34,14 @@ Elegimos **`pygame._sdl2.controller`**:
 - El stick izquierdo se lee con `CONTROLLER_AXIS_LEFTX` y `CONTROLLER_AXIS_LEFTY`, y la cruceta con `CONTROLLER_BUTTON_DPAD_*`.
 - Los ejes llegan como enteros de −32768 a 32767. Una función pura de `controls.py` los pasa a −1..1, y ahí se aplica la zona muerta.
 - La reconexión en caliente usa `CONTROLLERDEVICEADDED` (que trae `device_index`) y `CONTROLLERDEVICEREMOVED`.
-- `pygame._sdl2.controller` se usa en un solo módulo de `scenes/`. Si su API cambia, se cambia solo ahí.
+- En el juego, `pygame._sdl2.controller` se usa en un solo módulo de `scenes/`. Fuera del juego, también lo usa `tools/diagnostico_control.py`. Si su API cambia, se cambian esos dos archivos.
 - Un control que SDL no reconoce no mueve al jugador. El teclado sigue funcionando.
 
 ### Consecuencias
 
 - Bueno: el layout con nombre viene de la base de datos de controles de SDL. No escribimos tablas de índices por plataforma ni por driver.
 - Bueno: la cruceta llega como cuatro botones, sea hat o botones en el driver.
-- Malo: el índice de la documentación de pygame-ce pone el módulo en "Experimental modules" y pide no depender de él. Su API podría cambiar en otra versión. Lo acota que `uv.lock` fija la versión, que las dependencias se actualizan a mano al empezar cada milestone (ADR 0002) y que se usa en un solo módulo.
+- Malo: el índice de la documentación de pygame-ce pone el módulo en "Experimental modules" y pide no depender de él. Su API podría cambiar en otra versión. Lo acota que `uv.lock` fija la versión, que las dependencias se actualizan a mano al empezar cada milestone (ADR 0002) y que el juego lo usa en un solo módulo.
 - Malo: un control que SDL no conoce no funciona, aunque `pygame.joystick` sí lo vería.
 
 ### Confirmación

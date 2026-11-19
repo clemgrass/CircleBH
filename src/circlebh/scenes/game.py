@@ -16,8 +16,9 @@ from circlebh.world.game import World
 class Gamepads:
     """Los controles conectados. Se pueden conectar y desconectar con el juego abierto.
 
-    Usa la API de controles de SDL, con el layout con nombre (ADR 0019). Este es el
-    único módulo que la toca. Cada control se guarda con el `instance_id` de su
+    Usa la API de controles de SDL, con el layout con nombre (ADR 0019). Es el único
+    módulo del juego que la toca; fuera del juego, solo `tools/diagnostico_control.py`.
+    Cada control se guarda con el `instance_id` de su
     joystick: el alta trae `device_index` y la baja trae `instance_id`.
     """
 
