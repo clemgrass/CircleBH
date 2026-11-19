@@ -5,6 +5,7 @@ import random
 from pygame.math import Vector2
 
 from circlebh.balance import Balance
+from circlebh.world.enemy import Enemy, spawn_position
 from circlebh.world.player import Player
 
 
@@ -13,10 +14,18 @@ class World:
 
     def __init__(self, balance: Balance, rng: random.Random) -> None:
         self.balance = balance
-        # El único azar de la partida (ADR 0005). Todavía nada lo usa.
+        # El único azar de la partida (ADR 0005).
         self.rng = rng
         self.player = Player(balance.player)
+        # Por ahora, un solo hexágono al empezar, fuera de la vista.
+        position = spawn_position(self.player.position, balance.spawning.distance, rng)
+        self.enemies = [Enemy(balance.enemies["hexagon"], position)]
 
     def update(self, intent: Vector2) -> None:
-        """Avanza un paso, con la intención de movimiento del jugador (largo 0 a 1)."""
+        """Avanza un paso, con la intención de movimiento del jugador (largo 0 a 1).
+
+        El jugador se mueve primero, y los enemigos van hacia donde quedó.
+        """
         self.player.step(intent)
+        for enemy in self.enemies:
+            enemy.step(self.player.position)

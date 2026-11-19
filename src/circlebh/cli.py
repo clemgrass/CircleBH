@@ -89,7 +89,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--scenario",
         choices=sorted(SCENARIOS),
-        default="plano-vacio",
+        default="enemigo-persigue",
         help="estado inicial de la demo (por defecto: %(default)s)",
     )
     parser.add_argument(

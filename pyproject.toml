@@ -66,8 +66,12 @@ sequence = [
 ]
 
 [tool.poe.tasks.capturas]
-help = "Evidencia en la sesión (ADR 0013): tres PNG sin ventana en .capturas/."
-cmd = "circlebh --demo --scenario plano-vacio --seed 1 --capture 0,1,2"
+help = "Evidencia en la sesión (ADR 0013): PNG sin ventana en .capturas/, con la semilla 1."
+cmd = "circlebh --demo --scenario ${escenario} --seed 1 --capture ${tiempos}"
+args = [
+    { name = "escenario", options = ["--escenario"], default = "enemigo-persigue", help = "escenario de la demo" },
+    { name = "tiempos", options = ["--tiempos"], default = "0,4,6", help = "segundos de cada captura, separados por coma" },
+]
 
 [tool.poe.tasks.balance-chequear]
 help = "Compara balance.py y balance.json, y nombra cada campo que difiere (ADR 0004)."

@@ -115,5 +115,5 @@ class GameScene:
         # dibuja sobre las franjas.
         screen.set_clip(viewport.rect)
         draw_axes(screen, viewport)
-        draw_world(screen, self.world, viewport)
+        draw_world(screen, self.world, viewport, self.settings.debug.show_hitboxes)
         screen.set_clip(None)

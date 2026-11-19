@@ -26,13 +26,47 @@ class PlayerSpec:
 
 
 @dataclass(frozen=True)
+class EnemySpec:
+    """Un tipo de enemigo: un polígono regular que persigue al jugador."""
+
+    sides: int
+    """Lados al aparecer. Pierde uno por golpe y, sin lados, muere."""
+
+    radius: float
+    """Radio del círculo de choque con todos sus lados, en unidades del plano. Se achica
+    en proporción a los lados que le quedan."""
+
+    speed: float
+    """Velocidad, en unidades del plano por segundo."""
+
+
+@dataclass(frozen=True)
+class SpawningSpec:
+    """Cómo aparecen los enemigos."""
+
+    distance: float
+    """Distancia al jugador a la que aparecen, en unidades del plano. Tiene que quedar
+    fuera de la vista: más que la esquina de la pantalla, más el radio del enemigo."""
+
+
+@dataclass(frozen=True)
 class Balance:
     """Todas las entidades del juego."""
 
     player: PlayerSpec
     """El jugador."""
 
+    enemies: dict[str, EnemySpec]
+    """Los tipos de enemigo, por nombre."""
+
+    spawning: SpawningSpec
+    """Cómo aparecen los enemigos."""
+
 
 # >>> datos (lo genera poe balance-importar)
-BALANCE = Balance(player=PlayerSpec(speed=240.0, radius=12.0))
+BALANCE = Balance(
+    player=PlayerSpec(speed=240.0, radius=12.0),
+    enemies={"hexagon": EnemySpec(sides=6, radius=24.0, speed=120.0)},
+    spawning=SpawningSpec(distance=800.0),
+)
 # <<< datos
