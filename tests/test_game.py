@@ -37,7 +37,10 @@ def test_el_enemigo_persigue_la_posicion_nueva_del_jugador() -> None:
     world.update(Vector2(0, 1))
     hacia_el_jugador = world.player.position - Vector2(100, 0)
     avance = enemy.position - Vector2(100, 0)
-    assert avance.normalize() == hacia_el_jugador.normalize()
+    # La misma dirección, no los mismos bits.
+    assert tuple(avance.normalize()) == pytest.approx(
+        tuple(hacia_el_jugador.normalize())
+    )
 
 
 def test_world_sin_intencion_deja_al_jugador_quieto() -> None:

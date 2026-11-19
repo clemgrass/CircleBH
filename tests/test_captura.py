@@ -22,15 +22,18 @@ def capturas() -> list[str]:
 
 
 def test_capture_path() -> None:
-    assert capture_path("plano-vacio", 1, 1.0) == Path(
-        ".capturas/plano-vacio-seed1-t1.00.png"
+    assert capture_path("enemigo-persigue", 1, 1.0) == Path(
+        ".capturas/enemigo-persigue-seed1-t1.00.png"
     )
 
 
 def test_captura_de_punta_a_punta() -> None:
     main(["--demo", "--seed", "1", "--capture", "0,1"])
 
-    assert capturas() == ["plano-vacio-seed1-t0.00.png", "plano-vacio-seed1-t1.00.png"]
+    assert capturas() == [
+        "enemigo-persigue-seed1-t0.00.png",
+        "enemigo-persigue-seed1-t1.00.png",
+    ]
     for name in capturas():
         assert pygame.image.load(Path(".capturas") / name).get_size() == (1280, 720)
 
@@ -38,7 +41,7 @@ def test_captura_de_punta_a_punta() -> None:
 def test_captura_con_ventana_ancha() -> None:
     main(["--demo", "--seed", "1", "--capture", "0", "--window", "1600x720"])
 
-    imagen = pygame.image.load(Path(".capturas") / "plano-vacio-seed1-t0.00.png")
+    imagen = pygame.image.load(Path(".capturas") / "enemigo-persigue-seed1-t0.00.png")
     assert imagen.get_size() == (1600, 720)
 
 
@@ -48,8 +51,8 @@ def test_captura_dos_tiempos_en_el_mismo_paso(
     # 0 y 0.001 caen en el paso 0: se captura ese paso una sola vez.
     main(["--demo", "--seed", "1", "--capture", "0,0.001"])
 
-    assert capturas() == ["plano-vacio-seed1-t0.00.png"]
-    assert capsys.readouterr().out.count("plano-vacio-seed1-t0.00.png") == 1
+    assert capturas() == ["enemigo-persigue-seed1-t0.00.png"]
+    assert capsys.readouterr().out.count("enemigo-persigue-seed1-t0.00.png") == 1
 
 
 def test_tiempos_en_pasos_distintos_no_se_pisan() -> None:
@@ -57,7 +60,10 @@ def test_tiempos_en_pasos_distintos_no_se_pisan() -> None:
     # El nombre lleva el tiempo del paso capturado, así que no se pisan.
     main(["--demo", "--seed", "1", "--capture", "0.005,0.009"])
 
-    assert capturas() == ["plano-vacio-seed1-t0.00.png", "plano-vacio-seed1-t0.02.png"]
+    assert capturas() == [
+        "enemigo-persigue-seed1-t0.00.png",
+        "enemigo-persigue-seed1-t0.02.png",
+    ]
 
 
 def test_captura_deja_pygame_cerrado() -> None:

@@ -12,11 +12,11 @@ def falla_con_codigo_2(argv: list[str]) -> None:
 
 
 def test_opciones_completas() -> None:
-    argv = ["--demo", "--scenario", "plano-vacio", "--seed", "7", "--speed", "2"]
+    argv = ["--demo", "--scenario", "enemigo-persigue", "--seed", "7", "--speed", "2"]
     extra = ["--capture", "0,1,2", "--window", "1600x900"]
     assert parse_args([*argv, *extra]) == RunOptions(
         demo=True,
-        scenario="plano-vacio",
+        scenario="enemigo-persigue",
         seed=7,
         speed=2.0,
         capture=(0.0, 1.0, 2.0),
@@ -27,7 +27,7 @@ def test_opciones_completas() -> None:
 def test_valores_por_defecto() -> None:
     options = parse_args([])
     assert options.demo is False
-    assert options.scenario == "plano-vacio"
+    assert options.scenario == "enemigo-persigue"
     assert options.speed == 1.0
     assert options.capture == ()
     assert options.window == (1280, 720)
