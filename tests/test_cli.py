@@ -18,6 +18,7 @@ def test_opciones_completas() -> None:
         demo=True,
         scenario="enemigo-persigue",
         seed=7,
+        seed_fixed=True,
         speed=2.0,
         capture=(0.0, 1.0, 2.0),
         window=(1600, 900),
@@ -72,6 +73,21 @@ def test_capture_rechaza_tiempos_no_finitos(tiempo: str) -> None:
 
 def test_seed_negativa() -> None:
     falla_con_codigo_2(["--seed", "-1"])
+
+
+def test_seed_fijada() -> None:
+    options = parse_args(["--seed", "7"])
+    assert options.seed == 7
+    assert options.seed_fixed is True
+
+
+def test_seed_cero_tambien_esta_fijada() -> None:
+    # Borde: 0 es una semilla válida, no "sin semilla".
+    assert parse_args(["--seed", "0"]).seed_fixed is True
+
+
+def test_sin_seed_no_esta_fijada() -> None:
+    assert parse_args([]).seed_fixed is False
 
 
 def test_window_lee_ancho_por_alto() -> None:

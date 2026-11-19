@@ -5,11 +5,11 @@ Los errores salen por `argparse`, con código 2 y un mensaje que dice qué valor
 
 import argparse
 import math
-import secrets
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from circlebh.scenes.scenarios import SCENARIOS
+from circlebh.seeds import random_seed
 
 
 @dataclass(frozen=True)
@@ -19,6 +19,8 @@ class RunOptions:
     demo: bool
     scenario: str
     seed: int
+    seed_fixed: bool
+    """Si la semilla se fijó con `--seed`. Si no, cada partida nueva sortea otra."""
     speed: float
     capture: tuple[float, ...]
     window: tuple[int, int]
@@ -128,11 +130,12 @@ def parse_args(argv: Sequence[str] | None = None) -> RunOptions:
     if args.capture and not args.demo:
         parser.error("--capture exige --demo")
     # La semilla se elige fuera del juego; dentro, el azar sale solo de Random(seed) (ADR 0005).
-    seed = args.seed if args.seed is not None else secrets.randbelow(2**32)
+    seed = args.seed if args.seed is not None else random_seed()
     return RunOptions(
         demo=args.demo,
         scenario=args.scenario,
         seed=seed,
+        seed_fixed=args.seed is not None,
         speed=args.speed,
         capture=args.capture,
         window=args.window,
