@@ -7,7 +7,7 @@ import pygame._sdl2.controller as sdl_controller
 from pygame.math import Vector2
 
 from circlebh.balance import BALANCE
-from circlebh.cli import RunOptions, next_seed
+from circlebh.cli import RunOptions
 from circlebh.controls import (
     axis_to_unit,
     combine,
@@ -18,8 +18,9 @@ from circlebh.controls import (
 from circlebh.pilot import pilot_intent
 from circlebh.render.plane import draw_axes, draw_letterbox
 from circlebh.render.world_view import draw_world
-from circlebh.scenes.death import DeathScreen
+from circlebh.scenes.death import EFFECT_STEPS, DeathScreen
 from circlebh.scenes.scenarios import SCENARIOS, Scenario
+from circlebh.seeds import next_seed
 from circlebh.settings import Settings
 from circlebh.viewport import Viewport, camera_center
 from circlebh.world.clock import STEP
@@ -93,8 +94,8 @@ class GameScene:
     """La partida en pantalla, y sus reinicios. En la demo, el escenario manda.
 
     Al morir, `world` se detiene y la escena sigue contando pasos para el efecto de
-    muerte. Con R o con X empieza otra partida. En la demo, empieza sola tras
-    `DEMO_RESTART_STEPS`.
+    muerte. Cuando termina el efecto, R o X empiezan otra partida. En la demo, empieza
+    sola tras `DEMO_RESTART_STEPS`.
     """
 
     def __init__(self, options: RunOptions, settings: Settings) -> None:
@@ -114,28 +115,32 @@ class GameScene:
         print(f"semilla: {seed}")
         self.seed = seed
         self.world = World(BALANCE, random.Random(seed))
-        self.steps = 0
         self.dead_steps = 0
 
     def restart(self) -> None:
         """Empieza la partida siguiente, con la semilla que le toca (`next_seed`)."""
         self.game += 1
-        self.start(next_seed(self.options, self.game))
+        options = self.options
+        self.start(
+            next_seed(
+                options.seed, self.game, demo=options.demo, fixed=options.seed_fixed
+            )
+        )
 
     def handle_event(self, event: pygame.event.Event) -> None:
         # En la demo no se lee la entrada: ni controles ni reinicio.
         if self.gamepads is None:
             return
         self.gamepads.handle_event(event)
-        # Solo tras morir: R o X a mitad de partida no hacen nada.
-        if self.world.game_over and is_restart(event):
+        # Solo con el texto ya a la vista: R o X a mitad de partida, o justo al morir,
+        # no hacen nada. Así nadie se salta el tiempo que duró sin verlo.
+        if self.dead_steps >= EFFECT_STEPS and is_restart(event):
             self.restart()
 
     def step(self) -> None:
         """Avanza `world` un paso con la intención de este momento, o cuenta la muerte."""
         if not self.world.game_over:
             self.world.update(self.intent())
-            self.steps += 1
             return
         self.dead_steps += 1
         if self.demo is not None and self.dead_steps >= DEMO_RESTART_STEPS:
@@ -143,7 +148,7 @@ class GameScene:
 
     def intent(self) -> Vector2:
         if self.demo is not None:
-            return pilot_intent(self.steps) if self.demo.pilot else Vector2()
+            return pilot_intent(self.world.steps) if self.demo.pilot else Vector2()
         assert self.gamepads is not None
         deadzone = self.settings.controls.stick_deadzone
         return combine(keys_intent(), *self.gamepads.intents(deadzone))
@@ -171,5 +176,7 @@ class GameScene:
                 self.dead_steps,
                 self.seed,
                 self.world.elapsed,
+                # En la demo la entrada no se lee: la ayuda para reiniciar mentiría.
+                show_hint=self.demo is None,
             )
         screen.set_clip(None)

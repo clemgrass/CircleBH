@@ -2,7 +2,7 @@
 
 import pytest
 
-from circlebh.cli import RunOptions, next_seed, parse_args
+from circlebh.cli import RunOptions, parse_args
 
 
 def falla_con_codigo_2(argv: list[str]) -> None:
@@ -75,42 +75,19 @@ def test_seed_negativa() -> None:
     falla_con_codigo_2(["--seed", "-1"])
 
 
-# --- La semilla al reiniciar ---
-
-
-def test_seed_fijada_se_repite_al_reiniciar() -> None:
+def test_seed_fijada() -> None:
     options = parse_args(["--seed", "7"])
+    assert options.seed == 7
     assert options.seed_fixed is True
-    assert next_seed(options, game=3) == 7
 
 
 def test_seed_cero_tambien_esta_fijada() -> None:
     # Borde: 0 es una semilla válida, no "sin semilla".
-    options = parse_args(["--seed", "0"])
-    assert options.seed_fixed is True
-    assert next_seed(options, game=1) == 0
+    assert parse_args(["--seed", "0"]).seed_fixed is True
 
 
-@pytest.mark.parametrize("argv", [["--demo"], ["--demo", "--seed", "7"]])
-def test_demo_usa_la_semilla_inicial_mas_n(argv: list[str]) -> None:
-    # En la demo y las capturas, la partida n sale solo de la semilla inicial: así
-    # repetir con la semilla impresa da los mismos PNG, también tras morir.
-    options = parse_args(argv)
-    assert [next_seed(options, game=n) for n in (1, 2, 3)] == [
-        options.seed + 1,
-        options.seed + 2,
-        options.seed + 3,
-    ]
-
-
-def test_sin_seed_cada_reinicio_trae_una_nueva() -> None:
-    options = parse_args([])
-    assert options.seed_fixed is False
-    semillas = {next_seed(options, game=1) for _ in range(20)}
-    # Propiedad, no valor: todas en rango, y no todas iguales. Que 20 sorteos en 2³²
-    # salgan iguales tiene una probabilidad despreciable.
-    assert all(0 <= semilla < 2**32 for semilla in semillas)
-    assert len(semillas) > 1
+def test_sin_seed_no_esta_fijada() -> None:
+    assert parse_args([]).seed_fixed is False
 
 
 def test_window_lee_ancho_por_alto() -> None:

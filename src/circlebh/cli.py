@@ -5,11 +5,11 @@ Los errores salen por `argparse`, con código 2 y un mensaje que dice qué valor
 
 import argparse
 import math
-import secrets
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from circlebh.scenes.scenarios import SCENARIOS
+from circlebh.seeds import random_seed
 
 
 @dataclass(frozen=True)
@@ -140,20 +140,3 @@ def parse_args(argv: Sequence[str] | None = None) -> RunOptions:
         capture=args.capture,
         window=args.window,
     )
-
-
-def random_seed() -> int:
-    """Una semilla al azar, fuera del juego (ADR 0005)."""
-    return secrets.randbelow(2**32)
-
-
-def next_seed(options: RunOptions, game: int) -> int:
-    """La semilla de la partida número `game` (la primera es la 0, con `options.seed`).
-
-    - En la demo y las capturas, `seed + game`: solo depende de la semilla inicial, así
-      que repetir con la semilla impresa da lo mismo, también después de morir.
-    - Jugando, la misma si se fijó con `--seed`, o una nueva al azar.
-    """
-    if options.demo:
-        return options.seed + game
-    return options.seed if options.seed_fixed else random_seed()

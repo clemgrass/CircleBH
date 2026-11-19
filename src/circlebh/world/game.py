@@ -27,6 +27,11 @@ class World:
         self._steps = 0
 
     @property
+    def steps(self) -> int:
+        """Pasos dados en esta partida. Se detiene al morir."""
+        return self._steps
+
+    @property
     def elapsed(self) -> float:
         """Segundos de partida: los pasos dados por `STEP`, sin sumar error en cada paso."""
         return self._steps * STEP

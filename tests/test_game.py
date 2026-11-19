@@ -53,6 +53,7 @@ def test_elapsed_cuenta_un_step_por_update() -> None:
     world = World(BALANCE, random.Random(1))
     for _ in range(90):
         world.update(Vector2())
+    assert world.steps == 90
     assert world.elapsed == pytest.approx(1.5)
 
 

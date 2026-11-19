@@ -29,11 +29,14 @@ TEXT_CENTER = 0.7
 class DeathScreen:
     """Dibuja la muerte encima de la partida congelada.
 
-    Guarda una fuente por tamaño: cargarla en cada frame sería leer el archivo cada vez.
-    Vive con la escena, que se crea después de `pygame.init()`.
+    Reusa lo que es caro de crear en cada frame: la capa con transparencia y las
+    fuentes. Las dos dependen del tamaño del área útil, así que se rehacen solo cuando
+    cambia. Vive con la escena, que se crea después de `pygame.init()`.
     """
 
     def __init__(self) -> None:
+        self._size = (0, 0)
+        self._layer = pygame.Surface(self._size, pygame.SRCALPHA)
         self._fonts: dict[int, pygame.font.Font] = {}
 
     def draw(
@@ -44,15 +47,19 @@ class DeathScreen:
         dead_steps: int,
         seed: int,
         elapsed: float,
+        *,
+        show_hint: bool,
     ) -> None:
         """El efecto según los pasos desde la muerte, y el texto cuando termina.
 
-        `player` es la posición y el radio del jugador al morir.
+        `player` es la posición y el radio del jugador al morir. Con `show_hint`, el
+        texto dice cómo reiniciar.
         """
         progress = min(dead_steps / EFFECT_STEPS, 1.0)
         left, top, width, height = viewport.rect
-        # Una capa con transparencia, del tamaño del área útil: la sombra y el anillo.
-        layer = pygame.Surface((width, height), pygame.SRCALPHA)
+        self._resize((width, height))
+        # La capa del tamaño del área útil lleva la sombra y el anillo.
+        layer = self._layer
         layer.fill((0, 0, 0, round(SHADE_ALPHA * progress)))
 
         if progress < 1:
@@ -73,9 +80,21 @@ class DeathScreen:
             lines = [
                 (f"duraste {elapsed:.1f} s".replace(".", ","), TITLE_SIZE),
                 (f"semilla: {seed}", TEXT_SIZE),
-                ("R o X para reiniciar", TEXT_SIZE),
             ]
+            if show_hint:
+                lines.append(("R o X para reiniciar", TEXT_SIZE))
             self._draw_lines(screen, viewport, lines)
+
+    def _resize(self, size: tuple[int, int]) -> None:
+        """Si cambió el tamaño del área útil, una capa nueva y fuentes nuevas.
+
+        Las fuentes viejas se sueltan: con la ventana arrastrada de a poco, guardarlas
+        todas sumaría una por cada alto que pasó.
+        """
+        if size != self._size:
+            self._size = size
+            self._layer = pygame.Surface(size, pygame.SRCALPHA)
+            self._fonts.clear()
 
     def _draw_lines(
         self, screen: pygame.Surface, viewport: Viewport, lines: list[tuple[str, float]]
