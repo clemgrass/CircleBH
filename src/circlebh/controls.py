@@ -5,6 +5,7 @@ La intención mide de 0 a 1 y usa las coordenadas de `world`, con Y hacia arriba
 Leer los dispositivos es trabajo de `scenes/`; este módulo solo hace las cuentas.
 """
 
+import pygame
 from pygame.math import Vector2
 
 AXIS_MAX = 32767
@@ -42,6 +43,21 @@ def stick_intent(x: float, y: float, deadzone: float) -> Vector2:
         return Vector2()
     scaled = min((length - deadzone) / (1 - deadzone), 1.0)
     return intent * (scaled / length)
+
+
+RESTART_BUTTONS = (pygame.CONTROLLER_BUTTON_A, pygame.CONTROLLER_BUTTON_X)
+"""Los botones que reinician, con el layout con nombre de SDL (ADR 0019).
+
+A es el de abajo y X, el de la izquierda. Así "X" sirve en los dos controles comunes:
+en PlayStation es la ✕ (A en SDL), y en Xbox, la X. De paso, el □ y la A también.
+"""
+
+
+def is_restart(event: pygame.event.Event) -> bool:
+    """Si el evento pide reiniciar: apretar R, o un botón de `RESTART_BUTTONS`."""
+    return (event.type == pygame.KEYDOWN and event.key == pygame.K_r) or (
+        event.type == pygame.CONTROLLERBUTTONDOWN and event.button in RESTART_BUTTONS
+    )
 
 
 def combine(*intents: Vector2) -> Vector2:

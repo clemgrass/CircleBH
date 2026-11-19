@@ -2,12 +2,19 @@
 
 import math
 
+import pygame
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.controls import axis_to_unit, combine, keyboard_intent, stick_intent
+from circlebh.controls import (
+    axis_to_unit,
+    combine,
+    is_restart,
+    keyboard_intent,
+    stick_intent,
+)
 
 DEADZONE = 0.2
 
@@ -112,3 +119,46 @@ def test_teclado_y_stick_juntos_no_pasan_de_uno() -> None:
 
 def test_combinar_nada_es_cero() -> None:
     assert combine() == Vector2(0, 0)
+
+
+# --- Reiniciar ---
+
+
+def tecla(tipo: int, key: int) -> pygame.event.Event:
+    return pygame.event.Event(tipo, key=key)
+
+
+def boton(button: int) -> pygame.event.Event:
+    return pygame.event.Event(pygame.CONTROLLERBUTTONDOWN, instance_id=0, button=button)
+
+
+def test_r_reinicia() -> None:
+    assert is_restart(tecla(pygame.KEYDOWN, pygame.K_r))
+
+
+@pytest.mark.parametrize(
+    "button",
+    # A es el de abajo (✕ en PlayStation) y X, el de la izquierda (X en Xbox).
+    [pygame.CONTROLLER_BUTTON_A, pygame.CONTROLLER_BUTTON_X],
+)
+def test_a_y_x_del_control_reinician(button: int) -> None:
+    assert is_restart(boton(button))
+
+
+def test_soltar_r_no_reinicia() -> None:
+    # Borde: cuenta el apretar, no el soltar; si no, reiniciaría dos veces.
+    assert not is_restart(tecla(pygame.KEYUP, pygame.K_r))
+
+
+@pytest.mark.parametrize(
+    "evento",
+    [
+        tecla(pygame.KEYDOWN, pygame.K_w),
+        boton(pygame.CONTROLLER_BUTTON_B),
+        pygame.event.Event(
+            pygame.CONTROLLERBUTTONUP, instance_id=0, button=pygame.CONTROLLER_BUTTON_A
+        ),
+    ],
+)
+def test_otras_entradas_no_reinician(evento: pygame.event.Event) -> None:
+    assert not is_restart(evento)

@@ -8,7 +8,13 @@ from pygame.math import Vector2
 
 from circlebh.balance import BALANCE
 from circlebh.cli import RunOptions, next_seed
-from circlebh.controls import axis_to_unit, combine, keyboard_intent, stick_intent
+from circlebh.controls import (
+    axis_to_unit,
+    combine,
+    is_restart,
+    keyboard_intent,
+    stick_intent,
+)
 from circlebh.pilot import pilot_intent
 from circlebh.render.plane import draw_axes, draw_letterbox
 from circlebh.render.world_view import draw_world
@@ -83,14 +89,6 @@ def keys_intent() -> Vector2:
     )
 
 
-def is_restart(event: pygame.event.Event) -> bool:
-    """R en el teclado, o el botón de abajo del control: la ✕ en PlayStation (ADR 0019)."""
-    return (event.type == pygame.KEYDOWN and event.key == pygame.K_r) or (
-        event.type == pygame.CONTROLLERBUTTONDOWN
-        and event.button == pygame.CONTROLLER_BUTTON_A
-    )
-
-
 class GameScene:
     """La partida en pantalla, y sus reinicios. En la demo, el escenario manda.
 
@@ -107,6 +105,8 @@ class GameScene:
         )
         self.gamepads = Gamepads() if self.demo is None else None
         self.death_screen = DeathScreen()
+        self.game = 0
+        """Cuántas veces se reinició: la primera partida es la 0."""
         self.start(options.seed)
 
     def start(self, seed: int) -> None:
@@ -117,6 +117,11 @@ class GameScene:
         self.steps = 0
         self.dead_steps = 0
 
+    def restart(self) -> None:
+        """Empieza la partida siguiente, con la semilla que le toca (`next_seed`)."""
+        self.game += 1
+        self.start(next_seed(self.options, self.game))
+
     def handle_event(self, event: pygame.event.Event) -> None:
         # En la demo no se lee la entrada: ni controles ni reinicio.
         if self.gamepads is None:
@@ -124,7 +129,7 @@ class GameScene:
         self.gamepads.handle_event(event)
         # Solo tras morir: R o X a mitad de partida no hacen nada.
         if self.world.game_over and is_restart(event):
-            self.start(next_seed(self.options))
+            self.restart()
 
     def step(self) -> None:
         """Avanza `world` un paso con la intención de este momento, o cuenta la muerte."""
@@ -134,7 +139,7 @@ class GameScene:
             return
         self.dead_steps += 1
         if self.demo is not None and self.dead_steps >= DEMO_RESTART_STEPS:
-            self.start(next_seed(self.options))
+            self.restart()
 
     def intent(self) -> Vector2:
         if self.demo is not None:

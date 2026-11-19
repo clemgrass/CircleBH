@@ -81,20 +81,32 @@ def test_seed_negativa() -> None:
 def test_seed_fijada_se_repite_al_reiniciar() -> None:
     options = parse_args(["--seed", "7"])
     assert options.seed_fixed is True
-    assert next_seed(options) == 7
+    assert next_seed(options, game=3) == 7
 
 
 def test_seed_cero_tambien_esta_fijada() -> None:
     # Borde: 0 es una semilla válida, no "sin semilla".
     options = parse_args(["--seed", "0"])
     assert options.seed_fixed is True
-    assert next_seed(options) == 0
+    assert next_seed(options, game=1) == 0
+
+
+@pytest.mark.parametrize("argv", [["--demo"], ["--demo", "--seed", "7"]])
+def test_demo_usa_la_semilla_inicial_mas_n(argv: list[str]) -> None:
+    # En la demo y las capturas, la partida n sale solo de la semilla inicial: así
+    # repetir con la semilla impresa da los mismos PNG, también tras morir.
+    options = parse_args(argv)
+    assert [next_seed(options, game=n) for n in (1, 2, 3)] == [
+        options.seed + 1,
+        options.seed + 2,
+        options.seed + 3,
+    ]
 
 
 def test_sin_seed_cada_reinicio_trae_una_nueva() -> None:
     options = parse_args([])
     assert options.seed_fixed is False
-    semillas = {next_seed(options) for _ in range(20)}
+    semillas = {next_seed(options, game=1) for _ in range(20)}
     # Propiedad, no valor: todas en rango, y no todas iguales. Que 20 sorteos en 2³²
     # salgan iguales tiene una probabilidad despreciable.
     assert all(0 <= semilla < 2**32 for semilla in semillas)

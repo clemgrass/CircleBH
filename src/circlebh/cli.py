@@ -147,6 +147,13 @@ def random_seed() -> int:
     return secrets.randbelow(2**32)
 
 
-def next_seed(options: RunOptions) -> int:
-    """La semilla de la partida siguiente: la misma si se fijó con `--seed`, o una nueva."""
+def next_seed(options: RunOptions, game: int) -> int:
+    """La semilla de la partida número `game` (la primera es la 0, con `options.seed`).
+
+    - En la demo y las capturas, `seed + game`: solo depende de la semilla inicial, así
+      que repetir con la semilla impresa da lo mismo, también después de morir.
+    - Jugando, la misma si se fijó con `--seed`, o una nueva al azar.
+    """
+    if options.demo:
+        return options.seed + game
     return options.seed if options.seed_fixed else random_seed()
