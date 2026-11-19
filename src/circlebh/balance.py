@@ -50,6 +50,24 @@ class SpawningSpec:
 
 
 @dataclass(frozen=True)
+class CircleWeaponSpec:
+    """El arma círculo: anillos que nacen en el jugador, crecen con `r(t) = growth_speed · t`
+    y revientan al llegar a `max_radius`."""
+
+    cooldown: float
+    """Segundos entre un anillo y el siguiente."""
+
+    growth_speed: float
+    """Cuánto crece el radio, en unidades del plano por segundo."""
+
+    max_radius: float
+    """Radio al que el anillo revienta, en unidades del plano."""
+
+    thickness: float
+    """Grosor del trazo, en unidades del plano."""
+
+
+@dataclass(frozen=True)
 class Balance:
     """Todas las entidades del juego."""
 
@@ -62,11 +80,17 @@ class Balance:
     spawning: SpawningSpec
     """Cómo aparecen los enemigos."""
 
+    circle_weapon: CircleWeaponSpec
+    """El arma círculo."""
+
 
 # >>> datos (lo genera poe balance-importar)
 BALANCE = Balance(
     player=PlayerSpec(speed=240.0, radius=12.0),
     enemies={"hexagon": EnemySpec(sides=6, radius=24.0, speed=120.0)},
     spawning=SpawningSpec(distance=800.0),
+    circle_weapon=CircleWeaponSpec(
+        cooldown=1.5, growth_speed=300.0, max_radius=260.0, thickness=6.0
+    ),
 )
 # <<< datos

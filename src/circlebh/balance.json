@@ -12,5 +12,11 @@
   },
   "spawning": {
     "distance": 800.0
+  },
+  "circle_weapon": {
+    "cooldown": 1.5,
+    "growth_speed": 300.0,
+    "max_radius": 260.0,
+    "thickness": 6.0
   }
 }

@@ -118,6 +118,12 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
         "player": {"speed": 240.0, "radius": 12.0},
         "enemies": {"hexagon": {"sides": 6, "radius": 24.0, "speed": 120.0}},
         "spawning": {"distance": 800.0},
+        "circle_weapon": {
+            "cooldown": 1.5,
+            "growth_speed": 300.0,
+            "max_radius": 260.0,
+            "thickness": 6.0,
+        },
     }
 
 
