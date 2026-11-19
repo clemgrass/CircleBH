@@ -83,6 +83,7 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 - Enemigos y armas se definen por parámetros en `balance.py`, con dataclasses, y se reflejan en `balance.json`, dentro del paquete y leído con `importlib.resources`.
   - Ninguno de los dos manda: deben calzar siempre.
   - Si difieren, el chequeo nombra el campo y se corrige a mano, exportando o importando, antes de jugar.
+- La configuración del juego (cámara, controles, accesibilidad y depuración) vive solo en `settings.json`, dentro del paquete, y se valida al arrancar contra una dataclass (ADR 0018). Si describe a una entidad, va al balance; si describe cómo se juega o se ve, a la configuración.
 - La lógica avanza en pasos fijos de 1/60 s con acumulador. El azar sale solo de la `random.Random(seed)` inyectada.
 - En las colisiones, cada cuerpo es un círculo. Se usa una grilla espacial y funciones propias en `world/`.
 - No hay archivos de imagen. La única excepción es `docs/media/`, que genera `poe medios`, y `poe check` lo verifica.
@@ -115,6 +116,6 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 
 ## Preguntas abiertas
 - El nombre del juego. `circlebh` es provisorio.
-- El fondo negro o blanco y el color de acento: se decide con un prototipo desechable.
+- El fondo negro o blanco: se decide con capturas de la escena real, al final de la 0.1.0.
+- El color de acento: se decide cuando existan balas enemigas.
 - Los números de equilibrio y qué parámetro mejora cada tarjeta.
-- Si importar de `balance.json` a `balance.py` va en el MVP o con el editor.
