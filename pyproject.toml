@@ -69,6 +69,18 @@ sequence = [
 help = "Evidencia en la sesión (ADR 0013): tres PNG sin ventana en .capturas/."
 cmd = "circlebh --demo --scenario plano-vacio --seed 1 --capture 0,1,2"
 
+[tool.poe.tasks.balance-chequear]
+help = "Compara balance.py y balance.json, y nombra cada campo que difiere (ADR 0004)."
+cmd = "python -m circlebh.balance_tools chequear"
+
+[tool.poe.tasks.balance-exportar]
+help = "Escribe balance.json desde balance.py (Python → JSON)."
+cmd = "python -m circlebh.balance_tools exportar"
+
+[tool.poe.tasks.balance-importar]
+help = "Reescribe el bloque de datos de balance.py desde balance.json (JSON → Python)."
+cmd = "python -m circlebh.balance_tools importar"
+
 [tool.poe.tasks.medios]
 help = "Regenera las imágenes del README en docs/media/ (ADR 0013). Pendiente."
 cmd = "python -c \"raise SystemExit('poe medios: pendiente, todavía no hay nada que mostrar')\""

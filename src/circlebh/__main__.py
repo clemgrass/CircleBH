@@ -7,11 +7,13 @@ Hay dos modos:
 """
 
 import os
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 import pygame
 
+from circlebh.balance_tools import check
 from circlebh.cli import RunOptions, parse_args
 from circlebh.render.plane import draw_empty_plane
 from circlebh.world.clock import STEP, FixedStepClock, capture_steps
@@ -23,6 +25,7 @@ CAPTURE_DIR = Path(".capturas")
 
 def main(argv: Sequence[str] | None = None) -> None:
     options = parse_args(argv)
+    exit_if_balance_differs()
     print(f"semilla: {options.seed}")
     try:
         if options.capture:
@@ -31,6 +34,19 @@ def main(argv: Sequence[str] | None = None) -> None:
             run_window(options)
     finally:
         pygame.quit()
+
+
+def exit_if_balance_differs() -> None:
+    """ADR 0004: el juego no abre si `balance.py` y `balance.json` no calzan."""
+    errors = check()
+    if errors:
+        for line in errors:
+            print(line, file=sys.stderr)
+        print(
+            "Iguálalos con `poe balance-exportar` o `poe balance-importar`.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
 
 
 def capture_path(scenario: str, seed: int, t: float) -> Path:

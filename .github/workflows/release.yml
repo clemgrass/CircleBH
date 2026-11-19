@@ -48,10 +48,13 @@ jobs:
 
       - run: uv sync --locked --group release
 
+      # `--collect-data circlebh` mete los datos del paquete (balance.json): sin ellos,
+      # el juego no arranca (ADR 0004).
       - name: Armar con PyInstaller
         run: >
           uv run --locked --group release pyinstaller
           --noconfirm --clean --onedir --name circlebh --specpath build
+          --collect-data circlebh
           src/circlebh/__main__.py
 
       # El smoke corre el ejecutable empaquetado, no el código: si arranca, dibuja
