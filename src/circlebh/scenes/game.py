@@ -1,17 +1,26 @@
 """La partida en pantalla: lee la entrada, avanza `world` paso a paso y lo dibuja."""
 
+import random
+
 import pygame
 import pygame._sdl2.controller as sdl_controller
 from pygame.math import Vector2
 
+from circlebh.balance import BALANCE
+from circlebh.cli import RunOptions, next_seed
 from circlebh.controls import axis_to_unit, combine, keyboard_intent, stick_intent
 from circlebh.pilot import pilot_intent
 from circlebh.render.plane import draw_axes, draw_letterbox
 from circlebh.render.world_view import draw_world
-from circlebh.scenes.scenarios import Scenario
+from circlebh.scenes.death import DeathScreen
+from circlebh.scenes.scenarios import SCENARIOS, Scenario
 from circlebh.settings import Settings
 from circlebh.viewport import Viewport, camera_center
+from circlebh.world.clock import STEP
 from circlebh.world.game import World
+
+DEMO_RESTART_STEPS = round(2.0 / STEP)
+"""En la demo y las capturas, cuántos pasos se ve la muerte antes de reiniciar: 2 s."""
 
 
 class Gamepads:
@@ -74,26 +83,58 @@ def keys_intent() -> Vector2:
     )
 
 
-class GameScene:
-    """Una partida. Con `demo`, el escenario manda y no se lee la entrada."""
+def is_restart(event: pygame.event.Event) -> bool:
+    """R en el teclado, o el botón de abajo del control: la ✕ en PlayStation (ADR 0019)."""
+    return (event.type == pygame.KEYDOWN and event.key == pygame.K_r) or (
+        event.type == pygame.CONTROLLERBUTTONDOWN
+        and event.button == pygame.CONTROLLER_BUTTON_A
+    )
 
-    def __init__(
-        self, world: World, settings: Settings, demo: Scenario | None = None
-    ) -> None:
-        self.world = world
+
+class GameScene:
+    """La partida en pantalla, y sus reinicios. En la demo, el escenario manda.
+
+    Al morir, `world` se detiene y la escena sigue contando pasos para el efecto de
+    muerte. Con R o con X empieza otra partida. En la demo, empieza sola tras
+    `DEMO_RESTART_STEPS`.
+    """
+
+    def __init__(self, options: RunOptions, settings: Settings) -> None:
+        self.options = options
         self.settings = settings
-        self.demo = demo
-        self.gamepads = Gamepads() if demo is None else None
+        self.demo: Scenario | None = (
+            SCENARIOS[options.scenario] if options.demo else None
+        )
+        self.gamepads = Gamepads() if self.demo is None else None
+        self.death_screen = DeathScreen()
+        self.start(options.seed)
+
+    def start(self, seed: int) -> None:
+        """Empieza una partida nueva con `seed`. La semilla se imprime para repetirla."""
+        print(f"semilla: {seed}")
+        self.seed = seed
+        self.world = World(BALANCE, random.Random(seed))
         self.steps = 0
+        self.dead_steps = 0
 
     def handle_event(self, event: pygame.event.Event) -> None:
-        if self.gamepads is not None:
-            self.gamepads.handle_event(event)
+        # En la demo no se lee la entrada: ni controles ni reinicio.
+        if self.gamepads is None:
+            return
+        self.gamepads.handle_event(event)
+        # Solo tras morir: R o X a mitad de partida no hacen nada.
+        if self.world.game_over and is_restart(event):
+            self.start(next_seed(self.options))
 
     def step(self) -> None:
-        """Avanza `world` un paso con la intención de este momento."""
-        self.world.update(self.intent())
-        self.steps += 1
+        """Avanza `world` un paso con la intención de este momento, o cuenta la muerte."""
+        if not self.world.game_over:
+            self.world.update(self.intent())
+            self.steps += 1
+            return
+        self.dead_steps += 1
+        if self.demo is not None and self.dead_steps >= DEMO_RESTART_STEPS:
+            self.start(next_seed(self.options))
 
     def intent(self) -> Vector2:
         if self.demo is not None:
@@ -116,4 +157,14 @@ class GameScene:
         screen.set_clip(viewport.rect)
         draw_axes(screen, viewport)
         draw_world(screen, self.world, viewport, self.settings.debug.show_hitboxes)
+        if self.world.game_over:
+            player = self.world.player
+            self.death_screen.draw(
+                screen,
+                viewport,
+                (player.position, player.radius),
+                self.dead_steps,
+                self.seed,
+                self.world.elapsed,
+            )
         screen.set_clip(None)

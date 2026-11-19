@@ -8,22 +8,18 @@ Hay dos modos:
 
 import json
 import os
-import random
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 import pygame
 
-from circlebh.balance import BALANCE
 from circlebh.balance_tools import check
 from circlebh.cli import RunOptions, parse_args
 from circlebh.datafile import DataFileError
 from circlebh.scenes.game import GameScene
-from circlebh.scenes.scenarios import SCENARIOS
 from circlebh.settings import Settings, load_settings
 from circlebh.world.clock import STEP, FixedStepClock, capture_steps
-from circlebh.world.game import World
 
 FPS = 60
 CAPTURE_DIR = Path(".capturas")
@@ -33,7 +29,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     options = parse_args(argv)
     exit_if_balance_differs()
     settings = load_settings_or_exit()
-    print(f"semilla: {options.seed}")
     try:
         if options.capture:
             run_capture(options, settings)
@@ -72,13 +67,6 @@ def capture_path(scenario: str, seed: int, t: float) -> Path:
     return CAPTURE_DIR / f"{scenario}-seed{seed}-t{t:.2f}.png"
 
 
-def new_scene(options: RunOptions, settings: Settings) -> GameScene:
-    """Una partida con la semilla de `options`. En la demo, el escenario mueve al jugador."""
-    world = World(BALANCE, random.Random(options.seed))
-    demo = SCENARIOS[options.scenario] if options.demo else None
-    return GameScene(world, settings, demo)
-
-
 def run_capture(options: RunOptions, settings: Settings) -> None:
     """Avanza paso a paso, sin reloj real, y guarda un PNG en cada tiempo pedido."""
     # El driver sin ventana de SDL; tiene que fijarse antes de pygame.init().
@@ -86,7 +74,7 @@ def run_capture(options: RunOptions, settings: Settings) -> None:
     pygame.init()
     screen = pygame.display.set_mode(options.window)
     CAPTURE_DIR.mkdir(parents=True, exist_ok=True)
-    scene = new_scene(options, settings)
+    scene = GameScene(options, settings)
 
     # Varios tiempos pueden caer en el mismo paso: ese paso se captura una sola vez.
     steps = set(capture_steps(options.capture))
@@ -129,7 +117,7 @@ def run_window(options: RunOptions, settings: Settings) -> None:
     pygame.display.set_caption("CircleBH")
     clock = pygame.time.Clock()
     step_clock = FixedStepClock()
-    scene = new_scene(options, settings)
+    scene = GameScene(options, settings)
     windowed: tuple[int, int] | None = None
 
     running = True

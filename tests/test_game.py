@@ -43,6 +43,77 @@ def test_el_enemigo_persigue_la_posicion_nueva_del_jugador() -> None:
     )
 
 
+def test_world_empieza_sin_terminar_y_en_cero() -> None:
+    world = World(BALANCE, random.Random(1))
+    assert world.game_over is False
+    assert world.elapsed == 0
+
+
+def test_elapsed_cuenta_un_step_por_update() -> None:
+    world = World(BALANCE, random.Random(1))
+    for _ in range(90):
+        world.update(Vector2())
+    assert world.elapsed == pytest.approx(1.5)
+
+
+# --- Morir ---
+
+
+def separacion_de_contacto(world: World) -> float:
+    """La distancia entre centros a la que el jugador y el enemigo quedan tangentes."""
+    return world.player.radius + world.enemies[0].radius
+
+
+def test_contacto_termina_la_partida() -> None:
+    world = World(BALANCE, random.Random(1))
+    world.enemies[0].position = Vector2(separacion_de_contacto(world) / 2, 0)
+    world.update(Vector2())
+    assert world.game_over is True
+
+
+def test_contacto_tangente_termina_la_partida() -> None:
+    # Tras el paso, el enemigo queda justo tangente al jugador: eso ya es tocarlo.
+    world = World(BALANCE, random.Random(1))
+    paso = BALANCE.enemies["hexagon"].speed * STEP
+    world.enemies[0].position = Vector2(separacion_de_contacto(world) + paso, 0)
+    world.update(Vector2())
+    assert world.game_over is True
+
+
+def test_enemigo_a_una_unidad_no_termina_la_partida() -> None:
+    world = World(BALANCE, random.Random(1))
+    paso = BALANCE.enemies["hexagon"].speed * STEP
+    world.enemies[0].position = Vector2(0, separacion_de_contacto(world) + paso + 1)
+    world.update(Vector2())
+    assert world.game_over is False
+
+
+def test_enemigo_lejos_no_termina_la_partida() -> None:
+    world = World(BALANCE, random.Random(1))
+    for _ in range(60):
+        world.update(Vector2())
+    assert world.game_over is False
+
+
+def test_tras_morir_update_no_avanza() -> None:
+    world = World(BALANCE, random.Random(1))
+    world.enemies[0].position = Vector2(0, 0)
+    world.update(Vector2())
+    assert world.game_over is True
+
+    jugador, enemigo, tiempo = (
+        Vector2(world.player.position),
+        Vector2(world.enemies[0].position),
+        world.elapsed,
+    )
+    for _ in range(10):
+        world.update(Vector2(1, 0))
+    assert world.player.position == jugador
+    assert world.enemies[0].position == enemigo
+    assert world.elapsed == tiempo
+    assert world.game_over is True
+
+
 def test_world_sin_intencion_deja_al_jugador_quieto() -> None:
     world = World(BALANCE, random.Random(1))
     for _ in range(10):

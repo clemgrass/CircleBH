@@ -2,7 +2,7 @@
 
 import pytest
 
-from circlebh.cli import RunOptions, parse_args
+from circlebh.cli import RunOptions, next_seed, parse_args
 
 
 def falla_con_codigo_2(argv: list[str]) -> None:
@@ -18,6 +18,7 @@ def test_opciones_completas() -> None:
         demo=True,
         scenario="enemigo-persigue",
         seed=7,
+        seed_fixed=True,
         speed=2.0,
         capture=(0.0, 1.0, 2.0),
         window=(1600, 900),
@@ -72,6 +73,32 @@ def test_capture_rechaza_tiempos_no_finitos(tiempo: str) -> None:
 
 def test_seed_negativa() -> None:
     falla_con_codigo_2(["--seed", "-1"])
+
+
+# --- La semilla al reiniciar ---
+
+
+def test_seed_fijada_se_repite_al_reiniciar() -> None:
+    options = parse_args(["--seed", "7"])
+    assert options.seed_fixed is True
+    assert next_seed(options) == 7
+
+
+def test_seed_cero_tambien_esta_fijada() -> None:
+    # Borde: 0 es una semilla válida, no "sin semilla".
+    options = parse_args(["--seed", "0"])
+    assert options.seed_fixed is True
+    assert next_seed(options) == 0
+
+
+def test_sin_seed_cada_reinicio_trae_una_nueva() -> None:
+    options = parse_args([])
+    assert options.seed_fixed is False
+    semillas = {next_seed(options) for _ in range(20)}
+    # Propiedad, no valor: todas en rango, y no todas iguales. Que 20 sorteos en 2³²
+    # salgan iguales tiene una probabilidad despreciable.
+    assert all(0 <= semilla < 2**32 for semilla in semillas)
+    assert len(semillas) > 1
 
 
 def test_window_lee_ancho_por_alto() -> None:
