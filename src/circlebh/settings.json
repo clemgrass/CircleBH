@@ -1,4 +1,7 @@
 {
+  "controls": {
+    "stick_deadzone": 0.2
+  },
   "debug": {
     "show_hitboxes": false
   }
