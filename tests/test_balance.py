@@ -3,7 +3,7 @@
 import importlib.util
 import json
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from types import ModuleType
 
@@ -29,6 +29,18 @@ def copia_de_balance_py(tmp_path: Path) -> Path:
     return copia
 
 
+def con_jugador(speed: float, radius: float) -> Balance:
+    """El balance real, con otro jugador: el resto no cambia entre los dos lados."""
+    return replace(BALANCE, player=PlayerSpec(speed=speed, radius=radius))
+
+
+def json_con_jugador(player: dict[str, object]) -> str:
+    """El JSON del balance real, con otro objeto `player`."""
+    data = dump(BALANCE)
+    assert isinstance(data, dict)
+    return json.dumps(data | {"player": player})
+
+
 def cargar_modulo(path: Path) -> ModuleType:
     spec = importlib.util.spec_from_file_location("balance_copia", path)
     assert spec is not None
@@ -50,16 +62,16 @@ def test_chequeo_real_sin_errores() -> None:
 
 
 def test_diferencia_nombra_el_campo() -> None:
-    en_python = Balance(player=PlayerSpec(speed=3.0, radius=12.0))
-    en_json = Balance(player=PlayerSpec(speed=2.5, radius=12.0))
+    en_python = con_jugador(speed=3.0, radius=12.0)
+    en_json = con_jugador(speed=2.5, radius=12.0)
     assert differences(en_python, en_json) == [
         "player.speed: balance.py=3.0, balance.json=2.5"
     ]
 
 
 def test_todas_las_diferencias_se_reportan() -> None:
-    en_python = Balance(player=PlayerSpec(speed=3.0, radius=12.0))
-    en_json = Balance(player=PlayerSpec(speed=2.5, radius=10.0))
+    en_python = con_jugador(speed=3.0, radius=12.0)
+    en_json = con_jugador(speed=2.5, radius=10.0)
     assert differences(en_python, en_json) == [
         "player.speed: balance.py=3.0, balance.json=2.5",
         "player.radius: balance.py=12.0, balance.json=10.0",
@@ -83,7 +95,7 @@ def test_una_entrada_que_solo_esta_en_un_lado() -> None:
 
 def test_chequeo_nombra_el_campo_de_un_json_invalido(tmp_path: Path) -> None:
     roto = tmp_path / "balance.json"
-    roto.write_text('{"player": {"speed": true, "radius": 12.0}}', encoding="utf-8")
+    roto.write_text(json_con_jugador({"speed": True, "radius": 12.0}), encoding="utf-8")
     assert check(roto) == [
         "balance.json: player.speed: se esperaba un número, llegó true"
     ]
@@ -103,7 +115,9 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
     destino = tmp_path / "balance.json"
     export_json(destino)
     assert json.loads(destino.read_text(encoding="utf-8")) == {
-        "player": {"speed": 240.0, "radius": 12.0}
+        "player": {"speed": 240.0, "radius": 12.0},
+        "enemies": {"hexagon": {"sides": 6, "radius": 24.0, "speed": 120.0}},
+        "spawning": {"distance": 800.0},
     }
 
 
@@ -117,13 +131,15 @@ def test_exportar_e_importar_ida_y_vuelta(tmp_path: Path) -> None:
 
 def test_importar_cambia_solo_el_bloque_de_datos(tmp_path: Path) -> None:
     json_path = tmp_path / "balance.json"
-    json_path.write_text('{"player": {"speed": 300, "radius": 12.0}}', encoding="utf-8")
+    json_path.write_text(
+        json_con_jugador({"speed": 300, "radius": 12.0}), encoding="utf-8"
+    )
     py_path = copia_de_balance_py(tmp_path)
     import_json(json_path, py_path)
 
-    assert dump(cargar_modulo(py_path).BALANCE) == {
-        "player": {"speed": 300.0, "radius": 12.0}
-    }
+    assert dump(cargar_modulo(py_path).BALANCE) == dump(
+        con_jugador(speed=300.0, radius=12.0)
+    )
     original = BALANCE_PY.read_text(encoding="utf-8")
     nuevo = py_path.read_text(encoding="utf-8")
     assert original.replace("speed=240.0", "speed=300.0") == nuevo
@@ -132,7 +148,7 @@ def test_importar_cambia_solo_el_bloque_de_datos(tmp_path: Path) -> None:
 def test_importar_rechaza_un_campo_desconocido(tmp_path: Path) -> None:
     json_path = tmp_path / "balance.json"
     json_path.write_text(
-        '{"player": {"speed": 240.0, "radius": 12.0, "color": "rojo"}}',
+        json_con_jugador({"speed": 240.0, "radius": 12.0, "color": "rojo"}),
         encoding="utf-8",
     )
     py_path = copia_de_balance_py(tmp_path)

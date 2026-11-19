@@ -2,5 +2,15 @@
   "player": {
     "speed": 240.0,
     "radius": 12.0
+  },
+  "enemies": {
+    "hexagon": {
+      "sides": 6,
+      "radius": 24.0,
+      "speed": 120.0
+    }
+  },
+  "spawning": {
+    "distance": 800.0
   }
 }
