@@ -86,17 +86,40 @@ class PointWeapon(Weapon):
         paso en que tenga a quién."""
 
     def update(self, origin: Vector2, enemies: list[Enemy]) -> None:
-        """Avanza las balas, quita las vencidas y, si toca, dispara desde `origin`.
+        """Avanza las balas, aplica sus golpes, quita las gastadas y, si toca, dispara
+        desde `origin`.
+
+        Cada bala quita una sola línea y desaparece. Si su tramo cruza líneas de dos
+        enemigos, golpea la primera que cruza; si empatan, la del primero de la lista.
+        Una bala que llega a `range` en este paso todavía golpea con su último tramo.
 
         La bala nueva nace en `origin` y empieza a moverse en el paso siguiente. Sin
         objetivo, o con su centro justo en `origin`, no dispara y queda lista.
         """
+        remaining: list[Bullet] = []
         for bullet in self.bullets:
             bullet.step()
-        self.bullets = [bullet for bullet in self.bullets if not bullet.expired]
+            if not self._strike(bullet, enemies) and not bullet.expired:
+                remaining.append(bullet)
+        self.bullets = remaining
         self._steps_to_next -= 1
         if self._steps_to_next <= 0:
             self._fire(origin, enemies)
+
+    @staticmethod
+    def _strike(bullet: Bullet, enemies: list[Enemy]) -> bool:
+        """Si el último tramo de `bullet` cruza una línea, la quita y devuelve `True`."""
+        best: tuple[float, int, Enemy, int] | None = None
+        for index, enemy in enumerate(enemies):
+            hit = enemy.hit_by(bullet.previous, bullet.position)
+            if hit is not None and (best is None or hit[0] < best[0]):
+                t, k = hit
+                best = (t, index, enemy, k)
+        if best is None:
+            return False
+        _, _, enemy, k = best
+        enemy.remove_edge(k)
+        return True
 
     def _fire(self, origin: Vector2, enemies: list[Enemy]) -> None:
         target = nearest(origin, enemies)

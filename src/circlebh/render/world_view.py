@@ -5,7 +5,6 @@ from pygame.math import Vector2
 
 from circlebh.viewport import Viewport
 from circlebh.world.game import World
-from circlebh.world.polygon import regular_polygon
 from circlebh.world.weapons import PointWeapon
 
 PLAYER_COLOR = pygame.Color("white")
@@ -15,6 +14,8 @@ BULLET_DRAW_RADIUS = 3.0
 la bala es un punto."""
 # Provisorio: el color de acento sigue abierto hasta que existan balas enemigas.
 ENEMY_COLOR = pygame.Color("white")
+ENEMY_LINE_WIDTH = 2.0
+"""Grosor de las líneas del enemigo, en unidades del plano: escala con la cámara."""
 HITBOX_COLOR = pygame.Color("magenta")
 HITBOX_WIDTH = 1.0
 """Grosor del círculo de choque, en unidades del plano: escala con la cámara."""
@@ -23,10 +24,10 @@ HITBOX_WIDTH = 1.0
 def draw_world(
     screen: pygame.Surface, world: World, viewport: Viewport, show_hitboxes: bool
 ) -> None:
-    """Dibuja al jugador como un círculo y a cada enemigo como un polígono, rellenos, y
-    las balas del jugador debajo, como puntos.
+    """Dibuja al jugador como un círculo relleno, a cada enemigo con las líneas que le
+    quedan, sin relleno, y las balas del jugador debajo, como puntos.
 
-    Con `show_hitboxes`, encima va el círculo de choque de cada cuerpo.
+    Con `show_hitboxes`, encima va el círculo de cada cuerpo.
     """
     for weapon in world.weapons:
         if isinstance(weapon, PointWeapon):
@@ -45,13 +46,20 @@ def draw_world(
         viewport.to_screen(player.position),
         player.radius * viewport.scale,
     )
+    line_width = viewport.width(ENEMY_LINE_WIDTH)
     for enemy in world.enemies:
-        vertices = regular_polygon(enemy.position, enemy.radius, enemy.sides)
-        pygame.draw.polygon(
-            screen, ENEMY_COLOR, [viewport.to_screen(v) for v in vertices]
-        )
+        for a, b in enemy.lines():
+            pygame.draw.line(
+                screen,
+                ENEMY_COLOR,
+                viewport.to_screen(a),
+                viewport.to_screen(b),
+                line_width,
+            )
 
     if show_hitboxes:
+        # El jugador choca como círculo. Del enemigo se dibuja la envolvente, el primer
+        # descarte: lo que choca son sus líneas (ADR 0020).
         bodies = [(player.position, player.radius)]
         bodies += [(enemy.position, enemy.radius) for enemy in world.enemies]
         for position, radius in bodies:

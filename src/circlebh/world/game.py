@@ -42,8 +42,10 @@ class World:
     def update(self, intent: Vector2) -> None:
         """Avanza un paso, con la intención de movimiento del jugador (largo 0 a 1).
 
-        El jugador se mueve primero, los enemigos van hacia donde quedó y, al final, las
-        armas disparan. Si alguno lo toca, la partida termina; desde ahí, `update` no hace nada.
+        El jugador se mueve primero, los enemigos van hacia donde quedó, y las armas
+        golpean y disparan. Los enemigos sin líneas desaparecen, y recién entonces se
+        revisa el contacto: matar a uno en el mismo paso en que te tocaría te salva. Si
+        alguno lo toca, la partida termina; desde ahí, `update` no hace nada.
         """
         if self.game_over:
             return
@@ -53,6 +55,7 @@ class World:
             enemy.step(self.player.position)
         for weapon in self.weapons:
             weapon.update(self.player.position, self.enemies)
+        self.enemies = [enemy for enemy in self.enemies if enemy.alive]
         self.game_over = any(
             circles_touch(
                 self.player.position, self.player.radius, e.position, e.radius

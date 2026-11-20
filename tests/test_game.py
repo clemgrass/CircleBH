@@ -20,7 +20,7 @@ def test_world_mueve_al_jugador() -> None:
 def test_world_empieza_con_un_hexagono_a_la_distancia_de_aparicion() -> None:
     world = World(BALANCE, random.Random(1))
     [enemy] = world.enemies
-    assert enemy.sides == BALANCE.enemies["hexagon"].sides
+    assert len(enemy.edges) == BALANCE.enemies["hexagon"].sides
     assert enemy.position.length() == pytest.approx(BALANCE.spawning.distance)
 
 

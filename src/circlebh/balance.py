@@ -27,14 +27,15 @@ class PlayerSpec:
 
 @dataclass(frozen=True)
 class EnemySpec:
-    """Un tipo de enemigo: un polígono regular que persigue al jugador."""
+    """Un tipo de enemigo: un polígono regular hecho de líneas, que persigue al jugador
+    (ADR 0020)."""
 
     sides: int
-    """Lados al aparecer. Pierde uno por golpe y, sin lados, muere."""
+    """Líneas al aparecer. Cada bala quita la que golpea y, sin líneas, muere."""
 
     radius: float
-    """Radio del círculo de choque con todos sus lados, en unidades del plano. Se achica
-    en proporción a los lados que le quedan."""
+    """Radio del polígono, en unidades del plano: el del círculo que pasa por sus
+    vértices. Es también su círculo envolvente, y no cambia al perder líneas."""
 
     speed: float
     """Velocidad, en unidades del plano por segundo."""
