@@ -24,5 +24,11 @@ SCENARIOS: dict[str, Scenario] = {
             "El jugador quieto, y un hexágono que aparece fuera de la vista y lo alcanza.",
             pilot=False,
         ),
+        Scenario(
+            "punto-quita-lineas",
+            "El piloto se mueve, y cada bala le quita al hexágono la línea que golpea"
+            " hasta que desaparece.",
+            pilot=True,
+        ),
     ]
 }

@@ -20,7 +20,7 @@ La restricción de no usar sprites ni imágenes es el tema del juego, no un lím
 |---|---|
 | El jugador | una figura simple, por ejemplo un círculo con un punto que marca hacia dónde mira |
 | Sus ataques | solo el trazo, sin relleno |
-| Los enemigos | polígonos rellenos |
+| Los enemigos | polígonos hechos de líneas, sin relleno *(decisión del autor, 2026-11-19)* |
 | Las balas enemigas | puntos rellenos en el color de acento |
 | La experiencia | puntos pequeños sin relleno |
 
@@ -28,6 +28,7 @@ La tabla es el punto de partida. El prototipo puede ajustarla si algo no se lee 
 
 ## Cómo se juega
 
+- **El primer ataque es un punto** *(decisión del autor, 2026-11-19)*: una bala que sale sola hacia el centro del enemigo más cercano, porque el punto es de donde parte la geometría cartesiana. Es el arma de la 0.1.0; las curvas llegan después.
 - **Las armas son curvas** y disparan solas alrededor del jugador:
   - **Recta:** un rayo en la dirección en que se mueve el jugador.
   - **Círculo:** un anillo que se expande y revienta.
@@ -36,7 +37,7 @@ La tabla es el punto de partida. El prototipo puede ajustarla si algo no se lee 
 - **Las mejoras y las combinaciones salen de ideas matemáticas** *(decisión del autor, 2026-11-19)*: derivar, integrar, componer o sumar curvas, por ejemplo `r(θ, t) = v·t + A·sin(kθ)`, un anillo que ondula. La idea es diferenciarse de los survivors donde dos armas al máximo se fusionan. El mecanismo exacto sigue abierto.
   - **Rosa** (`r = cos(kθ)`): pétalos que orbitan alrededor del jugador.
 - **Al subir de nivel aparecen tres tarjetas.** Cada una muestra la fórmula del arma y el parámetro que cambia, por ejemplo "`y = A·sin(ωx)`: ω sube a 3". Una tarjeta puede dar un arma nueva o mejorar una que ya tienes. No hace falta entender la fórmula para elegir, porque la diferencia se ve en el ataque.
-- **Los enemigos son polígonos, y el número de lados es su vida.** Cada golpe le quita un lado: un hexágono pasa a pentágono, después a cuadrado, a triángulo, a línea y a punto, y desaparece. Los polígonos con más lados llegan más tarde en la partida.
+- **Los enemigos son polígonos hechos de líneas, y sus líneas son su vida** *(decisión del autor, 2026-11-19; antes, un golpe convertía el hexágono en pentágono)*. Cada golpe quita la línea exacta que golpea, así que la forma que queda cuenta dónde le pegaste. Sin líneas, desaparece. Una figura abierta deja pasar las balas por sus huecos: el jugador tiene que moverse para encontrar el ángulo. Los polígonos con más lados llegan más tarde en la partida.
 - **Cada arma hace daño a su manera:**
   - La **recta** y el **círculo** dañan en todo su trazo: el rayo y el anillo.
   - El **seno** y la **espiral** son proyectiles que recorren la curva. Dejan una estela corta que se ve pero no hace daño.

@@ -62,7 +62,7 @@ class DebugSettings:
     """Ayudas para depurar."""
 
     show_hitboxes: bool
-    """Dibuja el círculo de choque de cada cuerpo."""
+    """Dibuja el círculo de choque del jugador y el círculo envolvente de cada enemigo."""
 
 
 @dataclass(frozen=True)

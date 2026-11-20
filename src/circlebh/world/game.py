@@ -6,7 +6,6 @@ from pygame.math import Vector2
 
 from circlebh.balance import Balance
 from circlebh.world.clock import STEP
-from circlebh.world.collisions import circles_touch
 from circlebh.world.enemy import Enemy, spawn_position
 from circlebh.world.player import Player
 from circlebh.world.weapons import PointWeapon, Weapon
@@ -57,8 +56,6 @@ class World:
             weapon.update(self.player.position, self.enemies)
         self.enemies = [enemy for enemy in self.enemies if enemy.alive]
         self.game_over = any(
-            circles_touch(
-                self.player.position, self.player.radius, e.position, e.radius
-            )
-            for e in self.enemies
+            enemy.touches(self.player.position, self.player.radius)
+            for enemy in self.enemies
         )

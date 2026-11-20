@@ -144,3 +144,13 @@ def test_balance_aparece_fuera_de_la_vista() -> None:
     esquina = math.hypot(ancho / 2, alto / 2) + Vector2(camera.offset).length()
     hexagon = BALANCE.enemies["hexagon"]
     assert BALANCE.spawning.distance - hexagon.radius > esquina
+
+
+@pytest.mark.parametrize("nombre", sorted(BALANCE.enemies))
+def test_jugador_no_atraviesa_una_linea_en_un_paso(nombre: str) -> None:
+    # Coherencia del balance: el contacto se revisa una vez por paso. Si el jugador y el
+    # enemigo se acercan más que el diámetro del jugador en un paso, una línea podría
+    # pasarle por encima sin que ningún paso la vea tocándolo.
+    player = BALANCE.player
+    enemy = BALANCE.enemies[nombre]
+    assert (player.speed + enemy.speed) * STEP < 2 * player.radius

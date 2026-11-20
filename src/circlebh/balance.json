@@ -14,7 +14,7 @@
     "distance": 800.0
   },
   "point_weapon": {
-    "cooldown": 0.5,
+    "cooldown": 0.3,
     "speed": 600.0,
     "range": 700.0
   }

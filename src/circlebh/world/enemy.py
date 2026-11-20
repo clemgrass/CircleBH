@@ -12,7 +12,7 @@ from pygame.math import Vector2
 
 from circlebh.balance import EnemySpec
 from circlebh.world.clock import STEP
-from circlebh.world.collisions import segment_touches_circle
+from circlebh.world.collisions import circles_touch, segment_touches_circle
 from circlebh.world.polygon import edge_sectors, first_hit, polygon_edge
 
 
@@ -50,6 +50,18 @@ class Enemy:
                 polygon_edge(self.spec.radius, self.spec.sides, k) for k in self.edges
             )
         ]
+
+    def touches(self, center: Vector2, radius: float) -> bool:
+        """Si alguna de sus líneas toca al círculo de `center` y `radius`.
+
+        Primero descarta con el círculo envolvente; solo si lo toca, prueba cada línea.
+        Un círculo dentro del enemigo que no toca ninguna línea no lo toca.
+        """
+        if not circles_touch(center, radius, self.position, self.radius):
+            return False
+        return any(
+            segment_touches_circle(a, b, center, radius) for a, b in self.lines()
+        )
 
     def hit_by(self, start: Vector2, end: Vector2) -> tuple[float, int] | None:
         """La primera línea que cruza el tramo de una bala en el último paso, como `(t, k)`.
