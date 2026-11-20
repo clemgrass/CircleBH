@@ -74,8 +74,9 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 | `uv run poe check` | antes del push; es lo mismo que corre la CI |
 | `uv run poe capturas` | evidencia en la sesión |
 | `uv run poe medios` | regenerar las imágenes del README |
+| `uv run poe benchmark` | medir el paso con muchos enemigos, a mano |
 
-## Arquitectura (ADR 0003 a 0006, 0016)
+## Arquitectura (ADR 0003 a 0006, 0016, 0021)
 - En `src/circlebh/`, las importaciones van en una sola dirección: `scenes` → `render` → `world` → `balance`. `lint-imports` lo verifica.
 - `world/` es lógica pura: no tiene `draw()` ni usa `pygame.display` ni `pygame.draw`. De Pygame solo usa `Vector2`. La regla `TID251` de ruff lo verifica, y solo `render/`, `scenes/` y `__main__.py` tienen la excepción.
 - `world` usa coordenadas matemáticas: Y hacia arriba y ángulos antihorarios en radianes. Solo la cámara las pasa a pantalla. Cada curva se escribe como su fórmula.
@@ -83,6 +84,7 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 - Enemigos y armas se definen por parámetros en `balance.py`, con dataclasses, y se reflejan en `balance.json`, dentro del paquete y leído con `importlib.resources`.
   - Ninguno de los dos manda: deben calzar siempre.
   - Si difieren, el chequeo nombra el campo y se corrige a mano, exportando o importando, antes de jugar.
+- Los enemigos se mueven por los patrones de su tipo en el balance. Sus aceleraciones se suman, con inercia y roce, y entre ellos actúa una sola ley de cargas (ADR 0021).
 - La configuración del juego (cámara, controles, accesibilidad y depuración) vive solo en `settings.json`, dentro del paquete, y se valida al arrancar contra una dataclass (ADR 0018). Si describe a una entidad, va al balance; si describe cómo se juega o se ve, a la configuración.
 - La lógica avanza en pasos fijos de 1/60 s con acumulador. El azar sale solo de la `random.Random(seed)` inyectada.
 - En las colisiones, cada cuerpo es un círculo. Se usa una grilla espacial y funciones propias en `world/`.

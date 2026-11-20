@@ -1,6 +1,7 @@
 """Tests de `datafile`: cargar un dict de JSON en dataclasses, y la inversa."""
 
 from dataclasses import dataclass
+from typing import Literal
 
 import pytest
 from hypothesis import given
@@ -143,3 +144,67 @@ def test_dump_y_load_ida_y_vuelta(
         enemies=enemies,
     )
     assert load(Game, dump(game)) == game
+
+
+# --- Listas de patrones elegidos por `kind` (ADR 0021) ---
+
+
+@dataclass(frozen=True, kw_only=True)
+class _Seek:
+    kind: Literal["seek"] = "seek"
+    strength: float
+
+
+@dataclass(frozen=True, kw_only=True)
+class _Coulomb:
+    kind: Literal["coulomb"] = "coulomb"
+
+
+type _Pattern = _Seek | _Coulomb
+
+
+@dataclass(frozen=True)
+class _Holder:
+    patterns: tuple[_Pattern, ...]
+
+
+def test_lista_de_patrones_ida_y_vuelta() -> None:
+    datos = {"patterns": [{"kind": "seek", "strength": 2}, {"kind": "coulomb"}]}
+    holder = load(_Holder, datos)
+    assert holder == _Holder((_Seek(strength=2.0), _Coulomb()))
+    assert dump(holder) == {
+        "patterns": [{"kind": "seek", "strength": 2.0}, {"kind": "coulomb"}]
+    }
+
+
+def test_lista_vacia_es_valida() -> None:
+    assert load(_Holder, {"patterns": []}).patterns == ()
+
+
+def test_kind_desconocido_nombra_la_ruta() -> None:
+    datos = {"patterns": [{"kind": "seek", "strength": 1}, {"kind": "dash"}]}
+    error = falla_en(_Holder, datos)
+    assert error.field == "patterns[1].kind"
+    assert "seek" in error.reason and "coulomb" in error.reason
+
+
+def test_patron_sin_kind_nombra_la_ruta() -> None:
+    error = falla_en(_Holder, {"patterns": [{"strength": 1}]})
+    assert error.field == "patterns[0].kind"
+    assert error.reason == "falta el campo"
+
+
+def test_campo_que_sobra_en_un_patron() -> None:
+    error = falla_en(_Holder, {"patterns": [{"kind": "coulomb", "k": 1}]})
+    assert error.field == "patterns[0].k"
+
+
+def test_lista_donde_va_objeto() -> None:
+    error = falla_en(_Holder, {"patterns": {"kind": "seek"}})
+    assert error.field == "patterns"
+
+
+def test_literal_rechaza_otro_valor() -> None:
+    # Directo contra un miembro de la unión: su `kind` es fijo.
+    error = falla_en(_Seek, {"kind": "coulomb", "strength": 1})
+    assert error.field == "kind"

@@ -85,6 +85,10 @@ cmd = "python -m circlebh.balance_tools exportar"
 help = "Reescribe el bloque de datos de balance.py desde balance.json (JSON → Python)."
 cmd = "python -m circlebh.balance_tools importar"
 
+[tool.poe.tasks.benchmark]
+help = "Milisegundos por paso del enjambre de 300 hexágonos y del jefe de 100 líneas (ADR 0006). A mano, no en la CI."
+cmd = "python tools/benchmark.py"
+
 [tool.poe.tasks.medios]
 help = "Regenera las imágenes del README en docs/media/ (ADR 0013). Pendiente."
 cmd = "python -c \"raise SystemExit('poe medios: pendiente, todavía no hay nada que mostrar')\""

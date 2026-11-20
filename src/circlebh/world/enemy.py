@@ -1,5 +1,5 @@
-"""Los enemigos: polígonos regulares hechos de líneas, que persiguen al jugador en línea
-recta.
+"""Los enemigos: polígonos regulares hechos de líneas, que se mueven por sus patrones, con
+inercia y roce (ADR 0021).
 
 Cada línea es una parte del enemigo: la bala quita la que golpea, y sin líneas el enemigo
 muere. Chocan por sus líneas, y el círculo envolvente es el primer descarte (ADR 0020).
@@ -13,6 +13,7 @@ from pygame.math import Vector2
 from circlebh.balance import EnemySpec
 from circlebh.world.clock import STEP
 from circlebh.world.collisions import circles_touch, segment_touches_circle
+from circlebh.world.patterns import Context, make_pattern
 from circlebh.world.polygon import (
     ENVELOPE_SLACK,
     edge_sectors,
@@ -31,6 +32,21 @@ class Enemy:
         """Dónde estaba antes del último `step`. Lo usa el tramo relativo de `hit_by`."""
         self.edges = list(range(spec.sides))
         """Las aristas que le quedan, de menor a mayor (ver `polygon.py`)."""
+        self.velocity = Vector2()
+        """Unidades del plano por segundo. Parte quieto."""
+        self.patterns = [make_pattern(pattern) for pattern in spec.patterns]
+        """Su conducta: instancias propias de los patrones de su tipo (ADR 0021)."""
+
+    @property
+    def mass(self) -> float:
+        """Las líneas que le quedan (ADR 0021)."""
+        return float(len(self.edges))
+
+    @property
+    def charge(self) -> float:
+        """`charge_per_line` por las líneas que le quedan. Como la masa también son sus
+        líneas, un herido empuja menos, y a él lo empujan igual."""
+        return self.spec.charge_per_line * len(self.edges)
 
     @property
     def radius(self) -> float:
@@ -92,14 +108,25 @@ class Enemy:
         ]
         return first_hit(relative_start, relative_end, self.radius, sides, candidates)
 
-    def step(self, target: Vector2) -> None:
-        """Avanza un paso en línea recta hacia `target`, sin pasarse.
+    def acceleration(self, context: Context) -> Vector2:
+        """La suma de lo que aporta cada patrón, menos el roce: `a = Σ patrón − γ·v`."""
+        total = -self.velocity * self.spec.friction
+        for pattern in self.patterns:
+            total += pattern.acceleration(self, context)
+        return total
 
-        `move_towards` no normaliza cuando ya está encima: no divide por cero y,
-        si el objetivo queda a menos de un paso, llega justo y no oscila.
+    def step(self, acceleration: Vector2) -> None:
+        """Avanza un paso con Euler semi-implícito: primero la velocidad, después la
+        posición con la velocidad nueva.
+
+        `v ← v + a·dt`, acotada a `speed`, y `p ← p + v·dt`. Es estable con roce, y el tope
+        hace que nadie avance más de `speed·dt` por paso, aunque una fuerza sea enorme.
         """
         self.previous = Vector2(self.position)
-        self.position = self.position.move_towards(target, self.spec.speed * STEP)
+        self.velocity = (self.velocity + acceleration * STEP).clamp_magnitude(
+            self.spec.speed
+        )
+        self.position = self.position + self.velocity * STEP
 
 
 def spawn_position(center: Vector2, distance: float, rng: random.Random) -> Vector2:

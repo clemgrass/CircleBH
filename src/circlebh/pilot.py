@@ -26,7 +26,12 @@ def pilot_intent(step: int) -> Vector2:
 
 def simulate(balance: Balance, seconds: float, seed: int) -> list[float]:
     """Juega `seconds` de partida con el piloto, sin ventana, y devuelve cuánto duró cada
-    partida, en orden. La última queda cortada al llegar a `seconds`.
+    partida, en orden. La última queda cortada al llegar a `seconds`."""
+    return [world.elapsed for world in simulate_worlds(balance, seconds, seed)]
+
+
+def simulate_worlds(balance: Balance, seconds: float, seed: int) -> list[World]:
+    """Como `simulate`, pero devuelve las partidas mismas, para revisar su estado final.
 
     Al morir, empieza otra al tiro, con la semilla que usaría la demo (`seed + n` en la
     partida `n`). La demo además muestra la muerte unos segundos; aquí no hace falta.
@@ -38,4 +43,4 @@ def simulate(balance: Balance, seconds: float, seed: int) -> list[float]:
             worlds.append(World(balance, random.Random(next_game)))
         world = worlds[-1]
         world.update(pilot_intent(world.steps))
-    return [world.elapsed for world in worlds]
+    return worlds

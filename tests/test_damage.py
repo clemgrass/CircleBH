@@ -5,6 +5,7 @@ llega por la izquierda, en horizontal, golpea primero la 1.
 """
 
 import random
+from dataclasses import replace
 
 from pygame.math import Vector2
 
@@ -15,7 +16,10 @@ from circlebh.world.polygon import vertex
 from circlebh.world.weapons import PointWeapon
 
 SPEC = PointWeaponSpec(cooldown=0.5, speed=600.0, range=700.0)
-HEXAGON = EnemySpec(sides=6, radius=24.0, speed=120.0)
+# Sin patrones ni carga: aquí solo importa dónde está.
+HEXAGON = EnemySpec(
+    sides=6, radius=24.0, speed=120.0, friction=0.0, charge_per_line=0.0, patterns=()
+)
 ORIGEN = Vector2(0, 0)
 
 
@@ -70,7 +74,7 @@ def test_tramo_que_termina_en_un_vertice_golpea() -> None:
     # Lo encontró Hypothesis: el vértice 7 de un polígono de 20 lados queda, por
     # redondeo, a 24,000000000000004 del centro, y la envolvente de radio 24 descartaba
     # un golpe que la prueba exacta sí encuentra.
-    veinte = EnemySpec(sides=20, radius=24.0, speed=0.0)
+    veinte = replace(HEXAGON, sides=20, speed=0.0)
     enemy = Enemy(veinte, Vector2(0, 0))
     v = vertex(veinte.radius, veinte.sides, 7)
     assert enemy.hit_by(Vector2(-29, -1), v) is not None
@@ -86,11 +90,13 @@ def test_hit_by_da_t_y_arista() -> None:
 def test_enemigo_que_avanza_no_deja_pasar_la_bala() -> None:
     # Un enemigo muy rápido (50 por paso) contra una bala de 10 por paso: sin el tramo
     # relativo, la arista de enfrente saltaría por encima de la bala.
-    rapido = EnemySpec(sides=6, radius=24.0, speed=3000.0)
+    rapido = replace(HEXAGON, speed=3000.0)
     enemy = Enemy(rapido, Vector2(300, 0))
+    # Sin roce ni patrones, avanza a velocidad fija hacia el origen.
+    enemy.velocity = Vector2(-3000, 0)
     weapon = PointWeapon(SPEC)
     for _ in range(10):
-        enemy.step(ORIGEN)
+        enemy.step(Vector2())
         weapon.update(ORIGEN, [enemy])
         if len(enemy.edges) < 6:
             break

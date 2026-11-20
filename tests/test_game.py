@@ -10,8 +10,10 @@ from pygame.math import Vector2
 
 from circlebh.balance import BALANCE
 from circlebh.world.clock import STEP
+from circlebh.world.enemy import Enemy, spawn_position
 from circlebh.world.game import World
 from circlebh.world.polygon import polygon_edge
+from circlebh.world.swarm import lattice
 from circlebh.world.weapons import PointWeapon
 
 
@@ -231,3 +233,66 @@ def test_world_sin_intencion_deja_al_jugador_quieto() -> None:
     for _ in range(10):
         world.update(Vector2(0, 0))
     assert world.player.position == Vector2(0, 0)
+
+
+# --- El enjambre (ADR 0021) ---
+
+
+def test_el_jugador_se_mueve_igual_con_enemigos_cerca() -> None:
+    # La carga del jugador atrae, pero ninguna fuerza lo mueve: su control es exacto.
+    solo = World(BALANCE, random.Random(1), lethal=False, armed=False)
+    rodeado = World(BALANCE, random.Random(1), lethal=False, armed=False)
+    hexagon = BALANCE.enemies["hexagon"]
+    rodeado.enemies += [Enemy(hexagon, p) for p in lattice(Vector2(), 12, 60)]
+    for paso in range(60):
+        intent = Vector2(1, 0).rotate(paso * 6)
+        solo.update(intent)
+        rodeado.update(intent)
+    assert rodeado.player.position == solo.player.position
+
+
+def test_enemigo_muerto_no_divide_por_cero() -> None:
+    # Foco de revisión 1: una bala le quita la última línea en el paso, y el paso
+    # siguiente no puede calcular con masa 0.
+    world = World(BALANCE, random.Random(1))
+    [enemy] = world.enemies
+    enemy.position = Vector2(-150, 0)
+    enemy.previous = Vector2(enemy.position)
+    for k in [0, 1, 2, 3, 5]:
+        enemy.remove_edge(k)
+    for _ in range(40):
+        world.update(Vector2())
+    assert enemy not in world.enemies
+
+
+def test_aparecer_encima_de_otro_los_separa() -> None:
+    # Foco de revisión 4: el próximo enemigo aparece justo donde ya hay uno.
+    world = mundo_sin_armas(seed=1)
+    gemelo = random.Random()
+    gemelo.setstate(world.rng.getstate())
+    donde = spawn_position(world.player.position, BALANCE.spawning.distance, gemelo)
+    world.enemies[0].position = Vector2(donde)
+    for _ in range(INTERVALO + 1):
+        world.update(Vector2())
+    a, b = world.enemies
+    assert a.position.distance_to(b.position) >= a.radius + b.radius - 1e-9
+
+
+def test_sin_letalidad_no_termina() -> None:
+    world = World(BALANCE, random.Random(1), lethal=False)
+    world.enemies[0].position = Vector2(tangente() - 5, 0)
+    world.update(Vector2())
+    assert world.game_over is False
+
+
+def test_desarmado_no_dispara() -> None:
+    world = World(BALANCE, random.Random(1), armed=False)
+    assert world.weapons == []
+
+
+def test_cuenta_las_separaciones() -> None:
+    world = mundo_sin_armas(seed=1)
+    hexagon = world.balance.enemies["hexagon"]
+    world.enemies = [Enemy(hexagon, Vector2(300, 0)), Enemy(hexagon, Vector2(320, 0))]
+    world.update(Vector2())
+    assert world.separations == 1
