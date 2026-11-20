@@ -9,6 +9,7 @@ from dataclasses import replace
 
 from pygame.math import Vector2
 
+from circlebh.audio import sounds
 from circlebh.audio.harmony import bpm_for, variation_for
 from circlebh.audio.rhythm import SIXTEENTHS
 from circlebh.audio.sequencer import SAMPLES_PER_STEP, Sequencer
@@ -117,6 +118,21 @@ def test_game_volume_cero_calla_solo_las_notas_del_juego() -> None:
     assert list(bloques_con_enemigo_en(este, 1.0).ready) != list(
         bloques_con_enemigo_en(norte, 1.0).ready
     )
+
+
+def test_al_crearse_deja_lista_la_bateria() -> None:
+    # Generar un sonido la primera vez cuesta hasta 70 ms: no puede pasar a mitad de
+    # partida, donde se notaría como un tirón.
+    for sonido in (sounds.kick, sounds.clap, sounds.impact, sounds.riser):
+        sonido.cache_clear()
+    sequencer = Sequencer(1)
+    for sonido in (sounds.kick, sounds.closed_hat, sounds.open_hat, sounds.clap):
+        assert sonido.cache_info().currsize == 1
+    assert sounds.impact.cache_info().currsize == 1
+    assert sounds.rim.cache_info().currsize == 1
+    assert sounds.riser.cache_info().currsize == 1
+    sounds.riser(sequencer.grid.bar_seconds)
+    assert sounds.riser.cache_info().hits >= 1
 
 
 # --- La cuantización ---

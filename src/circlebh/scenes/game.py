@@ -6,6 +6,7 @@ import pygame
 import pygame._sdl2.controller as sdl_controller
 from pygame.math import Vector2
 
+from circlebh.audio.sequencer import Sequencer
 from circlebh.balance import BALANCE
 from circlebh.cli import RunOptions
 from circlebh.controls import (
@@ -19,6 +20,7 @@ from circlebh.pilot import pilot_intent
 from circlebh.render.plane import draw_axes, draw_letterbox
 from circlebh.render.world_view import draw_world
 from circlebh.scenes.death import EFFECT_STEPS, DeathScreen
+from circlebh.scenes.music import MusicPlayer, music_enabled
 from circlebh.scenes.scenarios import SCENARIOS, Scenario
 from circlebh.seeds import next_seed
 from circlebh.settings import Settings
@@ -108,6 +110,18 @@ class GameScene:
         )
         self.gamepads = Gamepads() if self.demo is None else None
         self.death_screen = DeathScreen()
+        self.music: Sequencer | None = None
+        self.music_player: MusicPlayer | None = None
+        if music_enabled(options, settings):
+            audio = settings.audio
+            player = MusicPlayer(audio.volume)
+            if player.available:
+                self.music_player = player
+                self.music = Sequencer(
+                    options.seed,
+                    base_volume=audio.base_volume,
+                    game_volume=audio.game_volume,
+                )
         self.game = 0
         """Cuántas veces se reinició: la primera partida es la 0."""
         self.start(options.seed)
@@ -131,6 +145,8 @@ class GameScene:
                 Enemy(hexagon, p) for p in lattice(Vector2(), demo.crowd, 90)
             ]
         self.dead_steps = 0
+        if self.music is not None:
+            self.music.start_game(seed)
 
     def restart(self) -> None:
         """Empieza la partida siguiente, con la semilla que le toca (`next_seed`)."""
@@ -153,13 +169,23 @@ class GameScene:
             self.restart()
 
     def step(self) -> None:
-        """Avanza `world` un paso con la intención de este momento, o cuenta la muerte."""
+        """Avanza `world` un paso con la intención de este momento, o cuenta la muerte.
+
+        La música avanza en todos los pasos, también con el jugador muerto.
+        """
         if not self.world.game_over:
             self.world.update(self.intent())
-            return
-        self.dead_steps += 1
-        if self.demo is not None and self.dead_steps >= DEMO_RESTART_STEPS:
-            self.restart()
+        else:
+            self.dead_steps += 1
+            if self.demo is not None and self.dead_steps >= DEMO_RESTART_STEPS:
+                self.restart()
+        if self.music is not None:
+            self.music.step(self.world)
+
+    def play_music(self) -> None:
+        """Pasa al canal de audio los bloques que el secuenciador dejó listos."""
+        if self.music is not None and self.music_player is not None:
+            self.music_player.update(self.music.ready)
 
     def intent(self) -> Vector2:
         if self.demo is not None:

@@ -18,6 +18,7 @@ from circlebh.balance_tools import check
 from circlebh.cli import RunOptions, parse_args
 from circlebh.datafile import DataFileError
 from circlebh.scenes.game import GameScene
+from circlebh.scenes.music import init_mixer
 from circlebh.settings import Settings, load_settings
 from circlebh.world.clock import STEP, FixedStepClock, capture_steps
 
@@ -111,6 +112,7 @@ def toggle_fullscreen(
 
 def run_window(options: RunOptions, settings: Settings) -> None:
     """Abre la ventana y la mantiene hasta que el jugador la cierra o presiona Escape."""
+    init_mixer()
     pygame.init()
     # La misma superficie sirve todo el rato: cambia de tamaño al redimensionar y con F11.
     screen = pygame.display.set_mode(options.window, pygame.RESIZABLE)
@@ -133,6 +135,7 @@ def run_window(options: RunOptions, settings: Settings) -> None:
             scene.handle_event(event)
         for _ in range(step_clock.advance(real_dt, options.speed)):
             scene.step()
+        scene.play_music()
         scene.draw(screen)
         pygame.display.flip()
 

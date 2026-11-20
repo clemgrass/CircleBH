@@ -158,6 +158,19 @@ class Sequencer:
         self._delay_l = [0.0] * (3 * round(self.grid.samples))  # corchea con puntillo
         self._delay_r = [0.0] * len(self._delay_l)
         self._delay_pos = 0
+        self._warm_up()
+
+    def _warm_up(self) -> None:
+        """Genera la batería ahora: la primera vez, un sonido cuesta hasta 70 ms, y a
+        mitad de partida se notaría como un tirón. Las notas, que dependen de la forma de
+        cada enemigo, se generan al sonar por primera vez."""
+        sounds.kick()
+        sounds.closed_hat()
+        sounds.open_hat()
+        sounds.clap()
+        sounds.impact()
+        sounds.rim()
+        sounds.riser(self.grid.bar_seconds)
 
     def start_game(self, seed: int) -> None:
         """Una partida nueva: su tonalidad y su acorde inicial entran en el compás
