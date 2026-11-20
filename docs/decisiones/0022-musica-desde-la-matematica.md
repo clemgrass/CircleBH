@@ -140,9 +140,9 @@ Lo de la 0.1.0 es una primera versión. Antes del MVP se revisa:
 
 ### Implementación (#44, 2026-11-20)
 
-- `uv run poe musica` (120 s, semilla 1): la mezcla cuesta 2,7 ms por paso de media, con p99 de 9,3 ms. Con el jugador inmortal, 3,3 ms y p99 de 10,6 ms. Cumple la meta de 4 ms de media. Dos corridas dieron el mismo sha256 (`802507901469ab6e`, después de arreglar que los eventos del paso fatal sonaban en cada paso de la pantalla de muerte).
+- `uv run poe musica` (120 s, semilla 1): la mezcla cuesta 2,7 ms por paso de media, con p99 de 9,3 ms. Con el jugador inmortal, 3,3 ms y p99 de 10,6 ms. Cumple la meta de 4 ms de media. Con todos los arreglos de la revisión, la demo cuesta 3,0 ms de media y dos corridas dan el mismo sha256 (`e99dddadd360c247`).
 - La revisión de la rama encontró ese defecto. La prueba manual encontró que la música se callaba a los pocos segundos: una carrera en pygame-ce 2.5.8 al encolar justo cuando un bloque termina. Se arregló en `audio/playback.py`, con un colchón de dos bloques y la recuperación del bloque atascado.
-- Queda un pico de 39 a 47 ms la primera vez que suena el acorde corto de cada acorde. Va al asterisco de CPU del MVP. La batería se genera al crear el secuenciador (173 ms una vez), porque generarla a mitad de partida trababa un cuadro en 70 ms.
+- Queda un pico de 40 a 100 ms la primera vez que suena el acorde corto de cada acorde en cada tonalidad. Va al asterisco de CPU del MVP. La batería se genera al crear el secuenciador (173 ms una vez), porque generarla a mitad de partida trababa un cuadro en 70 ms.
 
 ## Pros y contras de las opciones
 
