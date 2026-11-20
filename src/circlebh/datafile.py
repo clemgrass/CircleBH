@@ -1,12 +1,15 @@
 """Carga validada de dataclasses desde JSON, y la inversa.
 
 La usan el balance (ADR 0004) y la configuración del juego (ADR 0018). Los tipos de campo
-que entiende son `float`, `int`, `bool`, `str`, `tuple[...]` de largo fijo, otras
-dataclasses y `dict[str, Dataclass]`. Un error nombra la ruta del campo: `player.speed`.
+que entiende son `float`, `int`, `bool`, `str`, `Literal[...]`, `tuple[...]` de largo fijo,
+`tuple[X, ...]` de cualquier largo (una lista en JSON), otras dataclasses,
+`dict[str, Dataclass]`, alias `type X = ...` y uniones de dataclasses elegidas por su campo
+`kind: Literal["..."]` (ADR 0021). Un error nombra la ruta del campo: `player.speed`.
 """
 
 import dataclasses
 import json
+import types
 import typing
 
 type Json = dict[str, Json] | list[Json] | str | int | float | bool
@@ -49,11 +52,23 @@ def dump(obj: object) -> Json:
 
 
 def _load_value(kind: object, data: object, field: str) -> object:
+    if isinstance(kind, typing.TypeAliasType):
+        # `type PatternSpec = SeekSpec | CoulombSpec`: vale lo que nombra.
+        return _load_value(kind.__value__, data, field)
     if isinstance(kind, type) and dataclasses.is_dataclass(kind):
         return _load_dataclass(kind, data, field)
     origin = typing.get_origin(kind)
+    if origin is types.UnionType:
+        return _load_union(typing.get_args(kind), data, field)
+    if origin is typing.Literal:
+        if data not in typing.get_args(kind):
+            raise _mismatch(field, _one_of(typing.get_args(kind)), data)
+        return data
     if origin is tuple:
-        return _load_tuple(typing.get_args(kind), data, field)
+        args = typing.get_args(kind)
+        if len(args) == 2 and args[1] is Ellipsis:
+            return _load_list(args[0], data, field)
+        return _load_tuple(args, data, field)
     if origin is dict:
         _, value_kind = typing.get_args(kind)
         mapping = _expect_object(data, field)
@@ -101,6 +116,48 @@ def _load_tuple(kinds: tuple[object, ...], data: object, field: str) -> object:
         _load_value(kind, item, f"{field}[{i}]")
         for i, (kind, item) in enumerate(zip(kinds, data, strict=True))
     )
+
+
+def _load_list(kind: object, data: object, field: str) -> object:
+    """`tuple[X, ...]`: una lista de JSON de cualquier largo."""
+    if not isinstance(data, list):
+        raise _mismatch(field, "una lista", data)
+    return tuple(
+        _load_value(kind, item, f"{field}[{i}]") for i, item in enumerate(data)
+    )
+
+
+def _load_union(members: tuple[object, ...], data: object, field: str) -> object:
+    """Una unión de dataclasses, elegida por su campo `kind: Literal[...]`.
+
+    Es una unión discriminada: el valor de `kind` dice qué miembro cargar, así que un
+    error nombra el campo del miembro elegido y no una lista de intentos fallidos.
+    """
+    mapping = _expect_object(data, field)
+    by_kind = {_kind_of(member): member for member in members}
+    kind_field = _join(field, "kind")
+    if "kind" not in mapping:
+        raise DataFileError(kind_field, "falta el campo")
+    value = mapping["kind"]
+    chosen = by_kind.get(value) if isinstance(value, str) else None
+    if chosen is None:
+        raise _mismatch(kind_field, _one_of(tuple(by_kind)), value)
+    return _load_value(chosen, mapping, field)
+
+
+def _kind_of(member: object) -> str:
+    """El valor de `kind: Literal["..."]` de un miembro de una unión."""
+    if not (isinstance(member, type) and dataclasses.is_dataclass(member)):
+        raise TypeError(f"una unión solo puede tener dataclasses: {member!r}")
+    hint = typing.get_type_hints(member).get("kind")
+    values = typing.get_args(hint) if typing.get_origin(hint) is typing.Literal else ()
+    if len(values) != 1 or not isinstance(values[0], str):
+        raise TypeError(f'{member.__name__} necesita `kind: Literal["..."]`')
+    return values[0]
+
+
+def _one_of(values: tuple[object, ...]) -> str:
+    return "uno de: " + ", ".join(str(value) for value in values)
 
 
 def _expect_object(data: object, field: str) -> dict[str, object]:
