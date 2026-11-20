@@ -1,10 +1,17 @@
-"""Tests del piloto de la demo: una vuelta completa cada 4 s, siempre a largo 1."""
+"""Tests del piloto de la demo: una vuelta completa cada 4 s, siempre a largo 1.
+
+La simulación de 60 s está en `test_simulacion.py`; aquí van los reinicios, con
+partidas cortas.
+"""
+
+from dataclasses import replace
 
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from circlebh.pilot import pilot_intent
+from circlebh.balance import BALANCE
+from circlebh.pilot import pilot_intent, simulate
 
 STEPS_PER_LAP = 4 * 60
 
@@ -30,3 +37,19 @@ def test_piloto_vuelve_al_inicio_tras_4_s() -> None:
     start, lap = pilot_intent(0), pilot_intent(STEPS_PER_LAP)
     assert lap.x == pytest.approx(start.x)
     assert lap.y == pytest.approx(start.y, abs=1e-9)
+
+
+# --- La simulación ---
+
+
+def test_simulacion_reinicia_al_morir() -> None:
+    # Los hexágonos aparecen pegados al jugador: lo tocan en el primer paso de cada
+    # partida, así que en un segundo hay muchas.
+    letal = replace(BALANCE, spawning=replace(BALANCE.spawning, distance=30.0))
+    assert simulate(letal, seconds=1.0, seed=1) > 1
+
+
+def test_simulacion_sin_peligro_es_una_sola_partida() -> None:
+    quieto = replace(BALANCE.enemies["hexagon"], speed=0.0)
+    inofensivo = replace(BALANCE, enemies={"hexagon": quieto})
+    assert simulate(inofensivo, seconds=5.0, seed=1) == 1
