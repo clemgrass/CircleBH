@@ -24,7 +24,9 @@ from circlebh.seeds import next_seed
 from circlebh.settings import Settings
 from circlebh.viewport import Viewport, camera_center
 from circlebh.world.clock import STEP
+from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
+from circlebh.world.swarm import lattice
 
 DEMO_RESTART_STEPS = round(2.0 / STEP)
 """En la demo y las capturas, cuántos pasos se ve la muerte antes de reiniciar: 2 s."""
@@ -114,7 +116,20 @@ class GameScene:
         """Empieza una partida nueva con `seed`. La semilla se imprime para repetirla."""
         print(f"semilla: {seed}")
         self.seed = seed
-        self.world = World(BALANCE, random.Random(seed))
+        demo = self.demo
+        self.world = World(
+            BALANCE,
+            random.Random(seed),
+            lethal=demo is None or demo.lethal,
+            armed=demo is None or demo.armed,
+        )
+        if demo is not None and demo.crowd:
+            # Más abiertos que el equilibrio (≈ 55), para ver cómo se acercan y se
+            # ordenan.
+            hexagon = BALANCE.enemies["hexagon"]
+            self.world.enemies += [
+                Enemy(hexagon, p) for p in lattice(Vector2(), demo.crowd, 90)
+            ]
         self.dead_steps = 0
 
     def restart(self) -> None:

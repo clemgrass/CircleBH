@@ -9,6 +9,12 @@ class Scenario:
     description: str
     pilot: bool
     """Si el piloto mueve al jugador. Si no, el jugador se queda quieto."""
+    crowd: int = 0
+    """Hexágonos extra al empezar, en una red triangular alrededor del jugador."""
+    lethal: bool = True
+    """Si el contacto termina la partida."""
+    armed: bool = True
+    """Si el jugador tiene armas."""
 
 
 SCENARIOS: dict[str, Scenario] = {
@@ -35,6 +41,15 @@ SCENARIOS: dict[str, Scenario] = {
             "El piloto se mueve y llega un hexágono nuevo cada `spawning.interval`"
             " segundos. Al morir, la partida se reinicia sola.",
             pilot=True,
+        ),
+        Scenario(
+            "panal",
+            "40 hexágonos alrededor del jugador quieto, sin contacto ni arma: se"
+            " ordenan como imanes (ADR 0021).",
+            pilot=False,
+            crowd=40,
+            lethal=False,
+            armed=False,
         ),
     ]
 }
