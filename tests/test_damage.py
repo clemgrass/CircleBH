@@ -11,6 +11,7 @@ from pygame.math import Vector2
 from circlebh.balance import BALANCE, EnemySpec, PointWeaponSpec
 from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
+from circlebh.world.polygon import vertex
 from circlebh.world.weapons import PointWeapon
 
 SPEC = PointWeaponSpec(cooldown=0.5, speed=600.0, range=700.0)
@@ -63,6 +64,16 @@ def test_bala_dentro_de_la_envolvente_sin_cruzar_no_golpea() -> None:
     # afuera del polígono, sin cruzar ninguna línea.
     enemy = Enemy(HEXAGON, Vector2(0, 0))
     assert enemy.hit_by(Vector2(23, -1), Vector2(23, 1)) is None
+
+
+def test_tramo_que_termina_en_un_vertice_golpea() -> None:
+    # Lo encontró Hypothesis: el vértice 7 de un polígono de 20 lados queda, por
+    # redondeo, a 24,000000000000004 del centro, y la envolvente de radio 24 descartaba
+    # un golpe que la prueba exacta sí encuentra.
+    veinte = EnemySpec(sides=20, radius=24.0, speed=0.0)
+    enemy = Enemy(veinte, Vector2(0, 0))
+    v = vertex(veinte.radius, veinte.sides, 7)
+    assert enemy.hit_by(Vector2(-29, -1), v) is not None
 
 
 def test_hit_by_da_t_y_arista() -> None:

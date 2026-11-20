@@ -13,7 +13,12 @@ from pygame.math import Vector2
 from circlebh.balance import EnemySpec
 from circlebh.world.clock import STEP
 from circlebh.world.collisions import circles_touch, segment_touches_circle
-from circlebh.world.polygon import edge_sectors, first_hit, polygon_edge
+from circlebh.world.polygon import (
+    ENVELOPE_SLACK,
+    edge_sectors,
+    first_hit,
+    polygon_edge,
+)
 
 
 class Enemy:
@@ -57,7 +62,9 @@ class Enemy:
         Primero descarta con el círculo envolvente; solo si lo toca, prueba cada línea.
         Un círculo dentro del enemigo que no toca ninguna línea no lo toca.
         """
-        if not circles_touch(center, radius, self.position, self.radius):
+        if not circles_touch(
+            center, radius, self.position, self.radius + ENVELOPE_SLACK
+        ):
             return False
         return any(
             segment_touches_circle(a, b, center, radius) for a, b in self.lines()
@@ -74,7 +81,7 @@ class Enemy:
         relative_start = start - self.previous
         relative_end = end - self.position
         if not segment_touches_circle(
-            relative_start, relative_end, Vector2(), self.radius
+            relative_start, relative_end, Vector2(), self.radius + ENVELOPE_SLACK
         ):
             return None
         sides = self.spec.sides

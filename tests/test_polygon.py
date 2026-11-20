@@ -9,10 +9,12 @@ from pygame.math import Vector2
 
 from circlebh.world.collisions import segment_touches_circle
 from circlebh.world.polygon import (
+    ENVELOPE_SLACK,
     edge_sectors,
     first_hit,
     polygon_edge,
     regular_polygon,
+    vertex,
 )
 
 R = 24.0
@@ -124,12 +126,41 @@ def test_tramo_que_nace_en_el_centro_revisa_todas() -> None:
 
 coordenadas = st.floats(min_value=-100, max_value=100)
 puntos = st.builds(Vector2, coordenadas, coordenadas)
+angulos = st.floats(min_value=0, max_value=math.tau)
+largos = st.floats(min_value=0.5, max_value=100)
 
 
-@given(start=puntos, end=puntos, sides=st.integers(3, 100), data=st.data())
+def direccion(angulo: float) -> Vector2:
+    return Vector2(math.cos(angulo), math.sin(angulo))
+
+
+@st.composite
+def tramos(draw: st.DrawFn, sides: int) -> tuple[Vector2, Vector2]:
+    """Un tramo cualquiera, o uno dirigido a los casos difíciles de los sectores (la
+    revisión de #25 mostró que los puntos al azar casi nunca caen en ellos)."""
+    tipo = draw(st.sampled_from(["libre", "vertice", "centro", "arista"]))
+    if tipo == "libre":
+        return draw(puntos), draw(puntos)
+    if tipo == "vertice":
+        # Pasa por un vértice, en cualquier dirección: dos aristas empatan.
+        v = vertex(R, sides, draw(st.integers(0, sides - 1)))
+        d = direccion(draw(angulos))
+        return v + d * draw(largos), v - d * draw(largos)
+    if tipo == "centro":
+        # Pasa por el centro o a menos de 1e-6: el barrido es de casi media vuelta.
+        d = direccion(draw(angulos))
+        normal = Vector2(-d.y, d.x) * draw(st.floats(-1e-6, 1e-6))
+        return d * draw(largos) + normal, -d * draw(largos) + normal
+    # Termina justo sobre una arista, en cualquier punto de ella.
+    a, b = polygon_edge(R, sides, draw(st.integers(0, sides - 1)))
+    return draw(puntos), a + (b - a) * draw(st.floats(0, 1))
+
+
+@given(sides=st.integers(3, 100), data=st.data())
 def test_sectores_dan_lo_mismo_que_todas_las_lineas(
-    start: Vector2, end: Vector2, sides: int, data: st.DataObject
+    sides: int, data: st.DataObject
 ) -> None:
+    start, end = data.draw(tramos(sides))
     edges = sorted(data.draw(st.sets(st.integers(0, sides - 1))))
     candidatas = [k for k in edge_sectors(start, end, sides) if k in edges]
     assert first_hit(start, end, R, sides, candidatas) == first_hit(
@@ -137,9 +168,9 @@ def test_sectores_dan_lo_mismo_que_todas_las_lineas(
     )
 
 
-@given(start=puntos, end=puntos, sides=st.integers(3, 100))
-def test_la_envolvente_no_descarta_golpes(
-    start: Vector2, end: Vector2, sides: int
-) -> None:
+@given(sides=st.integers(3, 100), data=st.data())
+def test_la_envolvente_no_descarta_golpes(sides: int, data: st.DataObject) -> None:
+    start, end = data.draw(tramos(sides))
+    # La misma envolvente que usa `Enemy.hit_by`, con su margen.
     if first_hit(start, end, R, sides, range(sides)) is not None:
-        assert segment_touches_circle(start, end, Vector2(), R)
+        assert segment_touches_circle(start, end, Vector2(), R + ENVELOPE_SLACK)

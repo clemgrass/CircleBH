@@ -15,8 +15,17 @@ from pygame.math import Vector2
 from circlebh.world.collisions import crossing
 
 TIE = 1e-9
-"""Dos cruces cuyos `t` difieren menos que esto empatan. Así, una bala que pasa por un
-vértice da siempre la arista de índice menor, aunque el redondeo dé `t` distintos."""
+"""Dos cruces cuyos `t` difieren menos que esto empatan, y gana la arista de índice
+menor. Cubre el redondeo de `t` cuando una bala pasa por un vértice.
+
+Límite: no cubre el redondeo de `u` en `crossing`. Si el tramo pasa a ~1e-15 de un
+vértice, ese redondeo puede descartar una de las dos aristas, y gana la otra o, rara
+vez, ninguna en ese vértice. En el juego no se nota: exige pasar a esa distancia."""
+
+ENVELOPE_SLACK = 1e-9
+"""Margen del círculo envolvente, en unidades del plano. Por redondeo, un vértice puede
+quedar a `radius + 4e-15` del centro, y una envolvente justa descartaría un golpe en él.
+Un margen es siempre seguro: solo hace probar las líneas en algún caso de más."""
 
 NEAR_HALF_TURN = 1e-6
 """Si el barrido de un tramo queda a menos de esto de media vuelta, el tramo pasa por el
@@ -56,6 +65,9 @@ def edge_sectors(start: Vector2, end: Vector2, sides: int) -> list[int]:
     barrido, así que basta recorrer los sectores de `start` a `end` por el camino corto.
     Se suma uno a cada lado, por si el redondeo deja un extremo en el sector vecino. Si un
     extremo está en el centro, o el barrido es de casi media vuelta, devuelve todas.
+
+    Ese sector de más a cada lado y `NEAR_HALF_TURN` son defensivos: la revisión de #25
+    probó 200.000 tramos adversariales sin ellos y no encontró un caso que los necesite.
     """
     if start.length_squared() == 0 or end.length_squared() == 0:
         return list(range(sides))
