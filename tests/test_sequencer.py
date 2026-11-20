@@ -255,6 +255,20 @@ def test_los_eventos_del_paso_fatal_suenan_una_sola_vez() -> None:
     assert sum(d.death for d in sequencer.decisions) == 1
 
 
+def test_un_golpe_de_la_partida_anterior_no_suena_en_la_nueva() -> None:
+    # El golpe queda pendiente al final de un paso; si en el paso siguiente ya hay otro
+    # mundo (el jugador reinició), es de la partida anterior y no suena.
+    enemy = Enemy(QUIETO, Vector2(300, 0))
+    viejo = mundo(enemy, armed=False)
+    sequencer = Sequencer(1)
+    viejo.update(Vector2())
+    viejo.events += [Hit(enemy, 1), Death(enemy)]
+    sequencer.step(viejo)
+    tocar(sequencer, mundo(armed=False), 60)
+    assert sum(d.rims for d in sequencer.decisions) == 0
+    assert not any(d.death for d in sequencer.decisions)
+
+
 def test_un_mundo_nuevo_vuelve_a_la_calma_con_un_impacto() -> None:
     sequencer = Sequencer(1)
     tocar(sequencer, mundo(armed=False), 30)

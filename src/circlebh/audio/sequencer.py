@@ -187,6 +187,9 @@ class Sequencer:
             self._world = world
             self._world_steps = -1
             self._was_over = False
+            # Lo pendiente era de la partida anterior: no suena en la nueva.
+            self._pending = []
+            self._armed.clear()
         if world.game_over and not self._was_over:
             self._cues += self._arrangement.reset()
             self._was_over = True
