@@ -8,5 +8,11 @@
   },
   "debug": {
     "show_hitboxes": false
+  },
+  "audio": {
+    "music": true,
+    "volume": 0.8,
+    "base_volume": 1.0,
+    "game_volume": 1.0
   }
 }

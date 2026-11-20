@@ -66,6 +66,33 @@ class DebugSettings:
 
 
 @dataclass(frozen=True)
+class AudioSettings:
+    """La música (ADR 0022). Es configuración para el jugador: cada capa tiene su
+    volumen, y se puede apagar la música entera."""
+
+    music: bool
+    """Si suena la música."""
+
+    volume: float
+    """Volumen general, de 0 a 1."""
+
+    base_volume: float
+    """Volumen de la base de techno (batería, pad y bajo), de 0 a 1."""
+
+    game_volume: float
+    """Volumen de lo que sale del juego (loops de enemigos, arma y golpes), de 0 a 1."""
+
+    def __post_init__(self) -> None:
+        for name in ("volume", "base_volume", "game_volume"):
+            value = getattr(self, name)
+            # Con NaN, la comparación da falso y la mezcla quedaría en NaN, sin error.
+            if not (math.isfinite(value) and 0 <= value <= 1):
+                raise DataFileError(
+                    f"audio.{name}", f"debe estar entre 0 y 1, llegó {value}"
+                )
+
+
+@dataclass(frozen=True)
 class Settings:
     """Toda la configuración del juego."""
 
@@ -77,6 +104,9 @@ class Settings:
 
     debug: DebugSettings
     """Ayudas para depurar."""
+
+    audio: AudioSettings
+    """La música."""
 
 
 def load_settings(path: Path | None = None) -> Settings:

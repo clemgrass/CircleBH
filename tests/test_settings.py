@@ -9,6 +9,7 @@ import pytest
 
 from circlebh.datafile import DataFileError
 from circlebh.settings import (
+    AudioSettings,
     CameraSettings,
     ControlsSettings,
     DebugSettings,
@@ -20,6 +21,7 @@ VALIDO = {
     "controls": {"stick_deadzone": 0.2},
     "camera": {"fov": 720.0, "offset": [0.0, 0.0]},
     "debug": {"show_hitboxes": False},
+    "audio": {"music": True, "volume": 0.8, "base_volume": 1.0, "game_volume": 1.0},
 }
 
 
@@ -55,13 +57,39 @@ def test_lee_el_valor_del_archivo(tmp_path: Path) -> None:
             "controls": {"stick_deadzone": 0.3},
             "camera": {"fov": 900, "offset": [10, -20.5]},
             "debug": {"show_hitboxes": True},
+            "audio": {
+                "music": False,
+                "volume": 0.5,
+                "base_volume": 0.25,
+                "game_volume": 1,
+            },
         }
     )
     assert load_settings(escribir(tmp_path, texto)) == Settings(
         controls=ControlsSettings(stick_deadzone=0.3),
         camera=CameraSettings(fov=900.0, offset=(10.0, -20.5)),
         debug=DebugSettings(show_hitboxes=True),
+        audio=AudioSettings(music=False, volume=0.5, base_volume=0.25, game_volume=1.0),
     )
+
+
+# --- Audio ---
+
+
+@pytest.mark.parametrize("campo", ["volume", "base_volume", "game_volume"])
+@pytest.mark.parametrize("valor", [0, 1])
+def test_volumen_en_los_bordes_vale(tmp_path: Path, campo: str, valor: float) -> None:
+    path = escribir(tmp_path, con("audio", campo, valor))
+    assert getattr(load_settings(path).audio, campo) == valor
+
+
+@pytest.mark.parametrize("campo", ["volume", "base_volume", "game_volume"])
+@pytest.mark.parametrize("valor", [-0.1, 1.1, math.nan, math.inf])
+def test_volumen_fuera_de_rango_nombra_el_campo(
+    tmp_path: Path, campo: str, valor: float
+) -> None:
+    error = falla_en(escribir(tmp_path, con("audio", campo, valor)))
+    assert error.field == f"audio.{campo}"
 
 
 # --- Zona muerta ---

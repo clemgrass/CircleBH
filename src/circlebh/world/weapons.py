@@ -11,15 +11,16 @@ from pygame.math import Vector2
 from circlebh.balance import PointWeaponSpec
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
+from circlebh.world.events import Event, Hit, Shot
 
 
 class Weapon(ABC):
     """La base de toda arma."""
 
     @abstractmethod
-    def update(self, origin: Vector2, enemies: list[Enemy]) -> None:
+    def update(self, origin: Vector2, enemies: list[Enemy]) -> list[Event]:
         """Avanza un paso. `origin` es la posición del jugador en este paso, y `enemies`,
-        los enemigos vivos."""
+        los enemigos vivos. Devuelve los eventos del paso: disparos y golpes."""
 
 
 class Bullet:
@@ -99,7 +100,7 @@ class PointWeapon(Weapon):
         """Pasos que faltan para el próximo disparo. Parte en 0: dispara en el primer
         paso en que tenga a quién."""
 
-    def update(self, origin: Vector2, enemies: list[Enemy]) -> None:
+    def update(self, origin: Vector2, enemies: list[Enemy]) -> list[Event]:
         """Avanza las balas, aplica sus golpes, quita las gastadas y, si toca, dispara
         desde `origin`.
 
@@ -109,37 +110,46 @@ class PointWeapon(Weapon):
 
         La bala nueva nace en `origin` y empieza a moverse en el paso siguiente. Sin
         objetivo, o con su centro justo en `origin`, no dispara y queda lista.
+
+        Devuelve un `Hit` por cada línea quitada y un `Shot` si disparó.
         """
+        events: list[Event] = []
         remaining: list[Bullet] = []
         for bullet in self.bullets:
             bullet.step()
-            if not self._strike(bullet, enemies) and not bullet.expired:
+            hit = self._strike(bullet, enemies)
+            if hit is not None:
+                events.append(hit)
+            elif not bullet.expired:
                 remaining.append(bullet)
         self.bullets = remaining
         self._steps_to_next -= 1
-        if self._steps_to_next <= 0:
-            self._fire(origin, enemies)
+        if self._steps_to_next <= 0 and self._fire(origin, enemies):
+            events.append(Shot(self))
+        return events
 
     @staticmethod
-    def _strike(bullet: Bullet, enemies: list[Enemy]) -> bool:
-        """Si el último tramo de `bullet` cruza una línea, la quita y devuelve `True`."""
+    def _strike(bullet: Bullet, enemies: list[Enemy]) -> Hit | None:
+        """Si el último tramo de `bullet` cruza una línea, la quita y devuelve el golpe."""
         best: tuple[float, int, Enemy, int] | None = None
         for index, enemy in enumerate(enemies):
-            hit = enemy.hit_by(bullet.previous, bullet.position)
-            if hit is not None and (best is None or hit[0] < best[0]):
-                t, k = hit
+            crossing = enemy.hit_by(bullet.previous, bullet.position)
+            if crossing is not None and (best is None or crossing[0] < best[0]):
+                t, k = crossing
                 best = (t, index, enemy, k)
         if best is None:
-            return False
+            return None
         _, _, enemy, k = best
         enemy.remove_edge(k)
-        return True
+        return Hit(enemy, k)
 
-    def _fire(self, origin: Vector2, enemies: list[Enemy]) -> None:
+    def _fire(self, origin: Vector2, enemies: list[Enemy]) -> bool:
+        """Dispara al más cercano y devuelve `True`. Sin objetivo, no dispara."""
         target = nearest(origin, enemies)
         if target is None:
-            return
+            return False
         # `nearest` garantiza una dirección que se puede normalizar.
         velocity = (target.position - origin).normalize() * self.spec.speed
         self.bullets.append(Bullet(origin, velocity, self.spec))
         self._steps_to_next = round(self.spec.cooldown / STEP)
+        return True

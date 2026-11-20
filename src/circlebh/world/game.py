@@ -7,6 +7,7 @@ from pygame.math import Vector2
 from circlebh.balance import Balance
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy, spawn_position
+from circlebh.world.events import Death, Event
 from circlebh.world.player import Player
 from circlebh.world.swarm import step_swarm
 from circlebh.world.weapons import PointWeapon, Weapon
@@ -44,6 +45,8 @@ class World:
         self.separations = 0
         """Cuántos pares corrigió la red de seguridad en toda la partida. Con la ley de
         cargas bien afinada, debería quedar en 0 (ADR 0021)."""
+        self.events: list[Event] = []
+        """Lo que pasó en el último `update` (ADR 0022). Se vacía al empezar cada uno."""
         self._steps = 0
 
     @property
@@ -65,7 +68,11 @@ class World:
         siguiente. Recién entonces se revisa el contacto: matar a uno en el mismo paso
         en que te tocaría te salva. Si alguno lo toca, la partida termina; desde ahí,
         `update` no hace nada.
+
+        `events` queda con lo que pasó en este paso: los disparos y golpes de las armas,
+        y una muerte por cada enemigo que perdió su última línea.
         """
+        self.events = []
         if self.game_over:
             return
         self._steps += 1
@@ -77,7 +84,8 @@ class World:
             self.balance.charges,
         )
         for weapon in self.weapons:
-            weapon.update(self.player.position, self.enemies)
+            self.events += weapon.update(self.player.position, self.enemies)
+        self.events += [Death(enemy) for enemy in self.enemies if not enemy.alive]
         self.enemies = [enemy for enemy in self.enemies if enemy.alive]
         self._steps_to_spawn -= 1
         if self._steps_to_spawn <= 0:

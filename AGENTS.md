@@ -75,9 +75,11 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 | `uv run poe capturas` | evidencia en la sesión |
 | `uv run poe medios` | regenerar las imágenes del README |
 | `uv run poe benchmark` | medir el paso con muchos enemigos, a mano |
+| `uv run poe musica` | escuchar la música de la demo (WAV en `.capturas/`) y medir su mezcla, a mano |
 
-## Arquitectura (ADR 0003 a 0006, 0016, 0021)
-- En `src/circlebh/`, las importaciones van en una sola dirección: `scenes` → `render` → `world` → `balance`. `lint-imports` lo verifica.
+## Arquitectura (ADR 0003 a 0006, 0016, 0021, 0022)
+- En `src/circlebh/`, las importaciones van en una sola dirección: `scenes` → `render | audio` → `world` → `balance`. `render` y `audio` son hermanas y no se importan entre sí. `lint-imports` lo verifica.
+- La música sale de la geometría del juego, sobre una base de techno (ADR 0022). `audio/` es lógica pura como `world/`: escucha al mundo sin cambiarlo y nunca saca números de su `Random`. Solo `scenes/music.py` toca `pygame.mixer`: la regla `TID251` de ruff lo prohíbe fuera de `render/`, `scenes/` y `__main__.py`.
 - `world/` es lógica pura: no tiene `draw()` ni usa `pygame.display` ni `pygame.draw`. De Pygame solo usa `Vector2`. La regla `TID251` de ruff lo verifica, y solo `render/`, `scenes/` y `__main__.py` tienen la excepción.
 - `world` usa coordenadas matemáticas: Y hacia arriba y ángulos antihorarios en radianes. Solo la cámara las pasa a pantalla. Cada curva se escribe como su fórmula.
 - Clases simples con herencia y funciones cortas. Sin ECS, sin metaclases y sin `pygame.sprite`.
@@ -85,7 +87,7 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
   - Ninguno de los dos manda: deben calzar siempre.
   - Si difieren, el chequeo nombra el campo y se corrige a mano, exportando o importando, antes de jugar.
 - Los enemigos se mueven por los patrones de su tipo en el balance. Sus aceleraciones se suman, con inercia y roce, y entre ellos actúa una sola ley de cargas (ADR 0021).
-- La configuración del juego (cámara, controles, accesibilidad y depuración) vive solo en `settings.json`, dentro del paquete, y se valida al arrancar contra una dataclass (ADR 0018). Si describe a una entidad, va al balance; si describe cómo se juega o se ve, a la configuración.
+- La configuración del juego (cámara, controles, audio, accesibilidad y depuración) vive solo en `settings.json`, dentro del paquete, y se valida al arrancar contra una dataclass (ADR 0018). Si describe a una entidad, va al balance; si describe cómo se juega o se ve, a la configuración.
 - La lógica avanza en pasos fijos de 1/60 s con acumulador. El azar sale solo de la `random.Random(seed)` inyectada.
 - En las colisiones, cada cuerpo es un círculo. Se usa una grilla espacial y funciones propias en `world/`.
 - No hay archivos de imagen. La única excepción es `docs/media/`, que genera `poe medios`, y `poe check` lo verifica.

@@ -89,6 +89,10 @@ cmd = "python -m circlebh.balance_tools importar"
 help = "Milisegundos por paso del enjambre de 300 hexágonos y del jefe de 100 líneas (ADR 0006). A mano, no en la CI."
 cmd = "python tools/benchmark.py"
 
+[tool.poe.tasks.musica]
+help = "Evidencia de la música (ADR 0022): WAV de la demo en .capturas/ y ms por paso de la mezcla. A mano."
+cmd = "python tools/musica.py"
+
 [tool.poe.tasks.medios]
 help = "Regenera las imágenes del README en docs/media/ (ADR 0013). Pendiente."
 cmd = "python -c \"raise SystemExit('poe medios: pendiente, todavía no hay nada que mostrar')\""
@@ -102,6 +106,7 @@ extend-select = ["I", "B", "UP", "SIM", "N", "TID251"]
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "pygame.draw".msg = "Solo render/ y scenes/ dibujan (ADR 0003 y 0016)."
 "pygame.display".msg = "Solo render/ y scenes/ tocan la pantalla (ADR 0003 y 0016)."
+"pygame.mixer".msg = "Solo scenes/music.py toca el mixer; audio/ entrega bytes (ADR 0022)."
 
 [tool.ruff.lint.per-file-ignores]
 "src/circlebh/render/**" = ["TID251"]
@@ -120,11 +125,12 @@ files = ["src"]
 root_package = "circlebh"
 
 [[tool.importlinter.contracts]]
-name = "Capas: scenes → render → world → balance (ADR 0003)"
+name = "Capas: scenes → render | audio → world → balance (ADR 0003 y 0022)"
 type = "layers"
 layers = [
     "circlebh.scenes",
-    "circlebh.render",
+    # Hermanas independientes: ninguna importa a la otra.
+    "circlebh.render | circlebh.audio",
     "circlebh.world",
     "circlebh.balance",
 ]
