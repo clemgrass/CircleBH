@@ -49,6 +49,9 @@ class SpawningSpec:
     """Distancia al jugador a la que aparecen, en unidades del plano. Tiene que quedar
     fuera de la vista: más que la esquina de la pantalla, más el radio del enemigo."""
 
+    interval: float
+    """Segundos entre una aparición y la siguiente. El primero aparece al empezar."""
+
 
 @dataclass(frozen=True)
 class PointWeaponSpec:
@@ -86,7 +89,7 @@ class Balance:
 BALANCE = Balance(
     player=PlayerSpec(speed=240.0, radius=12.0),
     enemies={"hexagon": EnemySpec(sides=6, radius=24.0, speed=120.0)},
-    spawning=SpawningSpec(distance=800.0),
-    point_weapon=PointWeaponSpec(cooldown=0.3, speed=600.0, range=700.0),
+    spawning=SpawningSpec(distance=800.0, interval=2.0),
+    point_weapon=PointWeaponSpec(cooldown=0.6, speed=300.0, range=700.0),
 )
 # <<< datos

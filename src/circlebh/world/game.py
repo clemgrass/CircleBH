@@ -19,9 +19,10 @@ class World:
         # El único azar de la partida (ADR 0005).
         self.rng = rng
         self.player = Player(balance.player)
-        # Por ahora, un solo hexágono al empezar, fuera de la vista.
-        position = spawn_position(self.player.position, balance.spawning.distance, rng)
-        self.enemies = [Enemy(balance.enemies["hexagon"], position)]
+        self.enemies: list[Enemy] = []
+        self._spawn()
+        self._steps_to_spawn = self._spawn_steps()
+        """Pasos que faltan para la próxima aparición."""
         self.weapons: list[Weapon] = [PointWeapon(balance.point_weapon)]
         """Las armas del jugador. Por ahora, solo el arma punto."""
         self.game_over = False
@@ -42,9 +43,10 @@ class World:
         """Avanza un paso, con la intención de movimiento del jugador (largo 0 a 1).
 
         El jugador se mueve primero, los enemigos van hacia donde quedó, y las armas
-        golpean y disparan. Los enemigos sin líneas desaparecen, y recién entonces se
-        revisa el contacto: matar a uno en el mismo paso en que te tocaría te salva. Si
-        alguno lo toca, la partida termina; desde ahí, `update` no hace nada.
+        golpean y disparan. Los enemigos sin líneas desaparecen y, si toca, aparece uno
+        nuevo, que empieza a moverse en el paso siguiente. Recién entonces se revisa el
+        contacto: matar a uno en el mismo paso en que te tocaría te salva. Si alguno lo
+        toca, la partida termina; desde ahí, `update` no hace nada.
         """
         if self.game_over:
             return
@@ -55,7 +57,22 @@ class World:
         for weapon in self.weapons:
             weapon.update(self.player.position, self.enemies)
         self.enemies = [enemy for enemy in self.enemies if enemy.alive]
+        self._steps_to_spawn -= 1
+        if self._steps_to_spawn <= 0:
+            self._spawn()
+            self._steps_to_spawn = self._spawn_steps()
         self.game_over = any(
             enemy.touches(self.player.position, self.player.radius)
             for enemy in self.enemies
         )
+
+    def _spawn(self) -> None:
+        """Agrega un hexágono a `spawning.distance` del jugador, fuera de la vista."""
+        spawning = self.balance.spawning
+        position = spawn_position(self.player.position, spawning.distance, self.rng)
+        self.enemies.append(Enemy(self.balance.enemies["hexagon"], position))
+
+    def _spawn_steps(self) -> int:
+        """Pasos entre dos apariciones: `interval` redondeado a pasos enteros, como el
+        `cooldown` de las armas."""
+        return round(self.balance.spawning.interval / STEP)
