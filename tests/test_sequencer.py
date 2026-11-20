@@ -10,7 +10,7 @@ from dataclasses import replace
 from pygame.math import Vector2
 
 from circlebh.audio import sounds
-from circlebh.audio.harmony import bpm_for, variation_for
+from circlebh.audio.harmony import bpm_for, chord_at, variation_for
 from circlebh.audio.rhythm import SIXTEENTHS
 from circlebh.audio.sequencer import SAMPLES_PER_STEP, Sequencer
 from circlebh.balance import BALANCE, EnemySpec
@@ -215,6 +215,24 @@ def test_start_game_cambia_la_tonalidad_en_el_compas_siguiente() -> None:
         else:
             assert decision.variation == nueva
     assert sequencer.grid.bpm == bpm_for(1)
+
+
+def test_al_reiniciar_tonalidad_acorde_inicial_e_impacto_caen_juntos() -> None:
+    # Como `GameScene.restart`: mundo nuevo y `start_game` a mitad del compás 0. En el
+    # compás 1 entran juntos el impacto, la tonalidad nueva y su acorde inicial, que dura
+    # sus dos compases completos (1 y 2); en el 3 sigue el acorde siguiente.
+    sequencer = Sequencer(1)
+    tocar(sequencer, mundo(armed=False), 20)
+    sequencer.start_game(7)
+    tocar(sequencer, mundo(armed=False), 480)
+    nueva = variation_for(7)
+    por_g = {d.g: d for d in sequencer.decisions}
+    [impacto] = [d.g for d in sequencer.decisions if "impact" in d.cues]
+    assert impacto == SIXTEENTHS
+    assert por_g[SIXTEENTHS].variation == nueva
+    for g in range(SIXTEENTHS, 3 * SIXTEENTHS):
+        assert por_g[g].chord == chord_at(0, nueva)
+    assert por_g[3 * SIXTEENTHS].chord == chord_at(2, nueva)
 
 
 def test_el_mundo_queda_identico_con_y_sin_la_musica() -> None:

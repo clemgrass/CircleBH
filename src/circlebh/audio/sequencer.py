@@ -20,6 +20,7 @@ from circlebh.audio import sounds
 from circlebh.audio.harmony import (
     A1,
     A3,
+    Chord,
     Variation,
     bpm_for,
     chord_at,
@@ -65,6 +66,7 @@ class Decision:
     level: int
     cues: tuple[Cue, ...]
     variation: Variation
+    chord: Chord
     notes: tuple[Note, ...]
     """Las notas de los loops de enemigos."""
     weapon_hits: int
@@ -134,6 +136,11 @@ class Sequencer:
         self.game_volume = game_volume
         self._variation = variation_for(seed)
         self._next_variation: Variation | None = None
+        self._first_bar = 0
+        """El compás en que partió la progresión de la variación actual."""
+        self._bar_cues: list[Cue] = []
+        """Lo que espera a la variación nueva para sonar con ella: el impacto del
+        reinicio."""
         self._arrangement = Arrangement()
         self._world: World | None = None
         self._world_steps = -1
@@ -175,15 +182,21 @@ class Sequencer:
         sounds.riser(self.grid.bar_seconds)
 
     def start_game(self, seed: int) -> None:
-        """Una partida nueva: su tonalidad y su acorde inicial entran en el compás
-        siguiente. El tempo no cambia."""
+        """Una partida nueva: su tonalidad entra en el compás siguiente, con su acorde
+        inicial completo (sus dos compases) y con el impacto del reinicio, como una
+        transición de DJ. El tempo no cambia."""
         self._next_variation = variation_for(seed)
 
     def step(self, world: World) -> None:
         """Avanza un paso de la escena, con `world` como quedó después de su `update`."""
         if world is not self._world:
             if self._world is not None:
-                self._cues += self._arrangement.reset()
+                # Si viene una tonalidad nueva, el impacto espera para caer con ella.
+                cues = self._arrangement.reset()
+                if self._next_variation is not None:
+                    self._bar_cues += cues
+                else:
+                    self._cues += cues
             self._world = world
             self._world_steps = -1
             self._was_over = False
@@ -216,7 +229,12 @@ class Sequencer:
     def _decide(self, g: int) -> None:
         bar, s = divmod(g, SIXTEENTHS)
         if s == 0 and self._next_variation is not None:
+            # La progresión parte de nuevo en este compás: el acorde inicial suena
+            # completo, y el impacto que esperaba cae aquí.
             self._variation, self._next_variation = self._next_variation, None
+            self._first_bar = bar
+            self._cues += self._bar_cues
+            self._bar_cues = []
         start = self.grid.start(g)
         swung = start + self.grid.swing(g)
         cues = self._cues + self._arrangement.advance(
@@ -224,7 +242,8 @@ class Sequencer:
         )
         self._cues = []
         level = self._arrangement.level
-        root, voicing = chord_at(bar, self._variation)
+        chord = chord_at(bar - self._first_bar, self._variation)
+        root, voicing = chord
 
         self._add_base(g, start, swung, level, cues, voicing)
         weapon_hits = self._add_weapons(s, swung, voicing)
@@ -238,7 +257,15 @@ class Sequencer:
         self._open_block(start, level, voicing, root, bass_on)
         self.decisions.append(
             Decision(
-                g, level, tuple(cues), self._variation, notes, weapon_hits, rims, death
+                g,
+                level,
+                tuple(cues),
+                self._variation,
+                chord,
+                notes,
+                weapon_hits,
+                rims,
+                death,
             )
         )
 
