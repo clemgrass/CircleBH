@@ -14,5 +14,8 @@
     "volume": 0.8,
     "base_volume": 1.0,
     "game_volume": 1.0
+  },
+  "accessibility": {
+    "invert_colors": false
   }
 }

@@ -77,7 +77,7 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 | `uv run poe benchmark` | medir el paso con muchos enemigos, a mano |
 | `uv run poe musica` | escuchar la música de la demo (WAV en `.capturas/`) y medir su mezcla, a mano |
 
-## Arquitectura (ADR 0003 a 0006, 0016, 0021, 0022)
+## Arquitectura (ADR 0003 a 0006, 0016, 0021 a 0023)
 - En `src/circlebh/`, las importaciones van en una sola dirección: `scenes` → `render | audio` → `world` → `balance`. `render` y `audio` son hermanas y no se importan entre sí. `lint-imports` lo verifica.
 - La música sale de la geometría del juego, sobre una base de techno (ADR 0022). `audio/` es lógica pura como `world/`: escucha al mundo sin cambiarlo y nunca saca números de su `Random`. Solo `scenes/music.py` toca `pygame.mixer`: la regla `TID251` de ruff lo prohíbe fuera de `render/`, `scenes/` y `__main__.py`.
 - `world/` es lógica pura: no tiene `draw()` ni usa `pygame.display` ni `pygame.draw`. De Pygame solo usa `Vector2`. La regla `TID251` de ruff lo verifica, y solo `render/`, `scenes/` y `__main__.py` tienen la excepción.
@@ -88,6 +88,7 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
   - Si difieren, el chequeo nombra el campo y se corrige a mano, exportando o importando, antes de jugar.
 - Los enemigos se mueven por los patrones de su tipo en el balance. Sus aceleraciones se suman, con inercia y roce, y entre ellos actúa una sola ley de cargas (ADR 0021).
 - La configuración del juego (cámara, controles, audio, accesibilidad y depuración) vive solo en `settings.json`, dentro del paquete, y se valida al arrancar contra una dataclass (ADR 0018). Si describe a una entidad, va al balance; si describe cómo se juega o se ve, a la configuración.
+- El fondo es negro y el trazo, blanco. `accessibility.invert_colors` los invierte (ADR 0023). Los colores viven solo en `render/palette.py`, y las funciones de dibujo reciben la paleta como parámetro.
 - La lógica avanza en pasos fijos de 1/60 s con acumulador. El azar sale solo de la `random.Random(seed)` inyectada.
 - En las colisiones, cada cuerpo es un círculo. Se usa una grilla espacial y funciones propias en `world/`.
 - No hay archivos de imagen. La única excepción es `docs/media/`, que genera `poe medios`, y `poe check` lo verifica.
@@ -120,6 +121,5 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 
 ## Preguntas abiertas
 - El nombre del juego. `circlebh` es provisorio.
-- El fondo negro o blanco: se decide con capturas de la escena real, al final de la 0.1.0.
 - El color de acento: se decide cuando existan balas enemigas.
 - Los números de equilibrio y qué parámetro mejora cada tarjeta.
