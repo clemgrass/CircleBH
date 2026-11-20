@@ -82,6 +82,44 @@ def test_centro_sobre_el_jugador_no_dispara() -> None:
     assert weapon.bullets == []
 
 
+def test_centro_casi_sobre_el_jugador_no_falla() -> None:
+    # Negativo: a 1e-200, la dirección no es nula, pero su largo al cuadrado se redondea
+    # a 0 y `normalize` lanzaría ValueError.
+    weapon = PointWeapon(SPEC)
+    weapon.update(Vector2(0, 0), [enemigo(1e-200, 0)])
+    assert weapon.bullets == []
+
+
+def test_un_enemigo_a_una_millonesima_si_recibe_disparo() -> None:
+    # Borde: la igualdad de Vector2 tiene tolerancia 1e-6; a 1e-7 el enemigo no está
+    # "encima" y se le dispara.
+    weapon = PointWeapon(SPEC)
+    weapon.update(Vector2(0, 0), [enemigo(1e-7, 0)])
+    [bullet] = weapon.bullets
+    assert bullet.velocity == Vector2(SPEC.speed, 0)
+
+
+def test_ignora_al_enemigo_sobre_el_jugador_y_apunta_al_siguiente() -> None:
+    # Un enemigo abierto puede quedar estacionado sobre el jugador quieto. No debe
+    # callar el arma contra los demás.
+    weapon = PointWeapon(SPEC)
+    weapon.update(Vector2(0, 0), [enemigo(0, 0), enemigo(0, 200)])
+    [bullet] = weapon.bullets
+    assert bullet.velocity == Vector2(0, SPEC.speed)
+
+
+def test_no_apunta_a_un_enemigo_muerto() -> None:
+    # Un enemigo que perdió su última línea en este mismo paso sigue en la lista hasta
+    # que `World` lo quita.
+    muerto = enemigo(50, 0)
+    for k in range(HEXAGON.sides):
+        muerto.remove_edge(k)
+    weapon = PointWeapon(SPEC)
+    weapon.update(Vector2(0, 0), [muerto, enemigo(0, -300)])
+    [bullet] = weapon.bullets
+    assert bullet.velocity == Vector2(0, -SPEC.speed)
+
+
 # --- Cuándo dispara ---
 
 

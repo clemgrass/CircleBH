@@ -66,10 +66,24 @@ class Bullet:
 
 
 def nearest(origin: Vector2, enemies: list[Enemy]) -> Enemy | None:
-    """El enemigo de centro más cercano a `origin`. Si empatan, el primero de la lista."""
+    """El enemigo de centro más cercano a `origin` al que se puede apuntar. Si empatan,
+    el primero de la lista.
+
+    Descarta a los muertos (los que perdieron su última línea en este paso y `World`
+    todavía no quita) y a los que tienen el centro en `origin`: hacia ellos no hay
+    dirección. Un enemigo abierto puede quedar estacionado sobre el jugador quieto; así
+    no calla el arma contra los demás, y para pegarle hay que moverse (decisión 18).
+
+    Se compara la distancia al cuadrado con 0 y no `position != origin`, porque la
+    igualdad de `Vector2` tiene una tolerancia de 1e-6. La distancia al cuadrado es el
+    largo al cuadrado de la dirección del disparo: si no es 0, se puede normalizar.
+    """
+    targets = [
+        e for e in enemies if e.alive and e.position.distance_squared_to(origin) > 0
+    ]
     # `min` devuelve el primero de los empatados.
     return min(
-        enemies,
+        targets,
         key=lambda enemy: enemy.position.distance_squared_to(origin),
         default=None,
     )
@@ -125,10 +139,7 @@ class PointWeapon(Weapon):
         target = nearest(origin, enemies)
         if target is None:
             return
-        direction = target.position - origin
-        # Dirección nula: no se puede normalizar.
-        if direction.length_squared() == 0:
-            return
-        velocity = direction.normalize() * self.spec.speed
+        # `nearest` garantiza una dirección que se puede normalizar.
+        velocity = (target.position - origin).normalize() * self.spec.speed
         self.bullets.append(Bullet(origin, velocity, self.spec))
         self._steps_to_next = round(self.spec.cooldown / STEP)
