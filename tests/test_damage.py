@@ -92,9 +92,11 @@ def test_enemigo_que_avanza_no_deja_pasar_la_bala() -> None:
     # relativo, la arista de enfrente saltaría por encima de la bala.
     rapido = replace(HEXAGON, speed=3000.0)
     enemy = Enemy(rapido, Vector2(300, 0))
+    # Sin roce ni patrones, avanza a velocidad fija hacia el origen.
+    enemy.velocity = Vector2(-3000, 0)
     weapon = PointWeapon(SPEC)
     for _ in range(10):
-        enemy.step(ORIGEN)
+        enemy.step(Vector2())
         weapon.update(ORIGEN, [enemy])
         if len(enemy.edges) < 6:
             break

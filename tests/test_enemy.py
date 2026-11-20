@@ -1,7 +1,8 @@
-"""Tests del enemigo: aparece lejos del jugador y lo persigue en línea recta."""
+"""Tests del enemigo: aparece lejos del jugador y se mueve con inercia y roce."""
 
 import math
 import random
+from dataclasses import replace
 
 import pytest
 from hypothesis import given
@@ -13,6 +14,7 @@ from circlebh.settings import load_settings
 from circlebh.viewport import ASPECT_HEIGHT, ASPECT_WIDTH
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy, spawn_position
+from circlebh.world.patterns import Context
 from circlebh.world.polygon import polygon_edge
 
 SPEC = EnemySpec(
@@ -23,48 +25,83 @@ coordenadas = st.floats(min_value=-1e4, max_value=1e4)
 puntos = st.builds(Vector2, coordenadas, coordenadas)
 
 
-# --- Perseguir ---
+# --- Inercia y roce (ADR 0021) ---
 
 
-def test_enemigo_se_acerca_cada_paso() -> None:
-    enemy = Enemy(SPEC, Vector2(300, 400))
-    target = Vector2(0, 0)
+def contexto() -> Context:
+    """Un contexto sin vecinos y con el jugador sin carga."""
+    return Context(
+        player_position=Vector2(),
+        player_charge=0.0,
+        charges=BALANCE.charges,
+        neighbors=[],
+    )
+
+
+def test_con_seek_se_acerca_al_jugador() -> None:
+    enemy = Enemy(BALANCE.enemies["hexagon"], Vector2(300, 400))
     distancias = []
     for _ in range(10):
-        enemy.step(target)
-        distancias.append(enemy.position.distance_to(target))
+        enemy.step(enemy.acceleration(contexto()))
+        distancias.append(enemy.position.length())
     assert distancias == sorted(distancias, reverse=True)
-    assert distancias[0] == pytest.approx(500 - SPEC.speed * STEP)
 
 
-@given(inicio=puntos, target=puntos)
-def test_avanza_speed_por_paso_sin_pasarse(inicio: Vector2, target: Vector2) -> None:
-    enemy = Enemy(SPEC, inicio)
-    antes = inicio.distance_to(target)
-    enemy.step(target)
-    despues = enemy.position.distance_to(target)
-    assert despues == pytest.approx(max(0.0, antes - SPEC.speed * STEP), abs=1e-6)
+def test_sin_fuerzas_el_roce_frena() -> None:
+    con_roce = replace(SPEC, friction=2.0)
+    enemy = Enemy(con_roce, Vector2())
+    enemy.velocity = Vector2(100, 0)
+    rapideces = []
+    for _ in range(5):
+        enemy.step(enemy.acceleration(contexto()))
+        rapideces.append(enemy.velocity.length())
+    assert rapideces == sorted(rapideces, reverse=True)
+    assert rapideces[0] == pytest.approx(100 * (1 - 2.0 * STEP))
 
 
-def test_objetivo_a_menos_de_un_paso_llega_justo() -> None:
-    target = Vector2(1, 0)
-    enemy = Enemy(SPEC, Vector2(0, 0))
-    enemy.step(target)
-    assert enemy.position == target
+@given(x=coordenadas, y=coordenadas)
+def test_nunca_pasa_speed(x: float, y: float) -> None:
+    enemy = Enemy(SPEC, Vector2())
+    for _ in range(3):
+        enemy.step(Vector2(x, y) * 1000)
+    assert enemy.velocity.length() <= SPEC.speed + 1e-9
 
 
-def test_enemigo_encima_del_jugador_no_se_vuelve_inestable() -> None:
-    target = Vector2(5, -3)
-    enemy = Enemy(SPEC, Vector2(target))
+def test_en_reposo_sin_fuerzas_no_se_mueve() -> None:
+    enemy = Enemy(SPEC, Vector2(5, -3))
     for _ in range(60):
-        enemy.step(target)
-        assert enemy.position == target
+        enemy.step(enemy.acceleration(contexto()))
+    assert enemy.position == Vector2(5, -3)
 
 
-def test_step_no_modifica_el_objetivo() -> None:
-    target = Vector2(100, 0)
-    Enemy(SPEC, Vector2(0, 0)).step(target)
-    assert target == Vector2(100, 0)
+def test_avanza_con_euler_semi_implicito() -> None:
+    # Primero la velocidad, después la posición con la velocidad nueva.
+    enemy = Enemy(SPEC, Vector2())
+    enemy.step(Vector2(600, 0))
+    assert enemy.velocity.x == pytest.approx(600 * STEP)
+    assert enemy.position.x == pytest.approx(600 * STEP * STEP)
+
+
+def test_step_no_modifica_la_aceleracion() -> None:
+    aceleracion = Vector2(100, 0)
+    Enemy(SPEC, Vector2()).step(aceleracion)
+    assert aceleracion == Vector2(100, 0)
+
+
+def test_carga_y_masa_bajan_al_perder_lineas() -> None:
+    hexagon = BALANCE.enemies["hexagon"]
+    enemy = Enemy(hexagon, Vector2())
+    assert enemy.mass == 6
+    enemy.remove_edge(0)
+    assert enemy.mass == 5
+    assert enemy.charge == pytest.approx(5 * hexagon.charge_per_line)
+
+
+def test_cada_enemigo_tiene_sus_propios_patrones() -> None:
+    hexagon = BALANCE.enemies["hexagon"]
+    a, b = Enemy(hexagon, Vector2()), Enemy(hexagon, Vector2())
+    assert len(a.patterns) == len(hexagon.patterns)
+    assert all(pa is not pb for pa, pb in zip(a.patterns, b.patterns, strict=True))
 
 
 # --- Líneas (ADR 0020) ---
@@ -105,7 +142,8 @@ def test_lineas_en_coordenadas_del_plano() -> None:
 def test_previous_es_la_posicion_antes_del_paso() -> None:
     enemy = Enemy(SPEC, Vector2(300, 0))
     assert enemy.previous == enemy.position
-    enemy.step(Vector2(0, 0))
+    enemy.velocity = Vector2(-SPEC.speed, 0)
+    enemy.step(Vector2())
     assert enemy.previous == Vector2(300, 0)
     assert enemy.position.x == pytest.approx(300 - SPEC.speed * STEP)
 

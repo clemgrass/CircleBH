@@ -7,6 +7,7 @@ from pygame.math import Vector2
 from circlebh.balance import Balance
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy, spawn_position
+from circlebh.world.patterns import Context
 from circlebh.world.player import Player
 from circlebh.world.weapons import PointWeapon, Weapon
 
@@ -52,8 +53,14 @@ class World:
             return
         self._steps += 1
         self.player.step(intent)
+        context = Context(
+            player_position=self.player.position,
+            player_charge=self.balance.player.charge,
+            charges=self.balance.charges,
+            neighbors=[],
+        )
         for enemy in self.enemies:
-            enemy.step(self.player.position)
+            enemy.step(enemy.acceleration(context))
         for weapon in self.weapons:
             weapon.update(self.player.position, self.enemies)
         self.enemies = [enemy for enemy in self.enemies if enemy.alive]
