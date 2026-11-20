@@ -12,7 +12,7 @@ from circlebh.balance import BALANCE, EnemySpec
 from circlebh.settings import load_settings
 from circlebh.viewport import ASPECT_HEIGHT, ASPECT_WIDTH
 from circlebh.world.clock import STEP
-from circlebh.world.enemy import Enemy, regular_polygon, spawn_position
+from circlebh.world.enemy import Enemy, spawn_position
 
 SPEC = EnemySpec(sides=6, radius=24.0, speed=120.0)
 
@@ -115,32 +115,3 @@ def test_balance_aparece_fuera_de_la_vista() -> None:
     esquina = math.hypot(ancho / 2, alto / 2) + Vector2(camera.offset).length()
     hexagon = BALANCE.enemies["hexagon"]
     assert BALANCE.spawning.distance - hexagon.radius > esquina
-
-
-# --- Polígono ---
-
-
-@pytest.mark.parametrize("sides", [3, 4, 5, 6])
-def test_poligono_tiene_un_vertice_por_lado_sobre_el_circulo(sides: int) -> None:
-    centro = Vector2(7, -2)
-    vertices = regular_polygon(centro, 24.0, sides)
-    assert len(vertices) == sides
-    for v in vertices:
-        assert v.distance_to(centro) == pytest.approx(24.0)
-
-
-def test_poligono_apunta_hacia_arriba() -> None:
-    # El primer vértice va arriba (Y positiva, ADR 0003).
-    [primero, *_] = regular_polygon(Vector2(0, 0), 10.0, 6)
-    assert primero.x == pytest.approx(0, abs=1e-9)
-    assert primero.y == pytest.approx(10.0)
-
-
-def test_poligono_tiene_lados_iguales() -> None:
-    vertices = regular_polygon(Vector2(0, 0), 10.0, 6)
-    lados = [
-        a.distance_to(b)
-        for a, b in zip(vertices, vertices[1:] + vertices[:1], strict=True)
-    ]
-    # En un hexágono regular, el lado mide lo mismo que el radio.
-    assert lados == pytest.approx([10.0] * 6)

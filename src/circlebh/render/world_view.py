@@ -4,8 +4,8 @@ import pygame
 from pygame.math import Vector2
 
 from circlebh.viewport import Viewport
-from circlebh.world.enemy import regular_polygon
 from circlebh.world.game import World
+from circlebh.world.polygon import regular_polygon
 from circlebh.world.weapons import PointWeapon
 
 PLAYER_COLOR = pygame.Color("white")

@@ -39,20 +39,3 @@ def spawn_position(center: Vector2, distance: float, rng: random.Random) -> Vect
     """Un punto a `distance` de `center`, en un ángulo al azar de la `rng` inyectada."""
     angle = rng.uniform(0, math.tau)
     return center + Vector2(math.cos(angle), math.sin(angle)) * distance
-
-
-def regular_polygon(center: Vector2, radius: float, sides: int) -> list[Vector2]:
-    """Los vértices de un polígono regular inscrito en el círculo de `radius`.
-
-    El vértice k está en el ángulo `π/2 + 2πk / sides`: el primero apunta hacia arriba,
-    y los demás siguen en sentido antihorario (ADR 0003).
-    """
-    return [
-        center
-        + radius
-        * Vector2(
-            math.cos(math.pi / 2 + math.tau * k / sides),
-            math.sin(math.pi / 2 + math.tau * k / sides),
-        )
-        for k in range(sides)
-    ]
