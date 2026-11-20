@@ -1,4 +1,4 @@
-"""Las armas: curvas que disparan solas alrededor del jugador.
+"""Las armas: disparan solas desde el jugador.
 
 Toda arma hereda de `Weapon` y avanza con `update`, un paso de `STEP` a la vez (ADR 0005).
 Cada arma lee su `spec` en cada paso, así que mejorarla es reemplazar su `spec`.
@@ -8,29 +8,34 @@ from abc import ABC, abstractmethod
 
 from pygame.math import Vector2
 
-from circlebh.balance import CircleWeaponSpec
+from circlebh.balance import PointWeaponSpec
 from circlebh.world.clock import STEP
+from circlebh.world.enemy import Enemy
 
 
 class Weapon(ABC):
     """La base de toda arma."""
 
     @abstractmethod
-    def update(self, origin: Vector2) -> None:
-        """Avanza un paso. `origin` es la posición del jugador en este paso."""
+    def update(self, origin: Vector2, enemies: list[Enemy]) -> None:
+        """Avanza un paso. `origin` es la posición del jugador en este paso, y `enemies`,
+        los enemigos vivos."""
 
 
-class Ring:
-    """Un anillo del arma círculo: crece con `r(t) = growth_speed · t` y revienta en
-    `max_radius`.
+class Bullet:
+    """Una bala del arma punto: avanza en línea recta, `p(t) = p₀ + v·t`, y desaparece
+    al recorrer `range`.
 
-    Su centro queda fijo donde nació: es un proyectil que se expande, no un aura que
-    sigue al jugador.
+    No persigue: su dirección queda fija al nacer.
     """
 
-    def __init__(self, center: Vector2, spec: CircleWeaponSpec) -> None:
-        # Una copia: `Player.position` cambia en el lugar, y el anillo no debe seguirlo.
-        self.center = Vector2(center)
+    def __init__(
+        self, origin: Vector2, velocity: Vector2, spec: PointWeaponSpec
+    ) -> None:
+        # Copias: `Player.position` cambia en el lugar, y la bala no debe seguirlo.
+        self.origin = Vector2(origin)
+        self.velocity = Vector2(velocity)
+        """Unidades del plano por segundo."""
         self.spec = spec
         """El `spec` del arma cuando nació. Una mejora posterior no lo cambia."""
         self._steps = 0
@@ -41,39 +46,100 @@ class Ring:
         return self._steps * STEP
 
     @property
-    def radius(self) -> float:
-        """`r(t) = growth_speed · t`."""
-        return self.spec.growth_speed * self.age
+    def position(self) -> Vector2:
+        """`p(t) = p₀ + v·t`."""
+        return self.origin + self.velocity * self.age
+
+    @property
+    def previous(self) -> Vector2:
+        """Dónde estaba un paso antes. Al nacer, en `origin`."""
+        return self.origin + self.velocity * max(0, self._steps - 1) * STEP
 
     @property
     def expired(self) -> bool:
-        """Revienta al llegar a `max_radius`."""
-        return self.radius >= self.spec.max_radius
+        """Desaparece al recorrer `range`."""
+        return self.spec.speed * self.age >= self.spec.range
 
     def step(self) -> None:
-        """Envejece un paso."""
+        """Avanza un paso."""
         self._steps += 1
 
 
-class CircleWeapon(Weapon):
-    """El arma círculo: un anillo nuevo en el jugador cada `cooldown` segundos."""
+def nearest(origin: Vector2, enemies: list[Enemy]) -> Enemy | None:
+    """El enemigo de centro más cercano a `origin` al que se puede apuntar. Si empatan,
+    el primero de la lista.
 
-    def __init__(self, spec: CircleWeaponSpec) -> None:
+    Descarta a los muertos (los que perdieron su última línea en este paso y `World`
+    todavía no quita) y a los que tienen el centro en `origin`: hacia ellos no hay
+    dirección. Un enemigo abierto puede quedar estacionado sobre el jugador quieto; así
+    no calla el arma contra los demás, y para pegarle hay que moverse (decisión 18).
+
+    Se compara la distancia al cuadrado con 0 y no `position != origin`, porque la
+    igualdad de `Vector2` tiene una tolerancia de 1e-6. La distancia al cuadrado es el
+    largo al cuadrado de la dirección del disparo: si no es 0, se puede normalizar.
+    """
+    targets = [
+        e for e in enemies if e.alive and e.position.distance_squared_to(origin) > 0
+    ]
+    # `min` devuelve el primero de los empatados.
+    return min(
+        targets,
+        key=lambda enemy: enemy.position.distance_squared_to(origin),
+        default=None,
+    )
+
+
+class PointWeapon(Weapon):
+    """El arma punto: una bala cada `cooldown` segundos hacia el enemigo más cercano."""
+
+    def __init__(self, spec: PointWeaponSpec) -> None:
         self.spec = spec
-        self.rings: list[Ring] = []
+        self.bullets: list[Bullet] = []
         self._steps_to_next = 0
-        """Pasos que faltan para el próximo anillo. Parte en 0: el primero nace en el
-        primer paso."""
+        """Pasos que faltan para el próximo disparo. Parte en 0: dispara en el primer
+        paso en que tenga a quién."""
 
-    def update(self, origin: Vector2) -> None:
-        """Envejece los anillos, quita los reventados y, si toca, lanza uno en `origin`.
+    def update(self, origin: Vector2, enemies: list[Enemy]) -> None:
+        """Avanza las balas, aplica sus golpes, quita las gastadas y, si toca, dispara
+        desde `origin`.
 
-        El anillo nuevo nace con radio 0 y empieza a crecer en el paso siguiente.
+        Cada bala quita una sola línea y desaparece. Si su tramo cruza líneas de dos
+        enemigos, golpea la primera que cruza; si empatan, la del primero de la lista.
+        Una bala que llega a `range` en este paso todavía golpea con su último tramo.
+
+        La bala nueva nace en `origin` y empieza a moverse en el paso siguiente. Sin
+        objetivo, o con su centro justo en `origin`, no dispara y queda lista.
         """
-        for ring in self.rings:
-            ring.step()
-        self.rings = [ring for ring in self.rings if not ring.expired]
-        if self._steps_to_next <= 0:
-            self.rings.append(Ring(origin, self.spec))
-            self._steps_to_next = round(self.spec.cooldown / STEP)
+        remaining: list[Bullet] = []
+        for bullet in self.bullets:
+            bullet.step()
+            if not self._strike(bullet, enemies) and not bullet.expired:
+                remaining.append(bullet)
+        self.bullets = remaining
         self._steps_to_next -= 1
+        if self._steps_to_next <= 0:
+            self._fire(origin, enemies)
+
+    @staticmethod
+    def _strike(bullet: Bullet, enemies: list[Enemy]) -> bool:
+        """Si el último tramo de `bullet` cruza una línea, la quita y devuelve `True`."""
+        best: tuple[float, int, Enemy, int] | None = None
+        for index, enemy in enumerate(enemies):
+            hit = enemy.hit_by(bullet.previous, bullet.position)
+            if hit is not None and (best is None or hit[0] < best[0]):
+                t, k = hit
+                best = (t, index, enemy, k)
+        if best is None:
+            return False
+        _, _, enemy, k = best
+        enemy.remove_edge(k)
+        return True
+
+    def _fire(self, origin: Vector2, enemies: list[Enemy]) -> None:
+        target = nearest(origin, enemies)
+        if target is None:
+            return
+        # `nearest` garantiza una dirección que se puede normalizar.
+        velocity = (target.position - origin).normalize() * self.spec.speed
+        self.bullets.append(Bullet(origin, velocity, self.spec))
+        self._steps_to_next = round(self.spec.cooldown / STEP)

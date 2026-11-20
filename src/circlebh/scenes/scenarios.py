@@ -25,8 +25,9 @@ SCENARIOS: dict[str, Scenario] = {
             pilot=False,
         ),
         Scenario(
-            "anillo",
-            "El piloto se mueve, y los anillos crecen donde nacieron, sin seguirlo.",
+            "punto-quita-lineas",
+            "El piloto se mueve, y cada bala le quita al hexágono la línea que golpea"
+            " hasta que desaparece.",
             pilot=True,
         ),
     ]

@@ -12,7 +12,8 @@ from circlebh.balance import BALANCE, EnemySpec
 from circlebh.settings import load_settings
 from circlebh.viewport import ASPECT_HEIGHT, ASPECT_WIDTH
 from circlebh.world.clock import STEP
-from circlebh.world.enemy import Enemy, regular_polygon, spawn_position
+from circlebh.world.enemy import Enemy, spawn_position
+from circlebh.world.polygon import polygon_edge
 
 SPEC = EnemySpec(sides=6, radius=24.0, speed=120.0)
 
@@ -64,19 +65,47 @@ def test_step_no_modifica_el_objetivo() -> None:
     assert target == Vector2(100, 0)
 
 
-# --- Radio ---
+# --- Líneas (ADR 0020) ---
 
 
-def test_radio_inicial_es_el_del_spec() -> None:
+def test_parte_con_todas_sus_lineas() -> None:
     enemy = Enemy(SPEC, Vector2(0, 0))
-    assert enemy.sides == 6
+    assert enemy.edges == [0, 1, 2, 3, 4, 5]
+    assert enemy.alive is True
+
+
+def test_la_envolvente_no_se_achica() -> None:
+    # Las líneas que quedan no se mueven: el círculo que las contiene es el mismo.
+    enemy = Enemy(SPEC, Vector2(0, 0))
+    enemy.remove_edge(2)
+    enemy.remove_edge(5)
     assert enemy.radius == SPEC.radius
+    assert enemy.edges == [0, 1, 3, 4]
 
 
-def test_radio_se_achica_con_los_lados() -> None:
+def test_sin_lineas_no_esta_vivo() -> None:
     enemy = Enemy(SPEC, Vector2(0, 0))
-    enemy.sides = 3
-    assert enemy.radius == pytest.approx(SPEC.radius / 2)
+    for k in range(SPEC.sides):
+        enemy.remove_edge(k)
+    assert enemy.alive is False
+
+
+def test_lineas_en_coordenadas_del_plano() -> None:
+    enemy = Enemy(SPEC, Vector2(100, -50))
+    enemy.remove_edge(0)
+    lineas = enemy.lines()
+    assert len(lineas) == 5
+    # La arista 4, la vertical derecha, queda a la derecha del centro.
+    a, b = polygon_edge(SPEC.radius, SPEC.sides, 4)
+    assert (a + enemy.position, b + enemy.position) in lineas
+
+
+def test_previous_es_la_posicion_antes_del_paso() -> None:
+    enemy = Enemy(SPEC, Vector2(300, 0))
+    assert enemy.previous == enemy.position
+    enemy.step(Vector2(0, 0))
+    assert enemy.previous == Vector2(300, 0)
+    assert enemy.position.x == pytest.approx(300 - SPEC.speed * STEP)
 
 
 # --- Aparecer ---
@@ -117,30 +146,11 @@ def test_balance_aparece_fuera_de_la_vista() -> None:
     assert BALANCE.spawning.distance - hexagon.radius > esquina
 
 
-# --- Polígono ---
-
-
-@pytest.mark.parametrize("sides", [3, 4, 5, 6])
-def test_poligono_tiene_un_vertice_por_lado_sobre_el_circulo(sides: int) -> None:
-    centro = Vector2(7, -2)
-    vertices = regular_polygon(centro, 24.0, sides)
-    assert len(vertices) == sides
-    for v in vertices:
-        assert v.distance_to(centro) == pytest.approx(24.0)
-
-
-def test_poligono_apunta_hacia_arriba() -> None:
-    # El primer vértice va arriba (Y positiva, ADR 0003).
-    [primero, *_] = regular_polygon(Vector2(0, 0), 10.0, 6)
-    assert primero.x == pytest.approx(0, abs=1e-9)
-    assert primero.y == pytest.approx(10.0)
-
-
-def test_poligono_tiene_lados_iguales() -> None:
-    vertices = regular_polygon(Vector2(0, 0), 10.0, 6)
-    lados = [
-        a.distance_to(b)
-        for a, b in zip(vertices, vertices[1:] + vertices[:1], strict=True)
-    ]
-    # En un hexágono regular, el lado mide lo mismo que el radio.
-    assert lados == pytest.approx([10.0] * 6)
+@pytest.mark.parametrize("nombre", sorted(BALANCE.enemies))
+def test_jugador_no_atraviesa_una_linea_en_un_paso(nombre: str) -> None:
+    # Coherencia del balance: el contacto se revisa una vez por paso. Si el jugador y el
+    # enemigo se acercan más que el diámetro del jugador en un paso, una línea podría
+    # pasarle por encima sin que ningún paso la vea tocándolo.
+    player = BALANCE.player
+    enemy = BALANCE.enemies[nombre]
+    assert (player.speed + enemy.speed) * STEP < 2 * player.radius

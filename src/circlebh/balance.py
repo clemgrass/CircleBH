@@ -27,14 +27,15 @@ class PlayerSpec:
 
 @dataclass(frozen=True)
 class EnemySpec:
-    """Un tipo de enemigo: un polígono regular que persigue al jugador."""
+    """Un tipo de enemigo: un polígono regular hecho de líneas, que persigue al jugador
+    (ADR 0020)."""
 
     sides: int
-    """Lados al aparecer. Pierde uno por golpe y, sin lados, muere."""
+    """Líneas al aparecer. Cada bala quita la que golpea y, sin líneas, muere."""
 
     radius: float
-    """Radio del círculo de choque con todos sus lados, en unidades del plano. Se achica
-    en proporción a los lados que le quedan."""
+    """Radio del polígono, en unidades del plano: el del círculo que pasa por sus
+    vértices. Es también su círculo envolvente, y no cambia al perder líneas."""
 
     speed: float
     """Velocidad, en unidades del plano por segundo."""
@@ -50,21 +51,18 @@ class SpawningSpec:
 
 
 @dataclass(frozen=True)
-class CircleWeaponSpec:
-    """El arma círculo: anillos que nacen en el jugador, crecen con `r(t) = growth_speed · t`
-    y revientan al llegar a `max_radius`."""
+class PointWeaponSpec:
+    """El arma punto: balas que salen del jugador hacia el centro del enemigo más cercano
+    y avanzan en línea recta, `p(t) = p₀ + v·t`."""
 
     cooldown: float
-    """Segundos entre un anillo y el siguiente."""
+    """Segundos entre un disparo y el siguiente."""
 
-    growth_speed: float
-    """Cuánto crece el radio, en unidades del plano por segundo."""
+    speed: float
+    """Rapidez de la bala, en unidades del plano por segundo."""
 
-    max_radius: float
-    """Radio al que el anillo revienta, en unidades del plano."""
-
-    thickness: float
-    """Grosor del trazo, en unidades del plano."""
+    range: float
+    """Distancia que recorre la bala antes de desaparecer, en unidades del plano."""
 
 
 @dataclass(frozen=True)
@@ -80,8 +78,8 @@ class Balance:
     spawning: SpawningSpec
     """Cómo aparecen los enemigos."""
 
-    circle_weapon: CircleWeaponSpec
-    """El arma círculo."""
+    point_weapon: PointWeaponSpec
+    """El arma punto."""
 
 
 # >>> datos (lo genera poe balance-importar)
@@ -89,8 +87,6 @@ BALANCE = Balance(
     player=PlayerSpec(speed=240.0, radius=12.0),
     enemies={"hexagon": EnemySpec(sides=6, radius=24.0, speed=120.0)},
     spawning=SpawningSpec(distance=800.0),
-    circle_weapon=CircleWeaponSpec(
-        cooldown=1.5, growth_speed=300.0, max_radius=260.0, thickness=6.0
-    ),
+    point_weapon=PointWeaponSpec(cooldown=0.3, speed=600.0, range=700.0),
 )
 # <<< datos
