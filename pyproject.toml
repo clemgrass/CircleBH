@@ -120,11 +120,12 @@ files = ["src"]
 root_package = "circlebh"
 
 [[tool.importlinter.contracts]]
-name = "Capas: scenes → render → world → balance (ADR 0003)"
+name = "Capas: scenes → render | audio → world → balance (ADR 0003 y 0022)"
 type = "layers"
 layers = [
     "circlebh.scenes",
-    "circlebh.render",
+    # Hermanas independientes: ninguna importa a la otra.
+    "circlebh.render | circlebh.audio",
     "circlebh.world",
     "circlebh.balance",
 ]
