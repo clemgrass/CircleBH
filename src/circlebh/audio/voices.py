@@ -148,5 +148,21 @@ VOICES: dict[type[Weapon], WeaponVoice] = {PointWeapon: PointVoice()}
 """La voz de cada clase de arma. Un arma nueva suma aquí su voz."""
 
 
+def _voice_of_type(cls: type) -> WeaponVoice | None:
+    """La voz de la clase o, si no tiene, la de la clase más cercana de la que hereda:
+    una subclase de un arma suena como su arma."""
+    for base in cls.__mro__:
+        if base in VOICES:
+            return VOICES[base]
+    return None
+
+
+def has_voice(cls: type) -> bool:
+    return _voice_of_type(cls) is not None
+
+
 def voice_for(weapon: Weapon) -> WeaponVoice:
-    return VOICES[type(weapon)]
+    voice = _voice_of_type(type(weapon))
+    if voice is None:
+        raise KeyError(f"{type(weapon).__name__} no tiene voz en audio/voices.py")
+    return voice

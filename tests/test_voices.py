@@ -17,6 +17,7 @@ from circlebh.audio.voices import (
     VOICES,
     EnemyView,
     enemy_notes,
+    has_voice,
     nearest_views,
     rotation,
     voice_for,
@@ -154,6 +155,25 @@ def test_la_nota_del_arma_esta_en_el_acorde(s: int) -> None:
     assert weapon_note(s, VOICING) - 12 in VOICING
 
 
+def todas_las_subclases(cls: type) -> list[type]:
+    """Las subclases de `cls` a cualquier profundidad, no solo las directas."""
+    out = []
+    for sub in cls.__subclasses__():
+        out += [sub, *todas_las_subclases(sub)]
+    return out
+
+
+class PuntoDoble(PointWeapon):
+    """Una mejora hecha como subclase: hereda la voz del arma punto."""
+
+
 def test_toda_arma_tiene_voz() -> None:
-    for cls in Weapon.__subclasses__():
-        assert cls in VOICES, f"{cls.__name__} no tiene voz en audio/voices.py"
+    clases = todas_las_subclases(Weapon)
+    assert PuntoDoble in clases
+    for cls in clases:
+        assert has_voice(cls), f"{cls.__name__} no tiene voz en audio/voices.py"
+
+
+def test_una_subclase_hereda_la_voz_de_su_arma() -> None:
+    weapon = PuntoDoble(PointWeaponSpec(cooldown=0.6, speed=300.0, range=700.0))
+    assert voice_for(weapon) is VOICES[PointWeapon]
