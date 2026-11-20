@@ -11,4 +11,7 @@ from circlebh.pilot import simulate
 
 @pytest.mark.simulacion
 def test_simulacion_de_60_s_sin_errores() -> None:
-    assert simulate(BALANCE, seconds=60.0, seed=1) >= 1
+    # Lo que se exige es que no haya excepciones. Las duraciones confirman que jugó los
+    # 60 s completos.
+    durations = simulate(BALANCE, seconds=60.0, seed=1)
+    assert sum(durations) == pytest.approx(60.0)
