@@ -1,5 +1,5 @@
 ---
-estado: propuesto
+estado: aceptado
 fecha: 2026-11-20
 ---
 
@@ -98,10 +98,10 @@ La música tiene dos capas, y la frontera entre ellas es la decisión de fondo:
 
 ### Dónde vive *(Claude lo propone; el usuario aprobó la capa el 2026-11-20)*
 
-- **Una capa nueva, `circlebh.audio`, hermana de `render`.** El contrato de import-linter pasa a `scenes → render | audio → world → balance`: `audio` lee el mundo y el balance, `scenes` la usa, y `render` y `audio` no se conocen. La parte pura de `audio/` (el ritmo euclidiano, la cuantización, las capas y la mezcla en arreglos) se testea. Solo la reproducción con `pygame.mixer` queda fuera, como `render/`.
+- **Una capa nueva, `circlebh.audio`, hermana de `render`.** El contrato de import-linter pasa a `scenes → render | audio → world → balance`: `audio` lee el mundo y el balance, `scenes` la usa, y `render` y `audio` no se conocen. Todo `audio/` es puro y se testea: el ritmo euclidiano, la cuantización, las capas y la mezcla en arreglos. La reproducción con `pygame.mixer` quedó en `scenes/music.py`, como `Gamepads` con los controles, así que no se testea (ADR 0007) y la configuración de cobertura no cambió.
 - **`World` deja la lista de eventos del paso:** golpe (con el enemigo y la arista), muerte y disparo. Hoy no existe, y sacarlos comparando un paso con el siguiente, como en el prototipo, es frágil. Son datos puros, así que `world/` sigue sin dibujar ni sonar.
 - **Las voces se derivan de lo que ya está en el balance**, sin campos nuevos: el ritmo de un enemigo sale de sus lados y el de un arma, de su `spec`. Un tipo de enemigo nuevo suena solo. Un tipo de arma nuevo suma su clase de voz en `audio/`. Si después hace falta afinar una voz por entidad, se agrega un campo `voice` al balance, con un `kind`, como los patrones del ADR 0021.
-- **La configuración de audio va en `settings.json`:** si suena la música y su volumen, porque describe cómo se juega y no a una entidad (ADR 0018).
+- **La configuración de audio va en `settings.json`,** porque describe cómo se juega y no a una entidad (ADR 0018). Es configuración para el jugador y queda modular *(decisión del usuario, 2026-11-20)*: si suena la música, el volumen general y uno por capa (`base_volume` y `game_volume`).
 - **La demo con `--speed` distinto de 1 no tiene música,** y las capturas tampoco.
 
 ### Con asterisco para el MVP (1.0) *(decisión del usuario, 2026-11-20)*
@@ -137,6 +137,11 @@ Lo de la 0.1.0 es una primera versión. Antes del MVP se revisa:
 - Un test comprueba que los mismos eventos dan los mismos bytes de audio.
 - `lint-imports` comprueba que `world` no importa `audio`, y que `audio` y `render` no se importan entre sí.
 - Una medición, a mano como `poe benchmark`, reporta los milisegundos por cuadro de la mezcla.
+
+### Implementación (#44, 2026-11-20)
+
+- `uv run poe musica` (120 s, semilla 1): la mezcla cuesta 2,7 ms por paso de media, con p99 de 9,3 ms. Con el jugador inmortal, 3,3 ms y p99 de 10,6 ms. Cumple la meta de 4 ms de media. Dos corridas dieron el mismo sha256 (`173fbbe4bc31460c`).
+- Queda un pico de 39 a 47 ms la primera vez que suena el acorde corto de cada acorde. Va al asterisco de CPU del MVP. La batería se genera al crear el secuenciador (173 ms una vez), porque generarla a mitad de partida trababa un cuadro en 70 ms.
 
 ## Pros y contras de las opciones
 

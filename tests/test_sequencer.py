@@ -92,6 +92,22 @@ def test_sin_enemigos_ni_disparos_la_capa_del_juego_calla() -> None:
     assert any(any(block) for block in sequencer.ready)
 
 
+def test_con_enemigos_cerca_la_base_sube_hasta_la_capa_3() -> None:
+    # Diez hexágonos quietos a 150 unidades llevan la intensidad cerca de 0,9: en dos
+    # frases sube hasta la capa 3, con su riser, y suenan el bombo, el bajo y el sidechain.
+    enemigos = [Enemy(QUIETO, Vector2(150, 0).rotate(36 * i)) for i in range(10)]
+    sequencer = Sequencer(1)
+    tocar(sequencer, mundo(*enemigos, armed=False, lethal=False), 620)
+    niveles = [d.level for d in sequencer.decisions]
+    assert max(niveles) == 3
+    assert any("riser" in d.cues for d in sequencer.decisions)
+    # Con la base completa, el audio pesa más que en la calma del principio.
+    calma, fuerte = sequencer.ready[2], sequencer.ready[-1]
+    assert sum(map(abs, memoryview(fuerte).cast("h"))) > sum(
+        map(abs, memoryview(calma).cast("h"))
+    )
+
+
 def test_volumen_cero_en_las_dos_capas_es_silencio() -> None:
     sequencer = Sequencer(1, base_volume=0.0, game_volume=0.0)
     tocar(sequencer, mundo(Enemy(QUIETO, Vector2(100, 0))), 120)

@@ -47,6 +47,15 @@ La tabla es el punto de partida. El prototipo puede ajustarla si algo no se lee 
 - **El jefe aparece al minuto 10.** Es un polígono enorme con aristas interiores, y se va rompiendo de a poco. La idea base es una capa de afuera de unos 100 lados con polígonos anidados adentro: al romper una capa queda expuesta la siguiente. El prototipo decide la forma exacta de lo interior. La cantidad de lados y de capas tiene que ser fácil de cambiar, porque dependen del equilibrio al jugar.
 - **Cómo termina:** el jugador gana si destruye al jefe y pierde si recibe un golpe sin anillos. La pantalla final muestra el tiempo, los enemigos eliminados y el nivel alcanzado.
 
+## La música
+
+La música sale de la misma geometría que el juego, sobre una base de techno, y se genera con código, sin archivos de audio *(decisión del autor, 2026-11-20; [ADR 0022](decisiones/0022-musica-desde-la-matematica.md))*.
+
+- Cada enemigo cercano es un loop: un polígono de n lados toca n golpes repartidos en el compás, y pierde un golpe por cada arista que pierde.
+- Cada arma suena con un ritmo que sale de su `spec`, así que una mejora se oye.
+- Con pocos enemigos la música se calma, y con muchos sube. La base cambia de tonalidad en cada partida.
+- La evolución dentro de una partida larga, los super drops y que el jugador componga la base quedan para el MVP.
+
 ## El MVP
 
 - Un menú, una partida de 10 minutos que termina con el jefe, y la pantalla final.
