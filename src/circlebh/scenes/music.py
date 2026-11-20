@@ -10,6 +10,7 @@ from collections import deque
 
 import pygame
 
+from circlebh.audio.playback import next_action
 from circlebh.audio.rhythm import RATE
 from circlebh.cli import RunOptions
 from circlebh.settings import Settings
@@ -66,13 +67,31 @@ class MusicPlayer:
         return self._channel is not None
 
     def update(self, ready: deque[bytes]) -> None:
-        """Saca los bloques listos y, si el canal tiene lugar en su cola, encola uno."""
+        """Saca los bloques listos y hace lo que diga `next_action` con el canal.
+
+        Si el canal quedó mudo con un bloque atascado en su cola (la carrera de
+        pygame-ce que explica `audio/playback.py`), lo arranca con `play()`.
+        """
         while ready:
             self._waiting.append(ready.popleft())
         while len(self._waiting) > MAX_QUEUED:
             self._waiting.popleft()
-        if self._channel is None or not self._waiting:
+        channel = self._channel
+        if channel is None:
+            self._waiting.clear()
             return
-        if self._channel.get_queue() is None:
-            # Con el canal libre, `queue` lo empieza al tiro.
-            self._channel.queue(pygame.mixer.Sound(buffer=self._waiting.popleft()))
+        queued = channel.get_queue()
+        action = next_action(
+            busy=channel.get_busy(),
+            stuck=queued is not None,
+            waiting=len(self._waiting),
+        )
+        if action == "play_stuck" and queued is not None:
+            channel.play(queued)
+        elif action == "play":
+            channel.play(self._next_sound())
+        elif action == "queue":
+            channel.queue(self._next_sound())
+
+    def _next_sound(self) -> pygame.mixer.Sound:
+        return pygame.mixer.Sound(buffer=self._waiting.popleft())
