@@ -89,6 +89,10 @@ cmd = "python -m circlebh.balance_tools importar"
 help = "Milisegundos por paso del enjambre de 300 hexágonos y del jefe de 100 líneas (ADR 0006). A mano, no en la CI."
 cmd = "python tools/benchmark.py"
 
+[tool.poe.tasks.musica]
+help = "Evidencia de la música (ADR 0022): WAV de la demo en .capturas/ y ms por paso de la mezcla. A mano."
+cmd = "python tools/musica.py"
+
 [tool.poe.tasks.medios]
 help = "Regenera las imágenes del README en docs/media/ (ADR 0013). Pendiente."
 cmd = "python -c \"raise SystemExit('poe medios: pendiente, todavía no hay nada que mostrar')\""
