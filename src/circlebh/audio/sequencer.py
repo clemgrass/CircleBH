@@ -136,6 +136,8 @@ class Sequencer:
         self._next_variation: Variation | None = None
         self._arrangement = Arrangement()
         self._world: World | None = None
+        self._world_steps = -1
+        """Los pasos que llevaba `_world` cuando se leyeron sus eventos."""
         self._was_over = False
         self._steps = 0
         self._g = -1
@@ -183,6 +185,7 @@ class Sequencer:
             if self._world is not None:
                 self._cues += self._arrangement.reset()
             self._world = world
+            self._world_steps = -1
             self._was_over = False
         if world.game_over and not self._was_over:
             self._cues += self._arrangement.reset()
@@ -196,7 +199,12 @@ class Sequencer:
             self._decide(self._g)
         self._mix(SAMPLES_PER_STEP)
 
-        self._pending += world.events
+        # Los eventos de un paso del mundo se leen una sola vez: con la partida perdida,
+        # la escena ya no llama a `update` y `world.events` se queda con los del paso
+        # fatal, pero el secuenciador sigue avanzando.
+        if world.steps != self._world_steps:
+            self._pending += world.events
+            self._world_steps = world.steps
         self._snapshot = _snapshot(world)
         self._steps += 1
 

@@ -38,11 +38,13 @@ def mundo(*enemigos: Enemy, armed: bool = True, lethal: bool = True) -> World:
 def tocar(
     sequencer: Sequencer, world: World, pasos: int, *, piloto: bool = False
 ) -> list[list]:
-    """Avanza el mundo y el secuenciador `pasos` veces, como la escena. Devuelve los
+    """Avanza el mundo y el secuenciador `pasos` veces, como la escena: con la partida
+    perdida, el mundo ya no se actualiza, pero el secuenciador sigue. Devuelve los
     eventos de cada paso."""
     eventos = []
     for _ in range(pasos):
-        world.update(pilot_intent(world.steps) if piloto else Vector2())
+        if not world.game_over:
+            world.update(pilot_intent(world.steps) if piloto else Vector2())
         sequencer.step(world)
         eventos.append(list(world.events))
     return eventos
@@ -235,6 +237,22 @@ def test_mundo_muerto_sigue_sonando_con_un_solo_impacto() -> None:
     assert len(sequencer.ready) > listos
     impactos = [d for d in sequencer.decisions if "impact" in d.cues]
     assert len(impactos) == 1
+
+
+def test_los_eventos_del_paso_fatal_suenan_una_sola_vez() -> None:
+    # Con la partida perdida, la escena no vuelve a llamar a `update`, así que
+    # `world.events` se queda con los eventos del paso fatal. Si en ese paso una bala
+    # golpeó, el rim tiene que sonar una vez, no en cada paso de la pantalla de muerte.
+    enemy = Enemy(QUIETO, Vector2(25, 0))
+    world = mundo(enemy)
+    sequencer = Sequencer(1)
+    world.update(Vector2())
+    assert world.game_over
+    world.events += [Hit(enemy, 1), Death(enemy)]  # como si el paso fatal los dejara
+    sequencer.step(world)
+    tocar(sequencer, world, 120)
+    assert sum(d.rims for d in sequencer.decisions) == 1
+    assert sum(d.death for d in sequencer.decisions) == 1
 
 
 def test_un_mundo_nuevo_vuelve_a_la_calma_con_un_impacto() -> None:
