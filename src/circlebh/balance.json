@@ -11,7 +11,8 @@
     }
   },
   "spawning": {
-    "distance": 800.0
+    "distance": 800.0,
+    "interval": 2.0
   },
   "point_weapon": {
     "cooldown": 0.6,

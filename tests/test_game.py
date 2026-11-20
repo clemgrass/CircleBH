@@ -4,6 +4,8 @@ import random
 from dataclasses import replace
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 from pygame.math import Vector2
 
 from circlebh.balance import BALANCE
@@ -158,6 +160,70 @@ def test_tras_morir_update_no_avanza() -> None:
     assert world.enemies[0].position == enemigo
     assert world.elapsed == tiempo
     assert world.game_over is True
+
+
+# --- Oleadas ---
+
+INTERVALO = round(BALANCE.spawning.interval / STEP)
+"""Pasos entre una aparición y la siguiente."""
+
+
+def mundo_sin_armas(seed: int) -> World:
+    """Un mundo con los hexágonos quietos (`speed = 0`) y sin armas.
+
+    Así nadie muere ni mata, y la cuenta de enemigos solo cambia por las apariciones.
+    """
+    hexagon = replace(BALANCE.enemies["hexagon"], speed=0.0)
+    world = World(replace(BALANCE, enemies={"hexagon": hexagon}), random.Random(seed))
+    world.weapons = []
+    return world
+
+
+def test_aparece_uno_cada_intervalo() -> None:
+    world = mundo_sin_armas(seed=1)
+    for _ in range(INTERVALO * 3):
+        world.update(Vector2())
+    assert len(world.enemies) == 1 + 3
+
+
+def test_aparece_justo_al_cumplirse_el_intervalo() -> None:
+    world = mundo_sin_armas(seed=1)
+    for _ in range(INTERVALO - 1):
+        world.update(Vector2())
+    assert len(world.enemies) == 1
+    world.update(Vector2())
+    assert len(world.enemies) == 2
+
+
+def test_aparece_a_la_distancia_del_jugador_donde_esta() -> None:
+    world = mundo_sin_armas(seed=1)
+    for _ in range(INTERVALO):
+        world.update(Vector2(1, 0))
+    nuevo = world.enemies[-1]
+    assert nuevo.position.distance_to(world.player.position) == pytest.approx(
+        BALANCE.spawning.distance
+    )
+
+
+@given(seed=st.integers(min_value=0, max_value=2**32 - 1))
+def test_dos_apariciones_no_comparten_posicion(seed: int) -> None:
+    # Propiedad: cada aparición sortea su ángulo. Que dos ángulos al azar coincidan
+    # tiene probabilidad prácticamente nula, así que es un error y no azar.
+    world = mundo_sin_armas(seed)
+    for _ in range(INTERVALO):
+        world.update(Vector2())
+    primero, segundo = world.enemies
+    assert primero.position != segundo.position
+
+
+def test_tras_morir_no_aparecen_mas() -> None:
+    world = mundo_sin_armas(seed=1)
+    world.enemies[0].position = Vector2(tangente() - 5, 0)
+    world.update(Vector2())
+    assert world.game_over is True
+    for _ in range(INTERVALO * 2):
+        world.update(Vector2())
+    assert len(world.enemies) == 1
 
 
 def test_world_sin_intencion_deja_al_jugador_quieto() -> None:
