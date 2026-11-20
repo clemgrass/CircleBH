@@ -13,7 +13,10 @@ from circlebh.world.weapons import Bullet, PointWeapon, nearest
 SPEC = PointWeaponSpec(cooldown=0.5, speed=600.0, range=700.0)
 COOLDOWN = 30
 VIDA = 70
-HEXAGON = EnemySpec(sides=6, radius=24.0, speed=120.0)
+# Sin patrones ni carga: aquí solo importa dónde está.
+HEXAGON = EnemySpec(
+    sides=6, radius=24.0, speed=120.0, friction=0.0, charge_per_line=0.0, patterns=()
+)
 
 
 def enemigo(x: float, y: float) -> Enemy:

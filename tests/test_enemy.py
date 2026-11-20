@@ -15,7 +15,9 @@ from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy, spawn_position
 from circlebh.world.polygon import polygon_edge
 
-SPEC = EnemySpec(sides=6, radius=24.0, speed=120.0)
+SPEC = EnemySpec(
+    sides=6, radius=24.0, speed=120.0, friction=0.0, charge_per_line=0.0, patterns=()
+)
 
 coordenadas = st.floats(min_value=-1e4, max_value=1e4)
 puntos = st.builds(Vector2, coordenadas, coordenadas)
