@@ -58,14 +58,15 @@ jobs:
           src/circlebh/__main__.py
 
       # El smoke corre el ejecutable empaquetado, no el código: si arranca, dibuja
-      # y guarda el PNG sin pantalla, el zip sirve en este sistema.
+      # y guarda el PNG sin pantalla, el zip sirve en este sistema. No se fija en el
+      # nombre del PNG: depende del escenario por defecto, que puede cambiar.
       - name: Smoke sin ventana
         env:
           EXE: ${{ matrix.exe }}
         run: |
           mkdir smoke && cd smoke
           "../dist/circlebh/$EXE" --demo --seed 1 --capture 0
-          test -f .capturas/plano-vacio-seed1-t0.00.png
+          ls .capturas/*.png
 
       # `zip -r -y` conserva el permiso de ejecución y los enlaces; `python -m zipfile` no.
       - name: Comprimir
