@@ -19,6 +19,7 @@ SOLO_COULOMB = replace(HEXAGON, patterns=(CoulombSpec(),))
 QUIETO = replace(HEXAGON, speed=0.0, patterns=())
 """No se mueve por sí mismo: solo la red de seguridad lo corre."""
 CONTACTO = 2 * HEXAGON.radius
+CELDA = BALANCE.charges.cutoff
 
 
 def paso(enemies: list[Enemy], player_charge: float = 0.0) -> int:
@@ -77,21 +78,45 @@ def test_solo_entran_los_vivos() -> None:
 def test_superpuestos_quedan_tangentes_y_sin_acercarse() -> None:
     a, b = Enemy(QUIETO, Vector2(0, 0)), Enemy(QUIETO, Vector2(30, 0))
     a.velocity, b.velocity = Vector2(10, 0), Vector2(-10, 0)
-    assert separate([a, b]) == 1
+    assert separate([a, b], CELDA) == 1
     assert a.position.distance_to(b.position) == pytest.approx(CONTACTO)
     assert (b.velocity - a.velocity).x >= 0
 
 
 def test_misma_posicion_no_divide_por_cero() -> None:
     a, b = Enemy(QUIETO, Vector2(5, 5)), Enemy(QUIETO, Vector2(5, 5))
-    separate([a, b])
+    separate([a, b], CELDA)
     assert a.position.distance_to(b.position) == pytest.approx(CONTACTO)
     assert all(math.isfinite(c) for c in (*a.position, *b.position))
 
 
+@given(
+    cuerpos=st.lists(
+        st.tuples(
+            coordenada,
+            coordenada,
+            st.sampled_from([HEXAGON.radius, 10.0, 200.0]),
+        ),
+        max_size=20,
+    )
+)
+def test_corrige_los_mismos_pares_que_la_fuerza_bruta(
+    cuerpos: list[tuple[float, float, float]],
+) -> None:
+    # Con tamaños mezclados, como un jefe entre hexágonos: un cuerpo más grande que la
+    # celda no puede quedar fuera de la red de seguridad.
+    enemies = [Enemy(replace(QUIETO, radius=r), Vector2(x, y)) for x, y, r in cuerpos]
+    superpuestos = sum(
+        1
+        for a, b in combinations(enemies, 2)
+        if a.position.distance_to(b.position) < a.radius + b.radius
+    )
+    assert separate(enemies, CELDA) == superpuestos
+
+
 def test_separados_no_se_tocan() -> None:
     a, b = Enemy(QUIETO, Vector2(0, 0)), Enemy(QUIETO, Vector2(100, 0))
-    assert separate([a, b]) == 0
+    assert separate([a, b], CELDA) == 0
     assert (a.position, b.position) == (Vector2(0, 0), Vector2(100, 0))
 
 
@@ -101,7 +126,7 @@ def test_la_bala_golpea_al_que_movio_el_empujon() -> None:
     # `previous` (115) a `position` (105): de −27 a −16, con la arista en −20,8.
     a = Enemy(QUIETO, Vector2(115, 0))
     b = Enemy(QUIETO, Vector2(143, 0))
-    separate([a, b])
+    separate([a, b], CELDA)
     assert a.position.x == pytest.approx(105)
     assert a.previous == Vector2(115, 0)
     assert a.hit_by(Vector2(88, 0), Vector2(89, 0)) is not None

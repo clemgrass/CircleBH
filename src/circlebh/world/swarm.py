@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from pygame.math import Vector2
 
 from circlebh.balance import ChargesSpec
+from circlebh.world.collisions import circles_touch
 from circlebh.world.enemy import Enemy
 from circlebh.world.grid import SpatialGrid
 from circlebh.world.patterns import Context
@@ -49,10 +50,10 @@ def step_swarm(
     ]
     for enemy, acceleration in zip(alive, accelerations, strict=True):
         enemy.step(acceleration)
-    return separate(alive)
+    return separate(alive, charges.cutoff)
 
 
-def separate(enemies: Sequence[Enemy]) -> int:
+def separate(enemies: Sequence[Enemy], cell_size: float) -> int:
     """La red de seguridad: aparta a los pares cuyos círculos envolventes se superponen,
     y devuelve cuántos pares corrigió.
 
@@ -62,15 +63,10 @@ def separate(enemies: Sequence[Enemy]) -> int:
     dependan del orden de la lista. Un par aislado queda tangente; en un grupo puede
     quedar un resto, que se corrige en el paso siguiente.
     """
-    if not enemies:
-        return 0
-    positions = [enemy.position for enemy in enemies]
-    radii = [enemy.radius for enemy in enemies]
-    pairs = SpatialGrid(2 * max(radii)).pairs(positions, radii)
     shifts = [Vector2() for _ in enemies]
     pushes = [Vector2() for _ in enemies]
     corrected = 0
-    for i, j in sorted(pairs):
+    for i, j in sorted(_close_pairs(enemies, cell_size)):
         a, b = enemies[i], enemies[j]
         offset = b.position - a.position
         overlap = a.radius + b.radius - offset.length()
@@ -88,6 +84,34 @@ def separate(enemies: Sequence[Enemy]) -> int:
         enemy.position = enemy.position + shift
         enemy.velocity = enemy.velocity + push
     return corrected
+
+
+def _close_pairs(enemies: Sequence[Enemy], cell_size: float) -> set[tuple[int, int]]:
+    """Los pares cuyos círculos envolventes se tocan, con `i < j`.
+
+    Los cuerpos cuyo diámetro cabe en `cell_size` van a la grilla. Los pocos más grandes,
+    como un jefe, se revisan contra todos: si la grilla usara celdas de su tamaño, cada
+    celda juntaría a decenas de hexágonos y la búsqueda se volvería casi todos contra
+    todos.
+    """
+    small = [i for i, enemy in enumerate(enemies) if 2 * enemy.radius <= cell_size]
+    big = [i for i, enemy in enumerate(enemies) if 2 * enemy.radius > cell_size]
+    found = {
+        (small[a], small[b])
+        for a, b in SpatialGrid(cell_size).pairs(
+            [enemies[i].position for i in small], [enemies[i].radius for i in small]
+        )
+    }
+    for i in big:
+        for j in range(len(enemies)):
+            if j != i and circles_touch(
+                enemies[i].position,
+                enemies[i].radius,
+                enemies[j].position,
+                enemies[j].radius,
+            ):
+                found.add((min(i, j), max(i, j)))
+    return found
 
 
 def lattice(center: Vector2, count: int, spacing: float) -> list[Vector2]:
