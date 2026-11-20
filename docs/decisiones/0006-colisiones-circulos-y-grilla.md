@@ -1,5 +1,5 @@
 ---
-estado: aceptado
+estado: aceptado; que los enemigos choquen como círculos lo reemplaza el ADR 0020
 fecha: 2026-11-18
 ---
 
