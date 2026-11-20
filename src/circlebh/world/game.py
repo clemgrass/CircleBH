@@ -7,27 +7,43 @@ from pygame.math import Vector2
 from circlebh.balance import Balance
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy, spawn_position
-from circlebh.world.patterns import Context
 from circlebh.world.player import Player
+from circlebh.world.swarm import step_swarm
 from circlebh.world.weapons import PointWeapon, Weapon
 
 
 class World:
     """El estado de una partida. Solo avanza con `update`."""
 
-    def __init__(self, balance: Balance, rng: random.Random) -> None:
+    def __init__(
+        self,
+        balance: Balance,
+        rng: random.Random,
+        *,
+        lethal: bool = True,
+        armed: bool = True,
+    ) -> None:
+        """`lethal=False` hace que el contacto no termine la partida, y `armed=False`
+        deja al jugador sin armas. Los usan el escenario `panal`, el benchmark y la
+        simulación, para mirar al enjambre sin que la partida termine."""
         self.balance = balance
         # El único azar de la partida (ADR 0005).
         self.rng = rng
+        self.lethal = lethal
         self.player = Player(balance.player)
         self.enemies: list[Enemy] = []
         self._spawn()
         self._steps_to_spawn = self._spawn_steps()
         """Pasos que faltan para la próxima aparición."""
-        self.weapons: list[Weapon] = [PointWeapon(balance.point_weapon)]
+        self.weapons: list[Weapon] = (
+            [PointWeapon(balance.point_weapon)] if armed else []
+        )
         """Las armas del jugador. Por ahora, solo el arma punto."""
         self.game_over = False
         """Pasa a `True` cuando un enemigo toca al jugador, y no vuelve atrás."""
+        self.separations = 0
+        """Cuántos pares corrigió la red de seguridad en toda la partida. Con la ley de
+        cargas bien afinada, debería quedar en 0 (ADR 0021)."""
         self._steps = 0
 
     @property
@@ -43,24 +59,23 @@ class World:
     def update(self, intent: Vector2) -> None:
         """Avanza un paso, con la intención de movimiento del jugador (largo 0 a 1).
 
-        El jugador se mueve primero, los enemigos van hacia donde quedó, y las armas
-        golpean y disparan. Los enemigos sin líneas desaparecen y, si toca, aparece uno
-        nuevo, que empieza a moverse en el paso siguiente. Recién entonces se revisa el
-        contacto: matar a uno en el mismo paso en que te tocaría te salva. Si alguno lo
-        toca, la partida termina; desde ahí, `update` no hace nada.
+        El jugador se mueve primero, y el enjambre da su paso con el jugador donde quedó
+        (`step_swarm`). Después las armas golpean y disparan. Los enemigos sin líneas
+        desaparecen y, si toca, aparece uno nuevo, que empieza a moverse en el paso
+        siguiente. Recién entonces se revisa el contacto: matar a uno en el mismo paso
+        en que te tocaría te salva. Si alguno lo toca, la partida termina; desde ahí,
+        `update` no hace nada.
         """
         if self.game_over:
             return
         self._steps += 1
         self.player.step(intent)
-        context = Context(
-            player_position=self.player.position,
-            player_charge=self.balance.player.charge,
-            charges=self.balance.charges,
-            neighbors=[],
+        self.separations += step_swarm(
+            self.enemies,
+            self.player.position,
+            self.balance.player.charge,
+            self.balance.charges,
         )
-        for enemy in self.enemies:
-            enemy.step(enemy.acceleration(context))
         for weapon in self.weapons:
             weapon.update(self.player.position, self.enemies)
         self.enemies = [enemy for enemy in self.enemies if enemy.alive]
@@ -68,7 +83,7 @@ class World:
         if self._steps_to_spawn <= 0:
             self._spawn()
             self._steps_to_spawn = self._spawn_steps()
-        self.game_over = any(
+        self.game_over = self.lethal and any(
             enemy.touches(self.player.position, self.player.radius)
             for enemy in self.enemies
         )
