@@ -13,7 +13,7 @@ La restricción de no usar sprites ni imágenes es el tema del juego, no un lím
 ## Lo que ve el jugador
 
 - **El escenario es un plano cartesiano.** Los ejes X e Y van bien marcados y el resto es una cuadrícula muy suave que no distrae. Los ejes están fijos en el mundo: la cámara sigue al jugador, que puede alejarse del origen. En una esquina se muestran sus coordenadas, por ejemplo `(x: 142, y: −37)`.
-- **Es blanco y negro con un solo color de acento**, reservado para el peligro: las balas enemigas y el destello cuando el jugador recibe daño. El prototipo decide si el fondo es negro o blanco.
+- **Es blanco y negro con un solo color de acento**, reservado para el peligro: las balas enemigas y el destello cuando el jugador recibe daño. El fondo es negro, y una opción de la configuración lo invierte a blanco *(decisión del autor, 2026-11-20; ADR 0023)*.
 - **Todo se lee por su forma y su movimiento:**
 
 | Qué es | Cómo se ve |
@@ -114,7 +114,7 @@ Sobre el color: el blanco y negro estricto es lo más fiel a la idea, pero cuest
 ## Preguntas abiertas
 
 - El nombre del juego. `circlebh` es provisorio.
-- El fondo negro o blanco, y el color de acento: se deciden con un prototipo desechable.
+- El color de acento: se decide cuando existan balas enemigas, y tiene que leerse sobre el fondo negro y sobre el invertido.
 - Los números de equilibrio: los lados de cada polígono y del jefe, la velocidad, la frecuencia de las oleadas y de las protecciones, y la curva de experiencia.
 - Qué parámetro mejora cada tarjeta de cada arma.
 - Cómo se mejoran y se combinan las armas con ideas matemáticas (derivar, integrar, componer), y si las combinaciones entran al MVP o quedan para después.

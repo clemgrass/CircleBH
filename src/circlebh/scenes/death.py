@@ -7,6 +7,7 @@ crece y se desvanece mientras la escena se oscurece. Al terminar, aparece el tex
 import pygame
 from pygame.math import Vector2
 
+from circlebh.render.palette import Palette
 from circlebh.viewport import Viewport
 from circlebh.world.clock import STEP
 
@@ -17,8 +18,7 @@ RING_GROWTH = 8.0
 RING_WIDTH = 2.0
 """Grosor del anillo, en unidades del plano: escala con la cámara."""
 SHADE_ALPHA = 180
-"""Qué tan oscura queda la escena detrás del texto, de 0 a 255."""
-TEXT_COLOR = pygame.Color("white")
+"""Cuánto se desvanece la escena hacia el fondo detrás del texto, de 0 a 255."""
 TITLE_SIZE = 64.0
 TEXT_SIZE = 28.0
 """Tamaños de letra, en unidades del plano: escalan con la cámara."""
@@ -34,7 +34,8 @@ class DeathScreen:
     cambia. Vive con la escena, que se crea después de `pygame.init()`.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, palette: Palette) -> None:
+        self._palette = palette
         self._size = (0, 0)
         self._layer = pygame.Surface(self._size, pygame.SRCALPHA)
         self._fonts: dict[int, pygame.font.Font] = {}
@@ -60,7 +61,7 @@ class DeathScreen:
         self._resize((width, height))
         # La capa del tamaño del área útil lleva la sombra y el anillo.
         layer = self._layer
-        layer.fill((0, 0, 0, round(SHADE_ALPHA * progress)))
+        layer.fill((*self._palette.background.rgb, round(SHADE_ALPHA * progress)))
 
         if progress < 1:
             position, radius = player
@@ -69,7 +70,7 @@ class DeathScreen:
             fade = round(255 * (1 - progress))
             pygame.draw.circle(
                 layer,
-                (255, 255, 255, fade),
+                (*self._palette.foreground.rgb, fade),
                 (x - left, y - top),
                 ring * viewport.scale,
                 viewport.width(RING_WIDTH),
@@ -106,7 +107,9 @@ class DeathScreen:
         """
         left, top, width, height = viewport.rect
         surfaces = [
-            self._font(viewport.width(size)).render(text, True, TEXT_COLOR)
+            self._font(viewport.width(size)).render(
+                text, True, self._palette.foreground
+            )
             for text, size in lines
         ]
         y = top + height * TEXT_CENTER - sum(s.get_height() for s in surfaces) / 2

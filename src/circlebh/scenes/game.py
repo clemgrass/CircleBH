@@ -17,6 +17,7 @@ from circlebh.controls import (
     stick_intent,
 )
 from circlebh.pilot import pilot_intent
+from circlebh.render.palette import DARK
 from circlebh.render.plane import draw_axes, draw_letterbox
 from circlebh.render.world_view import draw_world
 from circlebh.scenes.death import EFFECT_STEPS, DeathScreen
@@ -109,7 +110,9 @@ class GameScene:
             SCENARIOS[options.scenario] if options.demo else None
         )
         self.gamepads = Gamepads() if self.demo is None else None
-        self.death_screen = DeathScreen()
+        # ADR 0023: el fondo negro de fábrica, o su negativo si el jugador lo pide.
+        self.palette = DARK.inverted() if settings.accessibility.invert_colors else DARK
+        self.death_screen = DeathScreen(self.palette)
         self.music: Sequencer | None = None
         self.music_player: MusicPlayer | None = None
         if music_enabled(options, settings):
@@ -202,12 +205,18 @@ class GameScene:
 
     def draw(self, screen: pygame.Surface) -> None:
         viewport = self.viewport(screen)
-        draw_letterbox(screen, viewport)
+        draw_letterbox(screen, viewport, self.palette)
         # Lo que cruza el borde del área útil, como un eje grueso o un círculo, no se
         # dibuja sobre las franjas.
         screen.set_clip(viewport.rect)
-        draw_axes(screen, viewport)
-        draw_world(screen, self.world, viewport, self.settings.debug.show_hitboxes)
+        draw_axes(screen, viewport, self.palette)
+        draw_world(
+            screen,
+            self.world,
+            viewport,
+            self.palette,
+            self.settings.debug.show_hitboxes,
+        )
         if self.world.game_over:
             player = self.world.player
             self.death_screen.draw(

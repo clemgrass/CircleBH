@@ -9,6 +9,7 @@ import pytest
 
 from circlebh.datafile import DataFileError
 from circlebh.settings import (
+    AccessibilitySettings,
     AudioSettings,
     CameraSettings,
     ControlsSettings,
@@ -22,6 +23,7 @@ VALIDO = {
     "camera": {"fov": 720.0, "offset": [0.0, 0.0]},
     "debug": {"show_hitboxes": False},
     "audio": {"music": True, "volume": 0.8, "base_volume": 1.0, "game_volume": 1.0},
+    "accessibility": {"invert_colors": False},
 }
 
 
@@ -63,6 +65,7 @@ def test_lee_el_valor_del_archivo(tmp_path: Path) -> None:
                 "base_volume": 0.25,
                 "game_volume": 1,
             },
+            "accessibility": {"invert_colors": True},
         }
     )
     assert load_settings(escribir(tmp_path, texto)) == Settings(
@@ -70,7 +73,22 @@ def test_lee_el_valor_del_archivo(tmp_path: Path) -> None:
         camera=CameraSettings(fov=900.0, offset=(10.0, -20.5)),
         debug=DebugSettings(show_hitboxes=True),
         audio=AudioSettings(music=False, volume=0.5, base_volume=0.25, game_volume=1.0),
+        accessibility=AccessibilitySettings(invert_colors=True),
     )
+
+
+# --- Accesibilidad ---
+
+
+def test_los_colores_vienen_sin_invertir() -> None:
+    # ADR 0023: el fondo negro es el de fábrica; invertir es una elección del jugador.
+    assert load_settings().accessibility.invert_colors is False
+
+
+def test_invertir_colores_con_otro_tipo_nombra_el_campo(tmp_path: Path) -> None:
+    # "true" entre comillas es el error típico al editar a mano.
+    error = falla_en(escribir(tmp_path, con("accessibility", "invert_colors", "true")))
+    assert error.field == "accessibility.invert_colors"
 
 
 # --- Audio ---

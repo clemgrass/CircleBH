@@ -3,24 +3,22 @@
 import pygame
 from pygame.math import Vector2
 
+from circlebh.render.palette import Palette
 from circlebh.viewport import Viewport
 
-# Provisorio: el fondo negro o blanco se decide con un prototipo (pregunta abierta).
-BACKGROUND = pygame.Color("black")
-# Provisorio, como el fondo: se revisa en la Tarea 8.
-LETTERBOX = pygame.Color("#202020")
-AXIS_COLOR = pygame.Color("white")
 AXIS_WIDTH = 1.0
 """Grosor de los ejes, en unidades del plano: escala con la cámara."""
 
 
-def draw_letterbox(screen: pygame.Surface, viewport: Viewport) -> None:
+def draw_letterbox(
+    screen: pygame.Surface, viewport: Viewport, palette: Palette
+) -> None:
     """Pinta las franjas y, encima, el fondo del área útil."""
-    screen.fill(LETTERBOX)
-    screen.fill(BACKGROUND, viewport.rect)
+    screen.fill(palette.letterbox)
+    screen.fill(palette.background, viewport.rect)
 
 
-def draw_axes(screen: pygame.Surface, viewport: Viewport) -> None:
+def draw_axes(screen: pygame.Surface, viewport: Viewport, palette: Palette) -> None:
     """Dibuja los ejes X e Y, fijos en el plano, de borde a borde del área útil.
 
     Quien llama recorta al área útil con `set_clip`: así un eje grueso pegado al borde
@@ -33,9 +31,17 @@ def draw_axes(screen: pygame.Surface, viewport: Viewport) -> None:
     # pero su borde todavía se ve.
     if top - line_width <= origin_y <= top + height + line_width:
         pygame.draw.line(
-            screen, AXIS_COLOR, (left, origin_y), (left + width, origin_y), line_width
+            screen,
+            palette.foreground,
+            (left, origin_y),
+            (left + width, origin_y),
+            line_width,
         )
     if left - line_width <= origin_x <= left + width + line_width:
         pygame.draw.line(
-            screen, AXIS_COLOR, (origin_x, top), (origin_x, top + height), line_width
+            screen,
+            palette.foreground,
+            (origin_x, top),
+            (origin_x, top + height),
+            line_width,
         )

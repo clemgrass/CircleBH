@@ -93,6 +93,14 @@ class AudioSettings:
 
 
 @dataclass(frozen=True)
+class AccessibilitySettings:
+    """Cómo se ve, para quien lo necesita o lo prefiere."""
+
+    invert_colors: bool
+    """Invierte la paleta (ADR 0023): fondo blanco y trazo negro en vez de al revés."""
+
+
+@dataclass(frozen=True)
 class Settings:
     """Toda la configuración del juego."""
 
@@ -107,6 +115,9 @@ class Settings:
 
     audio: AudioSettings
     """La música."""
+
+    accessibility: AccessibilitySettings
+    """Cómo se ve, para quien lo necesita o lo prefiere."""
 
 
 def load_settings(path: Path | None = None) -> Settings:

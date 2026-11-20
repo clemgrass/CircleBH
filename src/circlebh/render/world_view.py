@@ -3,17 +3,14 @@
 import pygame
 from pygame.math import Vector2
 
+from circlebh.render.palette import Palette
 from circlebh.viewport import Viewport
 from circlebh.world.game import World
 from circlebh.world.weapons import PointWeapon
 
-PLAYER_COLOR = pygame.Color("white")
-WEAPON_COLOR = pygame.Color("white")
 BULLET_DRAW_RADIUS = 3.0
 """Radio con que se dibuja la bala, en unidades del plano. Solo es visual: para chocar,
 la bala es un punto."""
-# Provisorio: el color de acento sigue abierto hasta que existan balas enemigas.
-ENEMY_COLOR = pygame.Color("white")
 ENEMY_LINE_WIDTH = 2.0
 """Grosor de las líneas del enemigo, en unidades del plano: escala con la cámara."""
 HITBOX_COLOR = pygame.Color("magenta")
@@ -22,7 +19,11 @@ HITBOX_WIDTH = 1.0
 
 
 def draw_world(
-    screen: pygame.Surface, world: World, viewport: Viewport, show_hitboxes: bool
+    screen: pygame.Surface,
+    world: World,
+    viewport: Viewport,
+    palette: Palette,
+    show_hitboxes: bool,
 ) -> None:
     """Dibuja al jugador como un círculo relleno, a cada enemigo con las líneas que le
     quedan, sin relleno, y las balas del jugador debajo, como puntos.
@@ -34,7 +35,7 @@ def draw_world(
             for bullet in weapon.bullets:
                 pygame.draw.circle(
                     screen,
-                    WEAPON_COLOR,
+                    palette.foreground,
                     viewport.to_screen(bullet.position),
                     BULLET_DRAW_RADIUS * viewport.scale,
                 )
@@ -42,7 +43,7 @@ def draw_world(
     player = world.player
     pygame.draw.circle(
         screen,
-        PLAYER_COLOR,
+        palette.foreground,
         viewport.to_screen(player.position),
         player.radius * viewport.scale,
     )
@@ -51,7 +52,7 @@ def draw_world(
         for a, b in enemy.lines():
             pygame.draw.line(
                 screen,
-                ENEMY_COLOR,
+                palette.foreground,
                 viewport.to_screen(a),
                 viewport.to_screen(b),
                 line_width,
