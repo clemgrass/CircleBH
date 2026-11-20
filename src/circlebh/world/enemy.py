@@ -19,7 +19,7 @@ class Enemy:
         self.spec = spec
         self.position = Vector2(position)
         self.sides = spec.sides
-        """Lados que le quedan. Por ahora no cambia; el daño llega con el anillo."""
+        """Lados que le quedan. Por ahora no cambia; el daño llega con las balas."""
 
     @property
     def radius(self) -> float:

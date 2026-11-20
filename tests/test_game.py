@@ -8,7 +8,7 @@ from pygame.math import Vector2
 from circlebh.balance import BALANCE
 from circlebh.world.clock import STEP
 from circlebh.world.game import World
-from circlebh.world.weapons import CircleWeapon
+from circlebh.world.weapons import PointWeapon
 
 
 def test_world_mueve_al_jugador() -> None:
@@ -24,20 +24,20 @@ def test_world_empieza_con_un_hexagono_a_la_distancia_de_aparicion() -> None:
     assert enemy.position.length() == pytest.approx(BALANCE.spawning.distance)
 
 
-def test_mundo_parte_con_el_arma_circulo() -> None:
+def test_mundo_parte_con_el_arma_punto() -> None:
     world = World(BALANCE, random.Random(1))
     [weapon] = world.weapons
-    assert isinstance(weapon, CircleWeapon)
-    assert weapon.spec == BALANCE.circle_weapon
+    assert isinstance(weapon, PointWeapon)
+    assert weapon.spec == BALANCE.point_weapon
 
 
-def test_el_anillo_nace_donde_quedo_el_jugador() -> None:
+def test_la_bala_nace_donde_quedo_el_jugador() -> None:
     world = World(BALANCE, random.Random(1))
     world.update(Vector2(1, 0))
     [weapon] = world.weapons
-    assert isinstance(weapon, CircleWeapon)
-    [ring] = weapon.rings
-    assert ring.center == world.player.position
+    assert isinstance(weapon, PointWeapon)
+    [bullet] = weapon.bullets
+    assert bullet.position == world.player.position
 
 
 def test_misma_semilla_el_enemigo_aparece_en_el_mismo_lugar() -> None:

@@ -1,91 +1,125 @@
-"""Tests del arma círculo: un anillo que nace en el jugador, crece y revienta."""
-
-from dataclasses import replace
+"""Tests del arma punto: una bala que se dispara sola al centro del enemigo más cercano."""
 
 import pytest
 from pygame.math import Vector2
 
-from circlebh.balance import CircleWeaponSpec
+from circlebh.balance import EnemySpec, PointWeaponSpec
 from circlebh.world.clock import STEP
-from circlebh.world.weapons import CircleWeapon, Ring
+from circlebh.world.enemy import Enemy
+from circlebh.world.weapons import Bullet, PointWeapon, nearest
 
-# 260 / 300 = 52 pasos de vida justos, y 1,5 s = 90 pasos entre anillos.
-SPEC = CircleWeaponSpec(
-    cooldown=1.5, growth_speed=300.0, max_radius=260.0, thickness=6.0
-)
-VIDA = 52
-COOLDOWN = 90
+# 0,5 s = 30 pasos entre disparos; 600 / 60 = 10 unidades por paso; 700 / 10 = 70 pasos
+# de vida.
+SPEC = PointWeaponSpec(cooldown=0.5, speed=600.0, range=700.0)
+COOLDOWN = 30
+VIDA = 70
+HEXAGON = EnemySpec(sides=6, radius=24.0, speed=120.0)
 
 
-# --- El anillo ---
+def enemigo(x: float, y: float) -> Enemy:
+    return Enemy(HEXAGON, Vector2(x, y))
+
+
+# --- La bala ---
 
 
 @pytest.mark.parametrize("pasos", [0, 1, 30])
-def test_radio_crece_con_el_tiempo(pasos: int) -> None:
-    ring = Ring(Vector2(0, 0), SPEC)
+def test_bala_avanza_en_linea_recta(pasos: int) -> None:
+    origen, velocidad = Vector2(1, 2), Vector2(0, -SPEC.speed)
+    bullet = Bullet(origen, velocidad, SPEC)
     for _ in range(pasos):
-        ring.step()
-    assert ring.radius == pytest.approx(SPEC.growth_speed * pasos * STEP)
+        bullet.step()
+    # p(t) = p₀ + v·t
+    assert tuple(bullet.position) == pytest.approx(
+        tuple(origen + velocidad * pasos * STEP)
+    )
+    assert bullet.position.distance_to(origen) == pytest.approx(SPEC.speed / 60 * pasos)
 
 
-def test_revienta_al_llegar_al_maximo() -> None:
-    ring = Ring(Vector2(0, 0), SPEC)
+def test_previous_es_la_posicion_un_paso_antes() -> None:
+    bullet = Bullet(Vector2(0, 0), Vector2(SPEC.speed, 0), SPEC)
+    assert bullet.previous == bullet.position
+    bullet.step()
+    antes = Vector2(bullet.position)
+    bullet.step()
+    assert tuple(bullet.previous) == pytest.approx(tuple(antes))
+
+
+def test_bala_vence_al_recorrer_range() -> None:
+    bullet = Bullet(Vector2(0, 0), Vector2(SPEC.speed, 0), SPEC)
     for _ in range(VIDA - 1):
-        ring.step()
-    assert not ring.expired
-    ring.step()
-    assert ring.expired
+        bullet.step()
+    assert bullet.expired is False
+    bullet.step()
+    assert bullet.expired is True
 
 
-# --- El arma ---
+# --- A quién apunta ---
 
 
-def test_el_primer_anillo_nace_en_el_primer_paso() -> None:
-    weapon = CircleWeapon(SPEC)
-    assert weapon.rings == []
-    weapon.update(Vector2(3, 4))
-    [ring] = weapon.rings
-    assert ring.center == Vector2(3, 4)
-    assert ring.radius == 0
+def test_nearest_sin_enemigos_es_none() -> None:
+    assert nearest(Vector2(0, 0), []) is None
 
 
-def test_el_anillo_reventado_desaparece() -> None:
-    weapon = CircleWeapon(SPEC)
-    weapon.update(Vector2(0, 0))
-    for _ in range(VIDA - 1):
-        weapon.update(Vector2(0, 0))
-    assert len(weapon.rings) == 1
-    weapon.update(Vector2(0, 0))
-    assert weapon.rings == []
+def test_dispara_al_centro_del_mas_cercano() -> None:
+    weapon = PointWeapon(SPEC)
+    weapon.update(Vector2(0, 0), [enemigo(500, 0), enemigo(0, -100)])
+    [bullet] = weapon.bullets
+    assert bullet.velocity == Vector2(0, -SPEC.speed)
 
 
-def test_nace_uno_cada_cooldown() -> None:
-    weapon = CircleWeapon(SPEC)
-    centros: set[float] = set()
-    # El origen cambia en cada paso: el centro de cada anillo dice en qué paso nació.
-    for paso in range(1, 3 * COOLDOWN + 1):
-        weapon.update(Vector2(paso, 0))
-        centros |= {ring.center.x for ring in weapon.rings}
-    assert centros == {1, 1 + COOLDOWN, 1 + 2 * COOLDOWN}
+def test_empate_gana_el_primero() -> None:
+    weapon = PointWeapon(SPEC)
+    weapon.update(Vector2(0, 0), [enemigo(100, 0), enemigo(-100, 0)])
+    [bullet] = weapon.bullets
+    assert bullet.velocity == Vector2(SPEC.speed, 0)
 
 
-def test_el_anillo_no_sigue_al_jugador() -> None:
-    weapon = CircleWeapon(SPEC)
-    # El mismo objeto, movido en el lugar: así se mueve `Player.position` (`+=`).
-    jugador = Vector2(0, 0)
-    weapon.update(jugador)
+def test_centro_sobre_el_jugador_no_dispara() -> None:
+    # Negativo: la dirección es nula y no se puede normalizar.
+    weapon = PointWeapon(SPEC)
+    weapon.update(Vector2(5, 5), [enemigo(5, 5)])
+    assert weapon.bullets == []
+
+
+# --- Cuándo dispara ---
+
+
+def test_dispara_uno_cada_cooldown() -> None:
+    weapon = PointWeapon(SPEC)
+    lejos = [enemigo(10_000, 0)]
+    disparos = []
+    for paso in range(100):
+        weapon.update(Vector2(0, 0), lejos)
+        if any(bullet.age == 0 for bullet in weapon.bullets):
+            disparos.append(paso)
+    assert disparos == [0, COOLDOWN, 2 * COOLDOWN, 3 * COOLDOWN]
+
+
+def test_las_balas_vencidas_se_quitan() -> None:
+    weapon = PointWeapon(SPEC)
+    lejos = [enemigo(10_000, 0)]
+    for _ in range(VIDA + 1):
+        weapon.update(Vector2(0, 0), lejos)
+    # Nacieron en los pasos 0, 30 y 60; la del paso 0 ya recorrió `range`.
+    assert len(weapon.bullets) == 2
+
+
+def test_sin_enemigos_no_dispara_y_queda_lista() -> None:
+    weapon = PointWeapon(SPEC)
+    for _ in range(COOLDOWN * 3):
+        weapon.update(Vector2(0, 0), [])
+    assert weapon.bullets == []
+    weapon.update(Vector2(0, 0), [enemigo(100, 0)])
+    assert len(weapon.bullets) == 1
+
+
+def test_la_bala_no_sigue_al_jugador() -> None:
+    weapon = PointWeapon(SPEC)
+    objetivo = [enemigo(10_000, 0)]
+    weapon.update(Vector2(0, 0), objetivo)
     for _ in range(10):
-        jugador += Vector2(5, -2)
-        weapon.update(jugador)
-    [ring] = weapon.rings
-    assert ring.center == Vector2(0, 0)
-
-
-def test_anillo_lanzado_conserva_su_spec() -> None:
-    weapon = CircleWeapon(SPEC)
-    weapon.update(Vector2(0, 0))
-    # Una mejora cambia el spec del arma, no los anillos que ya van en el aire.
-    weapon.spec = replace(SPEC, growth_speed=2 * SPEC.growth_speed)
-    weapon.update(Vector2(0, 0))
-    [ring] = weapon.rings
-    assert ring.radius == pytest.approx(SPEC.growth_speed * STEP)
+        weapon.update(Vector2(0, 50), objetivo)
+    bullet = weapon.bullets[0]
+    assert bullet.position.y == 0
+    assert bullet.position.x == pytest.approx(SPEC.speed * 10 * STEP)

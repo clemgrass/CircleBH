@@ -6,10 +6,13 @@ from pygame.math import Vector2
 from circlebh.viewport import Viewport
 from circlebh.world.enemy import regular_polygon
 from circlebh.world.game import World
-from circlebh.world.weapons import CircleWeapon, Ring
+from circlebh.world.weapons import PointWeapon
 
 PLAYER_COLOR = pygame.Color("white")
 WEAPON_COLOR = pygame.Color("white")
+BULLET_DRAW_RADIUS = 3.0
+"""Radio con que se dibuja la bala, en unidades del plano. Solo es visual: para chocar,
+la bala es un punto."""
 # Provisorio: el color de acento sigue abierto hasta que existan balas enemigas.
 ENEMY_COLOR = pygame.Color("white")
 HITBOX_COLOR = pygame.Color("magenta")
@@ -21,14 +24,19 @@ def draw_world(
     screen: pygame.Surface, world: World, viewport: Viewport, show_hitboxes: bool
 ) -> None:
     """Dibuja al jugador como un círculo y a cada enemigo como un polígono, rellenos, y
-    los ataques del jugador debajo, solo con su trazo.
+    las balas del jugador debajo, como puntos.
 
     Con `show_hitboxes`, encima va el círculo de choque de cada cuerpo.
     """
     for weapon in world.weapons:
-        if isinstance(weapon, CircleWeapon):
-            for ring in weapon.rings:
-                draw_ring(screen, viewport, ring)
+        if isinstance(weapon, PointWeapon):
+            for bullet in weapon.bullets:
+                pygame.draw.circle(
+                    screen,
+                    WEAPON_COLOR,
+                    viewport.to_screen(bullet.position),
+                    BULLET_DRAW_RADIUS * viewport.scale,
+                )
 
     player = world.player
     pygame.draw.circle(
@@ -48,22 +56,6 @@ def draw_world(
         bodies += [(enemy.position, enemy.radius) for enemy in world.enemies]
         for position, radius in bodies:
             draw_hitbox(screen, viewport, position, radius)
-
-
-def draw_ring(screen: pygame.Surface, viewport: Viewport, ring: Ring) -> None:
-    """El anillo, solo el trazo, centrado en su radio: de `r − grosor/2` a `r + grosor/2`.
-
-    `pygame.draw.circle` pinta el borde hacia adentro desde el radio que recibe, por eso
-    se le pasa el radio de afuera.
-    """
-    thickness = ring.spec.thickness
-    pygame.draw.circle(
-        screen,
-        WEAPON_COLOR,
-        viewport.to_screen(ring.center),
-        (ring.radius + thickness / 2) * viewport.scale,
-        viewport.width(thickness),
-    )
 
 
 def draw_hitbox(
