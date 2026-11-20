@@ -106,6 +106,7 @@ extend-select = ["I", "B", "UP", "SIM", "N", "TID251"]
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "pygame.draw".msg = "Solo render/ y scenes/ dibujan (ADR 0003 y 0016)."
 "pygame.display".msg = "Solo render/ y scenes/ tocan la pantalla (ADR 0003 y 0016)."
+"pygame.mixer".msg = "Solo scenes/music.py toca el mixer; audio/ entrega bytes (ADR 0022)."
 
 [tool.ruff.lint.per-file-ignores]
 "src/circlebh/render/**" = ["TID251"]

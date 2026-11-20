@@ -79,7 +79,7 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 
 ## Arquitectura (ADR 0003 a 0006, 0016, 0021, 0022)
 - En `src/circlebh/`, las importaciones van en una sola dirección: `scenes` → `render | audio` → `world` → `balance`. `render` y `audio` son hermanas y no se importan entre sí. `lint-imports` lo verifica.
-- La música sale de la geometría del juego, sobre una base de techno (ADR 0022). `audio/` es lógica pura como `world/`: escucha al mundo sin cambiarlo y nunca saca números de su `Random`. Solo `scenes/music.py` toca `pygame.mixer`.
+- La música sale de la geometría del juego, sobre una base de techno (ADR 0022). `audio/` es lógica pura como `world/`: escucha al mundo sin cambiarlo y nunca saca números de su `Random`. Solo `scenes/music.py` toca `pygame.mixer`: la regla `TID251` de ruff lo prohíbe fuera de `render/`, `scenes/` y `__main__.py`.
 - `world/` es lógica pura: no tiene `draw()` ni usa `pygame.display` ni `pygame.draw`. De Pygame solo usa `Vector2`. La regla `TID251` de ruff lo verifica, y solo `render/`, `scenes/` y `__main__.py` tienen la excepción.
 - `world` usa coordenadas matemáticas: Y hacia arriba y ángulos antihorarios en radianes. Solo la cámara las pasa a pantalla. Cada curva se escribe como su fórmula.
 - Clases simples con herencia y funciones cortas. Sin ECS, sin metaclases y sin `pygame.sprite`.
