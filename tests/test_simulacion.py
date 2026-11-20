@@ -13,7 +13,7 @@ from circlebh.balance import BALANCE
 from circlebh.pilot import simulate_worlds
 from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
-from circlebh.world.swarm import lattice
+from circlebh.world.swarm import lattice, step_swarm
 
 
 @pytest.mark.simulacion
@@ -39,3 +39,34 @@ def test_300_hexagonos_nunca_se_tocan() -> None:
     assert world.separations == 0
     for a, b in combinations(world.enemies, 2):
         assert a.position.distance_to(b.position) >= a.radius + b.radius
+
+
+@pytest.mark.simulacion
+def test_los_heridos_no_tiemblan_en_la_multitud() -> None:
+    # Lo encontró la revisión del #27: un herido de 1 línea tiene masa 1, y el núcleo
+    # (una fuerza que no depende de la masa) le da una rigidez seis veces mayor. Con
+    # `ω·dt > 1`, Euler se pasa de un lado al otro en cada paso: tiembla a toda velocidad.
+    # Aquí, 300 hexágonos con de 1 a 6 líneas al azar contra el jugador quieto. En los
+    # últimos 2 s, ninguno puede invertir su velocidad de un paso al siguiente yendo a
+    # más de 30 u/s, y la red de seguridad nunca actúa.
+    rng = random.Random(1)
+    hexagon = BALANCE.enemies["hexagon"]
+    enemies = [Enemy(hexagon, p) for p in lattice(Vector2(), 300, 60)]
+    for enemy in enemies:
+        for k in rng.sample(range(hexagon.sides), rng.randint(0, hexagon.sides - 1)):
+            enemy.remove_edge(k)
+    separations = 0
+    temblores = 0
+    for paso in range(720):
+        antes = [Vector2(enemy.velocity) for enemy in enemies]
+        separations += step_swarm(
+            enemies, Vector2(), BALANCE.player.charge, BALANCE.charges
+        )
+        if paso >= 600:
+            temblores += sum(
+                1
+                for v, enemy in zip(antes, enemies, strict=True)
+                if enemy.velocity.length() > 30 and v.dot(enemy.velocity) < 0
+            )
+    assert separations == 0
+    assert temblores == 0

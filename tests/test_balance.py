@@ -124,9 +124,9 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
             "cutoff": 150.0,
             "softening": 1.0,
             "player_softening": 24.0,
-            "core_strength": 20000.0,
+            "core_strength": 30000.0,
             "core_reach": 1.2,
-            "core_exponent": 8.0,
+            "core_exponent": 4.0,
         },
         "enemies": {
             "hexagon": {
