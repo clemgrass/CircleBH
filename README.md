@@ -8,7 +8,13 @@ Un juego del género survivors hecho en Python con [pygame-ce](https://pyga.me/)
 
 ## Jugar
 
-Descarga el zip de tu sistema desde [Releases](https://github.com/clemgrass/CircleBH/releases): Windows x64, macOS con Apple Silicon o Linux x64. Descomprímelo y abre `circlebh` (en Windows, `circlebh.exe`) dentro de la carpeta `circlebh`.
+Por ahora se juega desde el código. Los ejecutables para Windows, macOS y Linux llegan con la 1.0.0. Necesitas [uv](https://docs.astral.sh/uv/) 0.13.7:
+
+```
+git clone https://github.com/clemgrass/CircleBH.git
+cd CircleBH
+uv run circlebh
+```
 
 | Acción | Teclado | Control |
 |---|---|---|
@@ -16,21 +22,6 @@ Descarga el zip de tu sistema desde [Releases](https://github.com/clemgrass/Circ
 | Reiniciar al morir | R | ✕ o □ en PlayStation; A o X en Xbox |
 | Pantalla completa | F11 | |
 | Salir | Escape | |
-
-### La primera vez
-
-El juego no está firmado, así que el sistema avisa la primera vez que lo abres.
-
-- **Windows:** aparece el aviso azul de SmartScreen. Elige **Más información** y después **Ejecutar de todas formas**. Si tienes activado el Control inteligente de aplicaciones de Windows 11, no deja abrirlo.
-- **macOS:** el sistema dice que no puede verificar `circlebh`. Ve a **Configuración del Sistema > Privacidad y seguridad**, busca el aviso en **Seguridad** y elige **Abrir de todos modos**. El botón dura cerca de una hora después del intento. Si vuelve a avisar por otros archivos de la carpeta, quítale la cuarentena a toda la carpeta desde la Terminal:
-
-  ```
-  xattr -dr com.apple.quarantine circlebh
-  ```
-
-- **Linux:** abre `./circlebh` desde la carpeta.
-
-Si prefieres no abrir un ejecutable sin firma, juega desde el código con `uv run circlebh` (ver [Desarrollo](#desarrollo)).
 
 ## Documentos
 

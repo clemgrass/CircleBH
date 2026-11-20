@@ -1,5 +1,5 @@
 ---
-estado: aceptado
+estado: aceptado; los releases 0.x los reemplaza el ADR 0024
 fecha: 2026-11-18
 ---
 
