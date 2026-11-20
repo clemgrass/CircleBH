@@ -1,5 +1,5 @@
 ---
-estado: propuesto
+estado: aceptado
 fecha: 2026-11-19
 ---
 
