@@ -58,6 +58,7 @@ Dónde corre la mezcla:
 
 - **La música escucha al juego, y el juego no escucha a la música** *(decisión del usuario, 2026-11-19)*. Las armas no disparan al pulso y el balance no cambia. Que el juego también escuche queda como posible evolución, no decidida.
 - **Lo único de cada partida sale del juego** *(decisión del usuario)*: cuántos enemigos hay, dónde están, cuándo les pegas y qué armas llevas.
+- **La base varía un poco con la semilla** *(decisión del usuario, 2026-11-20)*. La tonalidad (de −5 a +2 semitonos) y el acorde inicial cambian en cada partida, y el tempo (de 120 a 126 BPM), una vez por sesión. Así, reiniciar no suena siempre igual. El azar sale de la semilla, nunca del reloj, con un generador propio de la música (`Random(f"musica-{seed}")`), para que prender o apagar la música no cambie la partida. La evolución dentro de una partida queda para el MVP.
 
 ### El camino C *(decisión del usuario, 2026-11-20)*
 
