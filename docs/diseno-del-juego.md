@@ -44,8 +44,11 @@ La tabla es el punto de partida. El prototipo puede ajustarla si algo no se lee 
   - La **rosa** daña con sus pétalos completos mientras orbitan.
 - **Es un bullet hell:** hay enemigos que disparan, además de los que persiguen al jugador.
 - **El jugador es un círculo y muere de un golpe.** Si recoge una protección, se le suma un anillo concéntrico por fuera, y los anillos se acumulan sin límite. Cada anillo es una vida más, pero agranda al jugador: el anillo de afuera es más grande que el de adentro, así que tener más vidas hace más fácil que algo te golpee. Cada golpe rompe el anillo de afuera. *(Lo propuso Claude: que se rompa el de afuera es lo que hace que el jugador se achique al perder una vida.)*
-- **El jefe aparece al minuto 10.** Es un polígono enorme con aristas interiores, y se va rompiendo de a poco. La idea base es una capa de afuera de unos 100 lados con polígonos anidados adentro: al romper una capa queda expuesta la siguiente. El prototipo decide la forma exacta de lo interior. La cantidad de lados y de capas tiene que ser fácil de cambiar, porque dependen del equilibrio al jugar.
-- **Cómo termina:** el jugador gana si destruye al jefe y pierde si recibe un golpe sin anillos. La pantalla final muestra el tiempo, los enemigos eliminados y el nivel alcanzado.
+- **Hay diez tipos de enemigo además del jefe**, cada uno con su idea matemática y una reacción distinta del jugador: triángulo, cuadrado, pentágono, estrella, hexágono, octágono, imán inverso, regenerador, divisor y círculo *(decisión del autor, 2026-11-20; detalle en la spec `docs/specs/2026-11-20-version-0-2-0.md`)*. Todos son justos: ningún ataque llega sin aviso, ninguno queda encima de otro y siempre hay enemigos por todos lados.
+- **La partida sigue la forma de un tema de house o techno** *(decisión del autor, 2026-11-20)*: intro, subida, drop 1, respiro, subida y drop 2, en unos 5 minutos. La forma es fija y lo que entra, dónde y cuándo varía con la semilla.
+- **El jefe aparece cuando termina el drop 2** *(decisión del autor, 2026-11-20; antes, al minuto 10)*. Es un polígono enorme con aristas interiores, y se va rompiendo de a poco. La idea base es una capa de afuera de unos 100 lados con polígonos anidados adentro: al romper una capa queda expuesta la siguiente. El prototipo decide la forma exacta de lo interior. La cantidad de lados y de capas tiene que ser fácil de cambiar, porque dependen del equilibrio al jugar.
+- **Después del último jefe empieza un modo infinito** *(decisión del autor, 2026-11-20)*. Es el último jefe implementado, no el primero. La dificultad crece exponencialmente y el jugador ya no recibe mejoras.
+- **Cómo termina:** solo al morir, es decir, al recibir un golpe sin anillos *(decisión del autor, 2026-11-20; antes, se ganaba al destruir al jefe)*. La pantalla final muestra el tiempo, el tiempo en el modo infinito, los enemigos eliminados y el nivel alcanzado.
 
 ## La música
 
@@ -58,9 +61,9 @@ La música sale de la misma geometría que el juego, sobre una base de techno, y
 
 ## El MVP
 
-- Un menú, una partida de 10 minutos que termina con el jefe, y la pantalla final.
+- Un menú, una partida de unos 5 minutos con la forma de un tema, el jefe al terminar el drop 2, el modo infinito y la pantalla final.
 - 4 o 5 armas-curva.
-- 3 o 4 tipos de polígono, y al menos uno dispara.
+- Los diez tipos de enemigo; el pentágono dispara.
 - El jefe.
 - Los anillos de protección del jugador.
 - La subida de nivel con tarjetas.
@@ -75,7 +78,7 @@ La música sale de la misma geometría que el juego, sobre una base de techno, y
 
 ## Después del MVP
 
-Al terminar el MVP se hace una revisión de cómo expandir el juego. Ninguna de estas ideas está decidida:
+Al terminar el MVP se hace una revisión de cómo expandir el juego. El autor quiere ir sumando dificultad, música y un jefe cada 4 a 6 minutos, como los temas de un set de DJ, y el modo infinito siempre empieza después del último *(2026-11-20)*. Ninguna de estas otras ideas está decidida:
 
 - combinar curvas, por ejemplo seno con círculo para formar una figura de Lissajous;
 - esconder cosas en coordenadas del plano, como un final secreto;
