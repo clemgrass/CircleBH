@@ -71,5 +71,15 @@ SCENARIOS: dict[str, Scenario] = {
             crowd_enemy="square",
             lethal=False,
         ),
+        Scenario(
+            "cuadrado-herido",
+            "Un cuadrado que gira y llega al jugador quieto, que no muere y le dispara:"
+            " con cada línea que pierde, gira en torno a su nuevo centro de masa"
+            " (ADR 0027).",
+            pilot=False,
+            crowd=1,
+            crowd_enemy="square",
+            lethal=False,
+        ),
     ]
 }

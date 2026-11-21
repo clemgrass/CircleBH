@@ -19,7 +19,7 @@ from circlebh.world.clock import STEP
 from circlebh.world.collisions import closest_point_on_segment
 from circlebh.world.enemy import Enemy
 from circlebh.world.polygon import first_hit, polygon_edge, vertex
-from circlebh.world.rigid import to_local, to_world
+from circlebh.world.rigid import center_of_mass, to_local, to_world
 
 # Sin patrones ni carga, y rápido, para poder darle cualquier velocidad.
 CUADRADO = EnemySpec(
@@ -169,7 +169,8 @@ def golpe_en_subpasos(
         s = i / SUBPASOS
         centro = enemy.previous.lerp(enemy.position, s)
         angulo = enemy.previous_angle + s * (enemy.angle - enemy.previous_angle)
-        camino.append(to_local(start.lerp(end, s), centro, angulo))
+        # Del marco del cuerpo, centrado en su centro de masa, al del polígono.
+        camino.append(to_local(start.lerp(end, s), centro, angulo) - enemy.offset)
     sides = enemy.spec.sides
     for p, q in pairwise(camino):
         hit = first_hit(p, q, enemy.spec.radius, sides, enemy.edges)
@@ -232,19 +233,20 @@ def test_golpe_con_giro_coincide_con_subpasos(
     """Con `|ω·dt| ≤ 0,1`, el tramo recto en el marco del enemigo le quita la misma
     línea que 16 subpasos, salvo en los casos ambiguos (`ambiguo`) o si la cruza casi
     rasante. El margen es el doble de la `tolerancia`: con estos números, a lo más
-    unas 0,6 unidades.
+    unas 0,6 unidades. Vale también herido, girando en torno a su nuevo centro.
     """
     enemy = Enemy(replace(CUADRADO, spin=spin), Vector2())
     enemy.angle = angulo
+    for k in set(range(4)) - otras - {linea}:
+        enemy.remove_edge(k)
     enemy.velocity = velocidad
     enemy.step(Vector2())
-    enemy.edges = sorted(otras | {linea})
     # La bala pasa por un punto de `linea` en la fracción `s` del paso. Así casi
     # siempre hay golpe, y el filtro descarta poco.
     a, b = polygon_edge(CUADRADO.radius, 4, linea)
     centro = enemy.previous.lerp(enemy.position, s)
     pose = enemy.previous_angle + s * (enemy.angle - enemy.previous_angle)
-    cruce = to_world(a.lerp(b, u), centro, pose)
+    cruce = to_world(a.lerp(b, u) + enemy.offset, centro, pose)
     start, end = cruce - tramo * s, cruce + tramo * (1 - s)
 
     referencia = golpe_en_subpasos(enemy, start, end)
@@ -259,3 +261,161 @@ def test_golpe_con_giro_coincide_con_subpasos(
     hit = enemy.hit_by(start, end)
     assert hit is not None
     assert hit[1] == k
+
+
+# --- Perder una línea: mismo giro, nuevo centro (L2 del ADR 0027) ---
+
+giros = st.one_of(st.floats(0.1, MAX_SPIN), st.floats(-MAX_SPIN, -0.1))
+lineas_del_cuadrado = st.sets(st.integers(0, 3), min_size=1, max_size=3)
+"""Las líneas que se quitan: al menos una, y siempre queda una."""
+
+
+def cuadrado_local(edges: set[int] | range) -> list[tuple[Vector2, Vector2]]:
+    """Las líneas del cuadrado, medidas desde el centro del polígono."""
+    return [polygon_edge(CUADRADO.radius, 4, k) for k in sorted(edges)]
+
+
+def punto_medio(k: int) -> Vector2:
+    a, b = polygon_edge(CUADRADO.radius, 4, k)
+    return (a + b) / 2
+
+
+def herido(spin: float, angulo: float, velocidad: Vector2) -> Enemy:
+    """Un cuadrado que gira, a medio camino: ya dio un paso, así que la pose de antes
+    y la de ahora difieren."""
+    enemy = Enemy(replace(CUADRADO, spin=spin), Vector2(50, -20))
+    enemy.angle = angulo
+    enemy.velocity = velocidad
+    enemy.step(Vector2())
+    return enemy
+
+
+def pose_de_antes(enemy: Enemy) -> list[tuple[Vector2, Vector2]]:
+    """Sus líneas con la pose de antes del paso, la que usa `hit_by` para `start`."""
+    return [
+        (
+            to_world(a + enemy.offset, enemy.previous, enemy.previous_angle),
+            to_world(b + enemy.offset, enemy.previous, enemy.previous_angle),
+        )
+        for a, b in cuadrado_local(set(enemy.edges))
+    ]
+
+
+def test_centro_de_masa_del_cuadrado_entero_es_su_centro() -> None:
+    assert center_of_mass(cuadrado_local(range(4))).length() < 1e-12
+
+
+@pytest.mark.parametrize("quitada", range(4))
+def test_centro_de_masa_se_corre_hacia_las_que_quedan(quitada: int) -> None:
+    # Los cuatro puntos medios suman 0. Sin uno, `m`, el centro queda en `−m/3`: un
+    # tercio de la apotema hacia el lado opuesto a la línea perdida.
+    centro = center_of_mass(cuadrado_local(set(range(4)) - {quitada}))
+    assert centro.distance_to(-punto_medio(quitada) / 3) < 1e-9
+
+
+def test_centro_de_masa_pesa_cada_linea_por_su_largo() -> None:
+    # Borde: líneas de largos distintos. La de largo 3 pesa el triple.
+    corta = (Vector2(0, 0), Vector2(1, 0))
+    larga = (Vector2(0, 10), Vector2(3, 10))
+    centro = center_of_mass([corta, larga])
+    assert centro.distance_to(Vector2((0.5 + 3 * 1.5) / 4, 30 / 4)) < 1e-12
+
+
+def test_centro_de_masa_sin_lineas_falla() -> None:
+    # Negativo: sin masa no hay centro.
+    with pytest.raises(ValueError, match="sin líneas"):
+        center_of_mass([])
+
+
+@given(
+    spin=giros,
+    angulo=angulos,
+    velocidad=st.builds(polar, st.floats(0, 120), angulos),
+    quitadas=lineas_del_cuadrado,
+)
+def test_perder_linea_no_mueve_las_que_quedan(
+    spin: float, angulo: float, velocidad: Vector2, quitadas: set[int]
+) -> None:
+    # Ni con la pose de ahora, que se dibuja, ni con la de antes, que usa `hit_by`.
+    enemy = herido(spin, angulo, velocidad)
+    quedan = sorted(set(range(4)) - quitadas)
+    ahora = dict(zip(enemy.edges, enemy.lines(), strict=True))
+    antes = dict(zip(enemy.edges, pose_de_antes(enemy), strict=True))
+    for k in sorted(quitadas):
+        enemy.remove_edge(k)
+    for k, (a, b) in zip(quedan, enemy.lines(), strict=True):
+        assert a.distance_to(ahora[k][0]) < 1e-9
+        assert b.distance_to(ahora[k][1]) < 1e-9
+    for k, (a, b) in zip(quedan, pose_de_antes(enemy), strict=True):
+        assert a.distance_to(antes[k][0]) < 1e-9
+        assert b.distance_to(antes[k][1]) < 1e-9
+
+
+@given(
+    spin=giros,
+    angulo=angulos,
+    velocidad=st.builds(polar, st.floats(0, 120), angulos),
+    quitada=st.integers(0, 3),
+)
+def test_centro_nuevo_hereda_la_velocidad_de_su_punto(
+    spin: float, angulo: float, velocidad: Vector2, quitada: int
+) -> None:
+    # Un punto `r` de un cuerpo que gira va a `v + ω × r`, con `ω × r = ω·(−r.y, r.x)`.
+    enemy = herido(spin, angulo, velocidad)
+    antes = Vector2(enemy.position)
+    v = Vector2(enemy.velocity)
+    enemy.remove_edge(quitada)
+    r = enemy.position - antes
+    assert r.length() == pytest.approx(CUADRADO.radius * math.sqrt(2) / 2 / 3)
+    assert enemy.velocity.distance_to(v + spin * Vector2(-r.y, r.x)) < 1e-9
+    assert enemy.omega == spin
+
+
+@given(spin=giros, angulo=angulos, quitadas=lineas_del_cuadrado)
+def test_la_envolvente_del_herido_contiene_sus_lineas(
+    spin: float, angulo: float, quitadas: set[int]
+) -> None:
+    # La envolvente, medida desde el centro nuevo, es la justa: toca el extremo más
+    # lejano.
+    enemy = herido(spin, angulo, Vector2())
+    for k in sorted(quitadas):
+        enemy.remove_edge(k)
+    distancias = [
+        enemy.position.distance_to(p) for linea in enemy.lines() for p in linea
+    ]
+    assert max(distancias) == pytest.approx(enemy.radius)
+
+
+def test_una_sola_linea_gira_en_su_punto_medio() -> None:
+    # Borde: con una sola línea, el centro de masa es su punto medio, y la línea gira
+    # en torno a él sin moverlo.
+    enemy = Enemy(replace(CUADRADO, spin=1.5), Vector2(100, 0))
+    for k in (0, 1, 2):
+        enemy.remove_edge(k)
+    assert enemy.position.distance_to(Vector2(100, 0) + punto_medio(3)) < 1e-9
+    assert enemy.radius == pytest.approx(CUADRADO.radius * math.sqrt(2) / 2)
+    enemy.velocity = Vector2()
+    for _ in range(30):
+        enemy.step(Vector2())
+    [(a, b)] = enemy.lines()
+    assert ((a + b) / 2).distance_to(enemy.position) < 1e-9
+
+
+def test_perder_la_ultima_linea_lo_mata_sin_dividir_por_cero() -> None:
+    enemy = Enemy(replace(CUADRADO, spin=1.5), Vector2())
+    for k in range(4):
+        enemy.remove_edge(k)
+    assert enemy.alive is False
+
+
+def test_sin_giro_perder_linea_no_mueve_nada() -> None:
+    # Negativo: la regla de la 0.1.0 (decisión 15) para los que no giran.
+    enemy = Enemy(BALANCE.enemies["hexagon"], Vector2(100, 0))
+    enemy.velocity = Vector2(10, 0)
+    lineas = enemy.lines()
+    enemy.remove_edge(2)
+    assert enemy.position == Vector2(100, 0)
+    assert enemy.velocity == Vector2(10, 0)
+    assert enemy.offset == Vector2()
+    assert enemy.radius == BALANCE.enemies["hexagon"].radius
+    assert enemy.lines() == [linea for k, linea in enumerate(lineas) if k != 2]
