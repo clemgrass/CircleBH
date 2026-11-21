@@ -33,7 +33,13 @@
     }
   },
   "spawning": {
-    "distance": 800.0
+    "distance": 800.0,
+    "max_per_step": 4,
+    "formation_gap": 20.0,
+    "formation_size": [
+      3,
+      6
+    ]
   },
   "director": {
     "bpm": 124.0,
@@ -78,7 +84,8 @@
           }
         ],
         "formations": [
-          "single"
+          "single",
+          "line"
         ]
       },
       {
@@ -99,7 +106,9 @@
           }
         ],
         "formations": [
-          "single"
+          "ring",
+          "line",
+          "cluster"
         ]
       },
       {
@@ -141,7 +150,9 @@
           }
         ],
         "formations": [
-          "single"
+          "single",
+          "line",
+          "cluster"
         ]
       },
       {
@@ -162,7 +173,9 @@
           }
         ],
         "formations": [
-          "single"
+          "ring",
+          "line",
+          "cluster"
         ]
       }
     ]

@@ -5,9 +5,6 @@ Cada línea es una parte del enemigo: la bala quita la que golpea, y sin líneas
 muere. Chocan por sus líneas, y el círculo envolvente es el primer descarte (ADR 0020).
 """
 
-import math
-import random
-
 from pygame.math import Vector2
 
 from circlebh.balance import EnemySpec
@@ -127,9 +124,3 @@ class Enemy:
             self.spec.speed
         )
         self.position = self.position + self.velocity * STEP
-
-
-def spawn_position(center: Vector2, distance: float, rng: random.Random) -> Vector2:
-    """Un punto a `distance` de `center`, en un ángulo al azar de la `rng` inyectada."""
-    angle = rng.uniform(0, math.tau)
-    return center + Vector2(math.cos(angle), math.sin(angle)) * distance
