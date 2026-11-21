@@ -11,9 +11,10 @@ from pygame.math import Vector2
 
 from circlebh.audio import sounds
 from circlebh.audio.harmony import chord_at, variation_for
+from circlebh.audio.intensity import PHRASE_BARS
 from circlebh.audio.rhythm import SIXTEENTHS
 from circlebh.audio.sequencer import SAMPLES_PER_STEP, Sequencer
-from circlebh.balance import BALANCE, EnemySpec
+from circlebh.balance import BALANCE, EnemySpec, SectionSpec
 from circlebh.pilot import pilot_intent
 from circlebh.world.enemy import Enemy
 from circlebh.world.events import Death, Hit
@@ -158,9 +159,11 @@ def test_al_crearse_deja_lista_la_bateria() -> None:
         assert sonido.cache_info().currsize == 1
     assert sounds.impact.cache_info().currsize == 1
     assert sounds.rim.cache_info().currsize == 1
-    assert sounds.riser.cache_info().currsize == 1
+    # El de un compás y el de la subida de una frase (ADR 0026).
+    assert sounds.riser.cache_info().currsize == 2
     sounds.riser(sequencer.grid.bar_seconds)
-    assert sounds.riser.cache_info().hits >= 1
+    sounds.riser(PHRASE_BARS * sequencer.grid.bar_seconds)
+    assert sounds.riser.cache_info().hits >= 2
 
 
 # --- La cuantización ---
@@ -250,6 +253,66 @@ def test_al_reiniciar_tonalidad_acorde_inicial_e_impacto_caen_juntos() -> None:
     for g in range(SIXTEENTHS, 3 * SIXTEENTHS):
         assert por_g[g].chord == chord_at(0, nueva)
     assert por_g[3 * SIXTEENTHS].chord == chord_at(2, nueva)
+
+
+# --- El drop (ADR 0026) ---
+
+
+def seccion_vacia(name: str, layers: tuple[int, int]) -> SectionSpec:
+    """Una sección de 4 compases que no compra: solo importan sus capas."""
+    return replace(
+        BALANCE.director.sections[0],
+        name=name,
+        bars=4.0,
+        deck=(),
+        burst=0.0,
+        layers=layers,
+    )
+
+
+TEMA_CORTO = replace(
+    BALANCE,
+    director=replace(
+        BALANCE.director,
+        sections=(seccion_vacia("intro", (0, 3)), seccion_vacia("drop", (3, 3))),
+    ),
+)
+"""Una frase de intro y un drop en el compás 4 de la partida."""
+
+
+def test_reinicio_espera_el_compas_y_el_drop_cae_en_el_golpe() -> None:
+    # Como `GameScene` con R1: el jugador reinicia a mitad del compás 0. El mundo nuevo
+    # queda congelado mientras la música espera el compás, y parte con él.
+    sequencer = Sequencer(1)
+    tocar(sequencer, mundo(armed=False), 20)
+    sequencer.start_game(7)
+    world = World(TEMA_CORTO, random.Random(7), armed=False, lethal=False)
+    entra_al_drop = golpe_decidido = None
+    golpe = (
+        1 + 4
+    ) * SIXTEENTHS  # la tonalidad entra en el compás 1; el drop, 4 después
+    for paso in range(800):
+        if not sequencer.waiting_for_bar:
+            world.update(Vector2())
+            if entra_al_drop is None and world.director.section.name == "drop":
+                entra_al_drop = paso
+        sequencer.step(world)
+        if golpe_decidido is None and sequencer.decisions[-1].g >= golpe:
+            golpe_decidido = paso
+    assert entra_al_drop is not None and golpe_decidido is not None
+    assert abs(entra_al_drop - golpe_decidido) <= 1
+    por_g = {d.g: d for d in sequencer.decisions}
+    assert "build" in por_g[1 * SIXTEENTHS].cues
+    assert [g for g, d in por_g.items() if d.silent] == list(range(golpe - 4, golpe))
+    assert "impact" in por_g[golpe].cues
+    assert por_g[golpe].level == 3
+
+
+def test_sin_reinicio_no_espera() -> None:
+    # Negativo: sin `start_game` pendiente, la escena no frena al mundo.
+    sequencer = Sequencer(1)
+    tocar(sequencer, mundo(armed=False), 200)
+    assert not sequencer.waiting_for_bar
 
 
 def test_musica_apagada_misma_partida() -> None:

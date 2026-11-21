@@ -161,6 +161,14 @@ class SectionSpec:
     """El presupuesto al terminar, en amenaza por compás. Entre los dos, la tasa cambia
     de forma lineal, y lo que gana la sección es su integral."""
 
+    burst: float
+    """La ráfaga: amenaza que la sección compra entera en su primer paso, aparte de la
+    tasa. Es lo que llueve justo después del golpe de un drop."""
+
+    layers: tuple[int, int]
+    """La capa mínima y la máxima de la música en esta sección, de 0 a 3 (ADR 0026).
+    Dentro de ese rango, la intensidad elige."""
+
     deck: tuple[DeckEntry, ...]
     """Los tipos que puede comprar, con sus pesos. Sin mazo, no compra."""
 
@@ -258,6 +266,8 @@ BALANCE = Balance(
                 bars=24.0,
                 budget_start=0.5,
                 budget_end=1.0,
+                burst=0.0,
+                layers=(0, 3),
                 deck=(DeckEntry(enemy="hexagon", weight=1.0),),
                 formations=("single",),
             ),
@@ -267,6 +277,8 @@ BALANCE = Balance(
                 bars=24.0,
                 budget_start=1.0,
                 budget_end=2.0,
+                burst=0.0,
+                layers=(1, 3),
                 deck=(DeckEntry(enemy="hexagon", weight=1.0),),
                 formations=("single",),
             ),
@@ -276,6 +288,8 @@ BALANCE = Balance(
                 bars=32.0,
                 budget_start=2.5,
                 budget_end=2.5,
+                burst=12.0,
+                layers=(3, 3),
                 deck=(DeckEntry(enemy="hexagon", weight=1.0),),
                 formations=("single",),
             ),
@@ -285,6 +299,8 @@ BALANCE = Balance(
                 bars=24.0,
                 budget_start=0.5,
                 budget_end=0.5,
+                burst=0.0,
+                layers=(0, 1),
                 deck=(DeckEntry(enemy="hexagon", weight=1.0),),
                 formations=("single",),
             ),
@@ -294,6 +310,8 @@ BALANCE = Balance(
                 bars=16.0,
                 budget_start=1.0,
                 budget_end=2.5,
+                burst=0.0,
+                layers=(1, 3),
                 deck=(DeckEntry(enemy="hexagon", weight=1.0),),
                 formations=("single",),
             ),
@@ -303,6 +321,8 @@ BALANCE = Balance(
                 bars=32.0,
                 budget_start=3.0,
                 budget_end=3.0,
+                burst=20.0,
+                layers=(3, 3),
                 deck=(DeckEntry(enemy="hexagon", weight=1.0),),
                 formations=("single",),
             ),

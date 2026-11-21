@@ -12,6 +12,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
+from circlebh.audio.intensity import PHRASE_BARS
 from circlebh.balance import BALANCE, DeckEntry, DirectorSpec, SectionSpec
 from circlebh.world.clock import STEP
 from circlebh.world.director import Director, bar_at
@@ -33,7 +34,12 @@ def mazo(seccion: str) -> tuple[DeckEntry, ...]:
 
 
 def seccion(
-    name: str, bars: float, start: float, end: float, deck: tuple[DeckEntry, ...]
+    name: str,
+    bars: float,
+    start: float,
+    end: float,
+    deck: tuple[DeckEntry, ...],
+    burst: float = 0.0,
 ) -> SectionSpec:
     return SectionSpec(
         name=name,
@@ -41,6 +47,8 @@ def seccion(
         bars=bars,
         budget_start=start,
         budget_end=end,
+        burst=burst,
+        layers=(0, 3),
         deck=deck,
         formations=("single",),
     )
@@ -50,11 +58,11 @@ def tema(*secciones: SectionSpec, bpm: float = 124.0) -> DirectorSpec:
     return DirectorSpec(bpm=bpm, max_alive=300, sections=secciones)
 
 
-# Un tema corto, con presupuestos que suben, se mantienen y bajan. El silencio del final
-# no compra: así las tres primeras secciones quedan completas.
+# Un tema corto, con presupuestos que suben, se mantienen y bajan, y un drop con ráfaga.
+# El silencio del final no compra: así las tres primeras secciones quedan completas.
 CORTO = tema(
     seccion("intro", 2.0, 1.0, 3.0, mazo("intro")),
-    seccion("drop", 3.0, 4.0, 4.0, mazo("drop")),
+    seccion("drop", 3.0, 4.0, 4.0, mazo("drop"), burst=7.0),
     seccion("respiro", 2.0, 2.0, 0.5, mazo("respiro")),
     seccion("silencio", 1.0, 0.0, 0.0, ()),
 )
@@ -148,7 +156,7 @@ def test_no_gasta_mas_que_el_presupuesto(seed: int) -> None:
         for nombre in compras:
             gastado[nombre.split("-")[0]] += ENEMIGOS[nombre].threat
     for s in CORTO.sections[:-1]:
-        presupuesto = (s.budget_start + s.budget_end) / 2 * s.bars
+        presupuesto = s.burst + (s.budget_start + s.budget_end) / 2 * s.bars
         assert gastado[s.name] <= presupuesto
         # Y no deja más sin gastar de lo que cuesta la compra que está esperando.
         assert gastado[s.name] > presupuesto - PESADO
@@ -161,6 +169,41 @@ def test_lo_caro_tambien_se_compra() -> None:
     director = Director(spec, ENEMIGOS, random.Random(1))
     compras = [n for _, c in correr(director, primer_paso(16.0, spec.bpm)) for n in c]
     assert set(compras) == {"intro-ligero", "intro-pesado"}
+
+
+CALMA_Y_RAFAGA = tema(
+    seccion("calma", 1.0, 0.0, 0.0, (DeckEntry("hexagon", 1.0),)),
+    seccion("drop", 4.0, 0.0, 0.0, (DeckEntry("hexagon", 1.0),), burst=5.0),
+)
+"""Sin tasa: lo único que se compra es la ráfaga del drop, que empieza en el compás 1."""
+
+
+def test_rafaga_en_el_primer_paso() -> None:
+    director = Director(CALMA_Y_RAFAGA, ENEMIGOS, random.Random(1))
+    golpe = primer_paso(1.0, CALMA_Y_RAFAGA.bpm)
+    compras = {paso: c for paso, (_, c) in enumerate(correr(director, golpe), start=1)}
+    assert compras[golpe] == ["hexagon"] * 5
+    assert all(c == [] for paso, c in compras.items() if paso != golpe)
+
+
+def test_rafaga_solo_al_empezar() -> None:
+    # Negativo: la ráfaga se compra una vez, no en cada paso de la sección.
+    director = Director(CALMA_Y_RAFAGA, ENEMIGOS, random.Random(1))
+    resultado = correr(director, primer_paso(5.0, CALMA_Y_RAFAGA.bpm))
+    assert sum(len(c) for _, c in resultado) == 5
+
+
+def test_section_at() -> None:
+    # Borde: antes del compás 0 da la primera, y después del final, la última.
+    director = Director(CORTO, ENEMIGOS, random.Random(1))
+    nombres = [director.section_at(b).name for b in (-1.0, 0.0, 1.999, 2.0, 100.0)]
+    assert nombres == ["intro", "intro", "intro", "drop", "silencio"]
+
+
+def test_secciones_empiezan_en_una_frase() -> None:
+    # Foco 6: la capa de la música solo cambia al empezar una frase. Una sección que
+    # empieza a mitad de frase sonaría hasta 3 compases tarde.
+    assert all(b % PHRASE_BARS == 0 for b in inicios(BALANCE.director))
 
 
 def test_sin_mazo_no_compra() -> None:

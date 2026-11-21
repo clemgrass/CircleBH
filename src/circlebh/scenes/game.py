@@ -189,8 +189,11 @@ class GameScene:
         La música avanza en todos los pasos, también con el jugador muerto.
         """
         if not self.world.game_over:
-            self.world.update(self.intent())
-            self.log_section()
+            # R1 (ADR 0026): una partida nueva espera el compás de la música, para que
+            # cada drop caiga en el golpe. Sin música, no espera.
+            if self.music is None or not self.music.waiting_for_bar:
+                self.world.update(self.intent())
+                self.log_section()
         else:
             self.dead_steps += 1
             if self.demo is not None and self.dead_steps >= DEMO_RESTART_STEPS:

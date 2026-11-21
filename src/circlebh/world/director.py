@@ -29,13 +29,14 @@ def bar_at(steps: int, bpm: float) -> float:
 def earned(section: SectionSpec, bars: float) -> float:
     """Lo que ganó `section` en sus primeros `bars` compases.
 
-    La tasa va de `budget_start` a `budget_end`, en línea recta, así que lo ganado es el
-    área bajo esa recta. Pasados sus compases, sigue con la tasa del final.
+    La ráfaga, `burst`, está entera desde el compás 0. Además, la tasa va de
+    `budget_start` a `budget_end` en línea recta, así que se suma el área bajo esa
+    recta. Pasados sus compases, sigue con la tasa del final.
     """
     start, end, length = section.budget_start, section.budget_end, section.bars
     x = min(bars, length)
     area = start * x + (end - start) * x * x / (2 * length)
-    return area + end * max(0.0, bars - length)
+    return section.burst + area + end * max(0.0, bars - length)
 
 
 class Director:
@@ -63,6 +64,15 @@ class Director:
         """La sección en que va la partida."""
         return self.spec.sections[self.section_index]
 
+    def section_at(self, bar: float) -> SectionSpec:
+        """La sección del compás `bar`. Antes del compás 0 es la primera, y después del
+        final, la última, que sigue."""
+        return self.spec.sections[self._index_at(bar)]
+
+    def _index_at(self, bar: float) -> int:
+        last = len(self.spec.sections) - 1
+        return max(0, min(bisect.bisect_right(self._starts, bar) - 1, last))
+
     def update(self, steps: int) -> list[str]:
         """Avanza hasta el paso `steps` y devuelve los tipos comprados en este paso.
 
@@ -70,8 +80,7 @@ class Director:
         hasta su último compás. Lo que no alcanza para su próxima compra se pierde.
         """
         bar = bar_at(steps, self.spec.bpm)
-        last = len(self.spec.sections) - 1
-        index = min(bisect.bisect_right(self._starts, bar) - 1, last)
+        index = self._index_at(bar)
         bought: list[str] = []
         while self.section_index < index:
             bought += self._buy(self.section.bars)

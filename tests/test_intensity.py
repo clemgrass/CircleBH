@@ -1,5 +1,6 @@
 """Tests de la intensidad de la partida y de las capas por frases (ADR 0022)."""
 
+from collections.abc import Callable
 from itertools import pairwise
 
 import pytest
@@ -7,7 +8,13 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.audio.intensity import PHRASE_BARS, Arrangement, raw_intensity
+from circlebh.audio.intensity import (
+    FREE,
+    PHRASE_BARS,
+    Arrangement,
+    Layers,
+    raw_intensity,
+)
 from circlebh.audio.rhythm import SIXTEENTHS
 from circlebh.balance import BALANCE
 from circlebh.world.enemy import Enemy
@@ -25,13 +32,23 @@ def hexagono(x: float, lineas: int = 6) -> Enemy:
     return enemy
 
 
-def tocar(arrangement: Arrangement, raws: list[float], desde: int = 0) -> list[tuple]:
+def tocar(
+    arrangement: Arrangement,
+    raws: list[float],
+    desde: int = 0,
+    layers_at: Callable[[int], Layers] = lambda _: FREE,
+) -> list[tuple]:
     """Avanza una semicorchea por cada `raw`. Devuelve `(g, capa, cues)` de cada una."""
     out = []
     for g, raw in enumerate(raws, start=desde):
-        cues = arrangement.advance(raw, g, SEMICORCHEA)
+        cues = arrangement.advance(raw, g, SEMICORCHEA, layers_at)
         out.append((g, arrangement.level, cues))
     return out
+
+
+def tema(drop_desde: int, despues: Layers = (3, 3)) -> Callable[[int], Layers]:
+    """Las capas de un tema que pasa de `FREE` a `despues` en el compás `drop_desde`."""
+    return lambda bar: FREE if bar < drop_desde else despues
 
 
 def cambios(pasos: list[tuple]) -> list[tuple[int, int, int]]:
@@ -119,3 +136,73 @@ def test_la_intensidad_suavizada_sube_rapido_y_baja_lento() -> None:
         baja.advance(0.0, g, SEMICORCHEA)
     # En el mismo tiempo, recorre más camino al subir que al bajar.
     assert sube.smooth > 1 - baja.smooth
+
+
+# --- Las capas de cada sección (ADR 0026) ---
+
+DROP = 8
+"""El compás en que empieza el drop de los tests: el inicio de la tercera frase."""
+GOLPE = DROP * SIXTEENTHS
+"""La primera semicorchea del drop."""
+
+
+def test_drop_sin_enemigos_es_capa_3() -> None:
+    arrangement = Arrangement()
+    pasos = tocar(arrangement, [0.0] * (GOLPE + FRASE), layers_at=tema(DROP))
+    assert pasos[GOLPE - 1][1] == 0
+    assert all(capa == 3 for _, capa, _ in pasos[GOLPE:])
+    # El filtro se abre aunque la intensidad no haya subido.
+    assert arrangement.brightness == 1
+
+
+def test_respiro_no_pasa_de_capa_1() -> None:
+    # Borde: la intensidad al máximo no lo saca de su techo, ni en la capa ni en el
+    # filtro.
+    arrangement = Arrangement()
+    pasos = tocar(arrangement, [1e9] * (4 * FRASE), layers_at=lambda _: (0, 1))
+    assert max(capa for _, capa, _ in pasos) == 1
+    assert arrangement.brightness <= 0.5
+
+
+def marcas(
+    raw: float, layers_at: Callable[[int], Layers]
+) -> tuple[list[tuple], list[int], list[int]]:
+    """Toca hasta una frase después del drop, y anota en qué semicorcheas hubo subida y
+    silencio, preguntando en cada una, como el secuenciador."""
+    arrangement = Arrangement()
+    pasos, subida, silencio = [], [], []
+    for g in range(GOLPE + FRASE):
+        pasos += tocar(arrangement, [raw], desde=g, layers_at=layers_at)
+        subida += [g] if arrangement.building(g) else []
+        silencio += [g] if arrangement.silent(g) else []
+    return pasos, subida, silencio
+
+
+def test_subida_la_frase_antes_del_drop() -> None:
+    pasos, subida, silencio = marcas(0.0, tema(DROP))
+    assert "build" in pasos[GOLPE - FRASE][2]
+    assert subida == list(range(GOLPE - FRASE, GOLPE))
+    # El último pulso del último compás queda en silencio.
+    assert silencio == list(range(GOLPE - 4, GOLPE))
+    # La subida larga reemplaza al riser de un compás.
+    assert not any("riser" in cues for _, _, cues in pasos)
+    assert "impact" in pasos[GOLPE][2]
+
+
+def test_subida_aunque_ya_suene_la_capa_3() -> None:
+    # Borde: con muchos enemigos cerca la subida ya está en la capa 3, pero el drop
+    # igual se anuncia y cae con su golpe.
+    pasos, _, silencio = marcas(1e9, tema(DROP))
+    assert pasos[GOLPE - FRASE][1] == 3
+    assert "build" in pasos[GOLPE - FRASE][2]
+    assert silencio == list(range(GOLPE - 4, GOLPE))
+    assert "impact" in pasos[GOLPE][2]
+
+
+def test_sin_subida_si_no_exige_mas() -> None:
+    # Negativo: pasar a un respiro, o a una sección que no exige la capa 3, no se
+    # anuncia.
+    for despues in [(0, 1), (1, 3)]:
+        pasos, subida, silencio = marcas(0.0, tema(DROP, despues))
+        assert not any("build" in cues for _, _, cues in pasos)
+        assert subida == silencio == []

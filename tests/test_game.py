@@ -188,6 +188,8 @@ RAPIDO = replace(
                 bars=64.0,
                 budget_start=TASA,
                 budget_end=TASA,
+                burst=0.0,
+                layers=(0, 3),
                 deck=(DeckEntry("hexagon", 1.0),),
                 formations=("single",),
             ),
