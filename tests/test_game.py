@@ -1,5 +1,6 @@
 """Tests de la partida: `World` avanza un paso por `update`."""
 
+import itertools
 import math
 import random
 from dataclasses import replace
@@ -15,6 +16,7 @@ from circlebh.world.director import bar_at
 from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
 from circlebh.world.polygon import polygon_edge
+from circlebh.world.spawning import quadrant
 from circlebh.world.swarm import lattice
 from circlebh.world.weapons import PointWeapon
 
@@ -238,6 +240,114 @@ def test_dos_apariciones_no_comparten_posicion(seed: int) -> None:
     avanzar_hasta_que_haya(world, 2, Vector2())
     primero, segundo = world.enemies
     assert primero.position != segundo.position
+
+
+# --- La cola y los cuadrantes (ADR 0025, #53) ---
+
+
+def mundo_con_rafaga(
+    burst: float,
+    formation: str,
+    *,
+    size: int = 1,
+    max_per_step: int = 4,
+    seed: int = 1,
+) -> World:
+    """Un mundo cuya única compra es una ráfaga de `burst` en el primer paso, con
+    hexágonos quietos y sin armas. `size` fija el tamaño de las formaciones."""
+    seccion = SectionSpec(
+        name="rafaga",
+        kind="build",
+        bars=64.0,
+        budget_start=0.0,
+        budget_end=0.0,
+        burst=burst,
+        layers=(0, 3),
+        deck=(DeckEntry("hexagon", 1.0),),
+        formations=(formation,),
+    )
+    balance = replace(
+        BALANCE,
+        enemies={"hexagon": replace(BALANCE.enemies["hexagon"], speed=0.0)},
+        spawning=replace(
+            BALANCE.spawning, max_per_step=max_per_step, formation_size=(size, size)
+        ),
+        director=replace(BALANCE.director, sections=(seccion,)),
+    )
+    return World(balance, random.Random(seed), armed=False)
+
+
+def test_nunca_mas_de_max_per_step() -> None:
+    world = mundo_con_rafaga(20, "single", max_per_step=4)
+    cuentas = []
+    for _ in range(7):
+        world.update(Vector2())
+        cuentas.append(len(world.enemies))
+    assert cuentas == [4, 8, 12, 16, 20, 20, 20]
+
+
+def test_formacion_grande_llega_completa_y_en_orden() -> None:
+    # Borde: una fila de 6 con un tope de 4 llega en dos pasos, y en el orden de la
+    # fila: cada uno queda a la misma separación del anterior.
+    world = mundo_con_rafaga(6, "line", size=6, max_per_step=4)
+    world.update(Vector2())
+    assert len(world.enemies) == 4
+    world.update(Vector2())
+    fila = [e.position for e in world.enemies]
+    assert len(fila) == 6
+    pasos = [a.distance_to(b) for a, b in itertools.pairwise(fila)]
+    assert pasos == pytest.approx([pasos[0]] * 5)
+
+
+def test_rafaga_reparte_los_cuadrantes() -> None:
+    # La cola cuenta para el cuadrante más vacío: 12 sueltos quedan 3 por cuadrante.
+    world = mundo_con_rafaga(12, "single", max_per_step=12)
+    world.update(Vector2())
+    cuenta = [0, 0, 0, 0]
+    for enemy in world.enemies:
+        cuenta[quadrant(enemy.position - world.player.position)] += 1
+    assert cuenta == [3, 3, 3, 3]
+
+
+def test_formacion_en_varios_pasos_se_deforma_poco() -> None:
+    # La cola guarda posiciones relativas al jugador. Si avanza mientras una fila llega
+    # de a uno, cada vecino nace corrido lo que el jugador avanzó en un paso: la fila
+    # se deforma a lo más eso, y sigue fuera del núcleo duro.
+    world = mundo_con_rafaga(6, "line", size=6, max_per_step=1)
+    for _ in range(6):
+        world.update(Vector2(1, 0))
+    fila = [e.position for e in world.enemies]
+    assert len(fila) == 6
+    hexagon = BALANCE.enemies["hexagon"]
+    nucleo = BALANCE.charges.core_reach * 2 * hexagon.radius
+    separacion = nucleo + BALANCE.spawning.formation_gap
+    avance = BALANCE.player.speed * STEP
+    for a, b in itertools.pairwise(fila):
+        assert abs(a.distance_to(b) - separacion) <= avance + 1e-9
+        assert a.distance_to(b) > nucleo
+
+
+def test_formacion_que_no_cabe_se_rechaza_al_crear_el_mundo() -> None:
+    # Negativo: con hexágonos enormes, la fila de 6 de la subida no cabe en un
+    # cuadrante. Falla al empezar, no a mitad de la partida.
+    hexagon = replace(BALANCE.enemies["hexagon"], radius=300.0)
+    balance = replace(BALANCE, enemies={"hexagon": hexagon})
+    with pytest.raises(ValueError, match="cuadrante"):
+        World(balance, random.Random(1))
+
+
+@given(seed=st.integers(0, 2**32 - 1))
+def test_aparece_fuera_de_la_vista_aunque_el_jugador_avance(seed: int) -> None:
+    # Negativo: lo que espera en la cola se ubica desde donde está el jugador al salir,
+    # no desde donde estaba al comprarse.
+    world = mundo_con_rafaga(24, "cluster", size=6, max_per_step=1, seed=seed)
+    for _ in range(30):
+        antes = set(map(id, world.enemies))
+        world.update(Vector2(1, 0))
+        for enemy in world.enemies:
+            if id(enemy) not in antes:
+                distancia = enemy.position.distance_to(world.player.position)
+                assert distancia >= BALANCE.spawning.distance - 1e-9
 
 
 def test_tras_morir_no_aparecen_mas() -> None:

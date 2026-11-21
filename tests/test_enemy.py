@@ -1,7 +1,6 @@
 """Tests del enemigo: aparece lejos del jugador y se mueve con inercia y roce."""
 
 import math
-import random
 from dataclasses import replace
 
 import pytest
@@ -13,7 +12,7 @@ from circlebh.balance import BALANCE, EnemySpec
 from circlebh.settings import load_settings
 from circlebh.viewport import ASPECT_HEIGHT, ASPECT_WIDTH
 from circlebh.world.clock import STEP
-from circlebh.world.enemy import Enemy, spawn_position
+from circlebh.world.enemy import Enemy
 from circlebh.world.patterns import Context
 from circlebh.world.polygon import polygon_edge
 
@@ -154,31 +153,7 @@ def test_previous_es_la_posicion_antes_del_paso() -> None:
     assert enemy.position.x == pytest.approx(300 - SPEC.speed * STEP)
 
 
-# --- Aparecer ---
-
-
-@given(centro=puntos, seed=st.integers(min_value=0))
-def test_aparece_a_la_distancia_pedida(centro: Vector2, seed: int) -> None:
-    posicion = spawn_position(centro, 800.0, random.Random(seed))
-    assert posicion.distance_to(centro) == pytest.approx(800.0)
-
-
-@given(seed=st.integers(min_value=0))
-def test_misma_semilla_mismo_lugar(seed: int) -> None:
-    centro = Vector2(10, -20)
-    a = spawn_position(centro, 800.0, random.Random(seed))
-    b = spawn_position(centro, 800.0, random.Random(seed))
-    assert a == b
-
-
-def test_semillas_distintas_dan_angulos_distintos() -> None:
-    # Negativo: el ángulo sale del azar, no es fijo. 20 semillas en el mismo punto
-    # tendrían una probabilidad nula con un ángulo continuo.
-    posiciones = {
-        tuple(spawn_position(Vector2(), 800.0, random.Random(seed)))
-        for seed in range(20)
-    }
-    assert len(posiciones) == 20
+# --- Aparecer (dónde, en `test_spawning.py`) ---
 
 
 def test_balance_aparece_fuera_de_la_vista() -> None:

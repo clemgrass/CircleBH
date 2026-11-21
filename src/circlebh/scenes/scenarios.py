@@ -44,6 +44,14 @@ SCENARIOS: dict[str, Scenario] = {
             pilot=True,
         ),
         Scenario(
+            "cuadrantes",
+            "El piloto se mueve, armado y sin morir, por el tema entero. Lo comprado"
+            " nace en el cuadrante más vacío, solo o en formación, y la ráfaga de un"
+            " drop entra por los cuatro lados.",
+            pilot=True,
+            lethal=False,
+        ),
+        Scenario(
             "panal",
             "40 hexágonos alrededor del jugador quieto, sin contacto ni arma: se"
             " ordenan como imanes (ADR 0021).",

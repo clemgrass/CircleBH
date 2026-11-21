@@ -7,11 +7,14 @@ gasta comprando enemigos de su mazo, al azar por peso, con la `Random` del mundo
 
 import bisect
 import itertools
+import math
 import random
 from collections.abc import Mapping
+from dataclasses import dataclass, replace
 
-from circlebh.balance import DirectorSpec, EnemySpec, SectionSpec
+from circlebh.balance import DirectorSpec, EnemySpec, SectionSpec, SpawningSpec
 from circlebh.world.clock import STEP
+from circlebh.world.spawning import FORMATIONS, check_spawning
 
 STEPS_PER_MINUTE = round(60 / STEP)
 """3600. Es entero, y así el compás se calcula sin el error binario de `1/60`."""
@@ -39,19 +42,42 @@ def earned(section: SectionSpec, bars: float) -> float:
     return section.burst + area + end * max(0.0, bars - length)
 
 
-def _validate(spec: DirectorSpec, enemies: Mapping[str, EnemySpec]) -> None:
+@dataclass(frozen=True)
+class Purchase:
+    """Una compra del director: `count` enemigos de un tipo, en una formación."""
+
+    enemy: str
+    """El tipo, una clave de `enemies`."""
+
+    formation: str
+    """Una de `spawning.FORMATIONS`."""
+
+    count: int
+    """Cuántos. Siempre 1 en `single`."""
+
+
+def _validate(
+    spec: DirectorSpec, enemies: Mapping[str, EnemySpec], spawning: SpawningSpec
+) -> None:
     """Rechaza un tema que colgaría o rompería la partida a mitad de camino.
 
     Con amenaza 0 el director compraría sin fin en un solo paso; sin compases, `earned`
-    dividiría por 0; y un tipo desconocido o un peso no positivo fallarían recién al
-    llegar a esa sección. Mejor fallar al empezar, nombrando el campo.
+    dividiría por 0; y un tipo o una formación desconocidos, o un peso no positivo,
+    fallarían recién al llegar a esa sección. Mejor fallar al empezar, nombrando el
+    campo.
     """
+    check_spawning(spawning)
     if not spec.sections:
         raise ValueError("director.sections: el tema necesita al menos una sección")
     for section in spec.sections:
         where = f"director.sections[{section.name}]"
         if section.bars <= 0:
             raise ValueError(f"{where}.bars: tiene que ser mayor que 0")
+        if section.deck and not section.formations:
+            raise ValueError(f"{where}.formations: con mazo, necesita al menos una")
+        for formation in section.formations:
+            if formation not in FORMATIONS:
+                raise ValueError(f"{where}.formations: no existe {formation}")
         for entry in section.deck:
             if entry.enemy not in enemies:
                 raise ValueError(f"{where}.deck: no existe el enemigo {entry.enemy}")
@@ -72,11 +98,13 @@ class Director:
         self,
         spec: DirectorSpec,
         enemies: Mapping[str, EnemySpec],
+        spawning: SpawningSpec,
         rng: random.Random,
     ) -> None:
-        _validate(spec, enemies)
+        _validate(spec, enemies, spawning)
         self.spec = spec
         self.enemies = enemies
+        self.spawning = spawning
         self.rng = rng
         self._starts = list(
             itertools.accumulate((s.bars for s in spec.sections), initial=0.0)
@@ -100,45 +128,63 @@ class Director:
         last = len(self.spec.sections) - 1
         return max(0, min(bisect.bisect_right(self._starts, bar) - 1, last))
 
-    def update(self, steps: int) -> list[str]:
-        """Avanza hasta el paso `steps` y devuelve los tipos comprados en este paso.
+    def update(self, steps: int) -> list[Purchase]:
+        """Avanza hasta el paso `steps` y devuelve lo comprado en este paso.
 
         Si en este paso empieza otra sección, la que termina gasta antes lo que le queda
-        hasta su último compás. Lo que no alcanza para su próxima compra se pierde.
+        hasta su último compás, y la compra que esperaba se recorta a lo que alcance. Lo
+        que no alcanza ni para uno se pierde.
         """
         bar = bar_at(steps, self.spec.bpm)
         index = self._index_at(bar)
-        bought: list[str] = []
+        bought: list[Purchase] = []
         while self.section_index < index:
-            bought += self._buy(self.section.bars)
+            bought += self._buy(self.section.bars, closing=True)
             self.section_index += 1
             self._spent = 0.0
             self._next = self._pick()
-        bought += self._buy(bar - self._starts[self.section_index])
+        bought += self._buy(bar - self._starts[self.section_index], closing=False)
         return bought
 
-    def _buy(self, bars: float) -> list[str]:
+    def _buy(self, bars: float, *, closing: bool) -> list[Purchase]:
         """Compra mientras lo ganado en `bars` compases de la sección alcance para la
         compra que espera. Elegirla antes de tener con qué pagarla es lo que deja
         entrar a los caros: si se eligiera solo entre lo que alcanza, el presupuesto se
-        iría siempre en lo más barato."""
+        iría siempre en lo más barato.
+
+        Una formación se compra entera (decisión 28). Solo al cerrar la sección se
+        recorta a lo que alcance, para no perder lo que queda.
+        """
         available = earned(self.section, bars) - self._spent
-        bought: list[str] = []
+        bought: list[Purchase] = []
         while self._next is not None:
-            cost = self.enemies[self._next].threat
-            if cost > available:
+            wanted = self._next
+            cost = self.enemies[wanted.enemy].threat
+            count = min(wanted.count, math.floor(available / cost))
+            if count == 0 or (count < wanted.count and not closing):
                 break
-            bought.append(self._next)
-            self._spent += cost
-            available -= cost
+            bought.append(replace(wanted, count=count))
+            self._spent += count * cost
+            available -= count * cost
+            # Al cerrar, la última de estas compras no se paga: `update` la reemplaza
+            # por una de la sección nueva. Gasta un sorteo, pero la partida sigue igual
+            # de repetible con la misma semilla.
             self._next = self._pick()
         return bought
 
-    def _pick(self) -> str | None:
-        """El tipo de la próxima compra, al azar por peso. Sin mazo, ninguno."""
-        deck = self.section.deck
-        if not deck:
+    def _pick(self) -> Purchase | None:
+        """La próxima compra: el tipo al azar por peso, la formación al azar entre las
+        de la sección, y su tamaño entre `spawning.formation_size`. Sin mazo, ninguna."""
+        section = self.section
+        if not section.deck:
             return None
-        names = [entry.enemy for entry in deck]
-        weights = [entry.weight for entry in deck]
-        return self.rng.choices(names, weights)[0]
+        names = [entry.enemy for entry in section.deck]
+        weights = [entry.weight for entry in section.deck]
+        enemy = self.rng.choices(names, weights)[0]
+        formation = self.rng.choice(section.formations)
+        count = (
+            1
+            if formation == "single"
+            else self.rng.randint(*self.spawning.formation_size)
+        )
+        return Purchase(enemy, formation, count)

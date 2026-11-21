@@ -128,6 +128,17 @@ class SpawningSpec:
     """Distancia al jugador a la que aparecen, en unidades del plano. Tiene que quedar
     fuera de la vista: más que la esquina de la pantalla, más el radio del enemigo."""
 
+    max_per_step: int
+    """Cuántos enemigos salen de la cola, como mucho, en un paso. Reparte una oleada
+    grande en varios pasos, fuera de la vista."""
+
+    formation_gap: float
+    """El espacio libre entre dos vecinos de una formación, más allá del alcance del
+    núcleo duro (`charges.core_reach`). En unidades del plano."""
+
+    formation_size: tuple[int, int]
+    """El menor y el mayor tamaño de una formación que no es `single`."""
+
 
 @dataclass(frozen=True)
 class DeckEntry:
@@ -173,7 +184,8 @@ class SectionSpec:
     """Los tipos que puede comprar, con sus pesos. Sin mazo, no compra."""
 
     formations: tuple[str, ...]
-    """Las formaciones que puede usar. Por ahora solo hay `single`."""
+    """Las formaciones que puede usar: `single`, `ring`, `line` o `cluster`
+    (`world/spawning.py`). Con mazo, al menos una."""
 
 
 @dataclass(frozen=True)
@@ -255,7 +267,9 @@ BALANCE = Balance(
             threat=1.0,
         )
     },
-    spawning=SpawningSpec(distance=800.0),
+    spawning=SpawningSpec(
+        distance=800.0, max_per_step=4, formation_gap=20.0, formation_size=(3, 6)
+    ),
     director=DirectorSpec(
         bpm=124.0,
         max_alive=300,
@@ -280,7 +294,7 @@ BALANCE = Balance(
                 burst=0.0,
                 layers=(1, 3),
                 deck=(DeckEntry(enemy="hexagon", weight=1.0),),
-                formations=("single",),
+                formations=("single", "line"),
             ),
             SectionSpec(
                 name="drop_1",
@@ -291,7 +305,7 @@ BALANCE = Balance(
                 burst=12.0,
                 layers=(3, 3),
                 deck=(DeckEntry(enemy="hexagon", weight=1.0),),
-                formations=("single",),
+                formations=("ring", "line", "cluster"),
             ),
             SectionSpec(
                 name="respiro",
@@ -313,7 +327,7 @@ BALANCE = Balance(
                 burst=0.0,
                 layers=(1, 3),
                 deck=(DeckEntry(enemy="hexagon", weight=1.0),),
-                formations=("single",),
+                formations=("single", "line", "cluster"),
             ),
             SectionSpec(
                 name="drop_2",
@@ -324,7 +338,7 @@ BALANCE = Balance(
                 burst=20.0,
                 layers=(3, 3),
                 deck=(DeckEntry(enemy="hexagon", weight=1.0),),
-                formations=("single",),
+                formations=("ring", "line", "cluster"),
             ),
         ),
     ),

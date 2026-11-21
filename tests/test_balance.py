@@ -139,7 +139,12 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "threat": 1.0,
             }
         },
-        "spawning": {"distance": 800.0},
+        "spawning": {
+            "distance": 800.0,
+            "max_per_step": 4,
+            "formation_gap": 20.0,
+            "formation_size": [3, 6],
+        },
         # El tema es largo; basta con que salga entero y en su lugar.
         "director": dump(BALANCE.director),
         "point_weapon": {"cooldown": 0.6, "speed": 300.0, "range": 700.0},
