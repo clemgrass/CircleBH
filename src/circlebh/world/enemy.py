@@ -183,11 +183,13 @@ class Enemy:
         hace que nadie avance más de `speed·dt` por paso, aunque una fuerza sea enorme.
         El giro avanza igual: `θ ← θ + ω·dt`.
 
-        Si una acción fija la velocidad, como la embestida, `v` es esa, sin tope.
+        Si una acción fija la velocidad, como la embestida, `v` es esa, sin tope. Si fija
+        el giro, como el triángulo que te mira, `ω` es ese en este paso.
         """
         self.previous = Vector2(self.position)
         self.previous_angle = self.angle
-        self.angle += self.omega * STEP
+        turn = next((a.omega for a in self.actions if a.omega is not None), self.omega)
+        self.angle += turn * STEP
         imposed = next(
             (a.velocity for a in self.actions if a.velocity is not None), None
         )

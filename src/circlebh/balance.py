@@ -114,7 +114,8 @@ type PatternSpec = SeekSpec | CoulombSpec | OrbitSpec
 
 @dataclass(frozen=True, kw_only=True)
 class ChargeSpec:
-    """Acción: la embestida. Observa, y si ve al jugador con la recta libre, avisa,
+    """Acción: la embestida. Te mira siempre con una punta, salvo al embestir. Si te ve
+    con la recta libre, avisa retrocediendo como un resorte, se suelta hacia donde estás,
     embiste en línea recta sin corregir el rumbo y se recupera (`world/actions.py`)."""
 
     kind: Literal["charge"] = "charge"
@@ -124,7 +125,11 @@ class ChargeSpec:
     vista, para que nadie embista desde fuera de la pantalla."""
 
     telegraph: float
-    """Cuánto dura el aviso, en segundos. La dirección queda fija al empezarlo."""
+    """Cuánto dura el aviso, en segundos. Te sigue mirando, y la dirección se elige al
+    terminarlo."""
+
+    recoil: float
+    """Cuánto retrocede durante el aviso, alejándose de ti, en unidades del plano."""
 
     speed: float
     """La rapidez de la embestida, en unidades del plano por segundo. Pasa el tope
@@ -135,6 +140,17 @@ class ChargeSpec:
 
     cooldown: float
     """Cuánto se recupera después, en segundos, antes de volver a observar."""
+
+    turn_rate: float
+    """Lo más rápido que gira para mirarte, en rad/s. Como `spin`, cumple
+    `turn_rate · STEP ≤ 0,1` (ADR 0027)."""
+
+    lead_chance: float
+    """La probabilidad de que una embestida salga desviada, de 0 a 1."""
+
+    lead_angle: float
+    """Cuánto se desvía, en radianes, hacia el lado con menos enemigos cerca de ti:
+    adivina hacia dónde vas a escapar."""
 
 
 type ActionSpec = ChargeSpec
@@ -359,9 +375,13 @@ BALANCE = Balance(
                     kind="charge",
                     watch_distance=320.0,
                     telegraph=0.5,
+                    recoil=14.0,
                     speed=720.0,
                     duration=0.8,
                     cooldown=2.0,
+                    turn_rate=6.0,
+                    lead_chance=0.1,
+                    lead_angle=0.3,
                 ),
             ),
         ),

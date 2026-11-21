@@ -1,6 +1,8 @@
 """Tests de las acciones: lo que un enemigo hace y no es una fuerza (ADR 0021).
 
-Por ahora, la embestida del triángulo: observa, avisa, embiste y se recupera.
+Por ahora, la embestida del triángulo: observa, avisa, embiste y se recupera. Te mira
+siempre con una punta, salvo al embestir, y avisa retrocediendo como un resorte
+(decisión 30 de la spec de la 0.2.0).
 """
 
 import math
@@ -29,7 +31,7 @@ from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
 from circlebh.world.events import Telegraph
 from circlebh.world.game import World
-from circlebh.world.patterns import Context
+from circlebh.world.polygon import vertex
 
 TRIANGLE = BALANCE.enemies["triangle"]
 HEXAGON = BALANCE.enemies["hexagon"]
@@ -51,8 +53,36 @@ def pasos(seconds: float) -> int:
     return round(seconds / STEP)
 
 
-def contexto(enemies: Sequence[Enemy], player: Vector2 | None = None) -> ActionContext:
-    return ActionContext(player_position=player or Vector2(), enemies=enemies)
+def contexto(
+    enemies: Sequence[Enemy],
+    player: Vector2 | None = None,
+    rng: random.Random | None = None,
+) -> ActionContext:
+    return ActionContext(
+        player_position=player or Vector2(),
+        enemies=enemies,
+        rng=rng or random.Random(1),
+    )
+
+
+def triangulo(position: Vector2, **cambios: float) -> Enemy:
+    """Un triángulo con su embestida cambiada: `lead_chance=0` nunca se desvía, y
+    `lead_chance=1` siempre."""
+    return Enemy(replace(TRIANGLE, actions=(replace(CHARGE, **cambios),)), position)
+
+
+def hasta_soltarse(triangle: Enemy, enemies: Sequence[Enemy], player: Vector2) -> None:
+    """Avisa con el jugador en el origen, y se suelta con el jugador en `player`."""
+    charge = embestida(triangle)
+    charge.update(triangle, contexto(enemies))
+    for _ in range(pasos(CHARGE.telegraph)):
+        charge.update(triangle, contexto(enemies, player=player))
+
+
+def punta(enemy: Enemy) -> Vector2:
+    """Hacia dónde apunta su primera punta, como vector unitario."""
+    tip = vertex(enemy.spec.radius, enemy.spec.sides, 0).rotate_rad(enemy.angle)
+    return tip.normalize()
 
 
 def embestida(enemy: Enemy) -> Charge:
@@ -175,27 +205,31 @@ def test_watch_distance_cabe_en_la_vista(nombre: str) -> None:
         assert reach <= camera.fov / 2 - Vector2(camera.offset).length()
 
 
-def test_direccion_fija_durante_el_aviso() -> None:
-    # Si el jugador se mueve durante el aviso, embiste hacia donde apuntó al avisar.
-    triangle = Enemy(TRIANGLE, Vector2(200, 0))
+def test_embiste_hacia_donde_esta_el_jugador_al_soltarse() -> None:
+    # Decisión 30: si el jugador se mueve durante el aviso, lo sigue y se suelta hacia
+    # donde está en ese momento.
+    triangle = triangulo(Vector2(200, 0), lead_chance=0.0)
+    objetivo = Vector2(0, 150)
+    hasta_soltarse(triangle, [triangle], objetivo)
     charge = embestida(triangle)
-    charge.update(triangle, contexto([triangle]))
-    for _ in range(pasos(CHARGE.telegraph)):
-        charge.update(triangle, contexto([triangle], player=Vector2(0, 150)))
     assert charge.state is ChargeState.CHARGING
-    assert charge.velocity == Vector2(-CHARGE.speed, 0)
+    assert charge.velocity is not None
+    esperado = (objetivo - triangle.position).normalize() * CHARGE.speed
+    assert tuple(charge.velocity) == pytest.approx(tuple(esperado))
 
 
-def test_enemigo_que_cruza_durante_el_aviso_no_lo_detiene() -> None:
-    # Borde: la recta se mira solo al avisar. Después, embiste igual y el núcleo duro
-    # del otro lo desvía.
-    triangle = Enemy(TRIANGLE, Vector2(200, 0))
+def test_recta_tapada_al_soltarse_no_embiste() -> None:
+    # Negativo: la recta se mira otra vez al soltarse. Si está tapada, vuelve a observar.
+    triangle = triangulo(Vector2(200, 0), lead_chance=0.0)
     charge = embestida(triangle)
     charge.update(triangle, contexto([triangle]))
     otro = Enemy(HEXAGON, Vector2(100, 0))
-    for _ in range(pasos(CHARGE.telegraph)):
+    states = []
+    for _ in range(pasos(CHARGE.telegraph) + pasos(1)):
         charge.update(triangle, contexto([triangle, otro]))
-    assert charge.state is ChargeState.CHARGING
+        states.append(charge.state)
+    assert ChargeState.CHARGING not in states
+    assert charge.state is ChargeState.WATCHING
 
 
 def test_tras_recuperarse_vuelve_a_mirar_la_recta() -> None:
@@ -220,21 +254,41 @@ def test_observando_lo_mueven_sus_patrones() -> None:
     assert charge.velocity is None
 
 
-def test_durante_el_aviso_solo_frena() -> None:
-    triangle = Enemy(TRIANGLE, Vector2(200, 0))
-    triangle.velocity = Vector2(0, 50)
-    step_actions([triangle], Vector2())
+def test_durante_el_aviso_retrocede_recoil() -> None:
+    # El aviso es un resorte que se comprime: se aleja del jugador justo `recoil`.
+    world = World(SIN_APARICIONES, random.Random(1), lethal=False, armed=False)
+    triangle = triangulo(Vector2(200, 0), lead_chance=0.0)
+    world.enemies = [triangle]
+    for _ in range(pasos(CHARGE.telegraph)):
+        world.update(Vector2())
     assert embestida(triangle).state is ChargeState.TELEGRAPHING
-    # Sus patrones tirarían hacia el radio de su órbita: avisando, solo queda el roce.
-    a = triangle.acceleration(
-        Context(Vector2(), BALANCE.player.charge, BALANCE.charges, [triangle])
-    )
-    assert tuple(a) == pytest.approx((0.0, -50.0 * TRIANGLE.friction))
+    assert triangle.position.length() == pytest.approx(200 + CHARGE.recoil)
+
+
+def test_el_retroceso_frena_al_final_del_aviso() -> None:
+    # Como `sen`: rápido al empezar y casi quieto justo antes de soltarse.
+    triangle = triangulo(Vector2(200, 0), lead_chance=0.0)
+    charge = embestida(triangle)
+    rapideces = []
+    for _ in range(pasos(CHARGE.telegraph)):
+        charge.update(triangle, contexto([triangle]))
+        assert charge.velocity is not None
+        rapideces.append(charge.velocity.length())
+    assert rapideces == sorted(rapideces, reverse=True)
+    assert rapideces[-1] < rapideces[0] / 10
+
+
+def test_al_retroceder_se_aleja_del_jugador() -> None:
+    triangle = triangulo(Vector2(0, -200), lead_chance=0.0)
+    charge = embestida(triangle)
+    charge.update(triangle, contexto([triangle]))
+    assert charge.velocity is not None
+    assert tuple(charge.velocity.normalize()) == pytest.approx((0.0, -1.0))
 
 
 def test_embiste_a_speed_por_encima_de_su_tope() -> None:
     world = World(SIN_APARICIONES, random.Random(1), lethal=False, armed=False)
-    triangle = Enemy(TRIANGLE, Vector2(200, 0))
+    triangle = triangulo(Vector2(200, 0), lead_chance=0.0)
     world.enemies = [triangle]
     for _ in range(pasos(CHARGE.telegraph) + 1):
         world.update(Vector2())
@@ -253,17 +307,17 @@ def test_world_anota_el_aviso() -> None:
 
 def test_la_embestida_mata_al_jugador_quieto() -> None:
     world = World(SIN_APARICIONES, random.Random(1))
-    world.enemies = [Enemy(TRIANGLE, Vector2(200, 0))]
+    world.enemies = [triangulo(Vector2(200, 0), lead_chance=0.0)]
     for _ in range(pasos(CHARGE.telegraph + CHARGE.duration)):
         world.update(Vector2())
     assert world.game_over
 
 
 def test_se_esquiva_moviendose_de_lado() -> None:
-    # Al avisar, el jugador se mueve hacia +y. Con `telegraph`, le alcanza para salir
-    # de la recta.
+    # El jugador se mueve hacia +y sin parar. El triángulo se suelta hacia donde está,
+    # pero mientras embiste, el jugador sigue avanzando y sale de la recta.
     world = World(SIN_APARICIONES, random.Random(1))
-    world.enemies = [Enemy(TRIANGLE, Vector2(200, 0))]
+    world.enemies = [triangulo(Vector2(200, 0), lead_chance=0.0)]
     for _ in range(pasos(CHARGE.telegraph + CHARGE.duration)):
         world.update(Vector2(0, 1))
     assert not world.game_over
@@ -279,10 +333,150 @@ def test_la_embestida_no_atraviesa_al_jugador(nombre: str) -> None:
 
 
 @pytest.mark.parametrize("nombre", sorted(BALANCE.enemies))
+def test_la_mirada_cabe_en_la_cota_del_golpe(nombre: str) -> None:
+    # Coherencia (ADR 0027): como `spin`, el giro de la mirada cumple `|ω·dt| ≤ 0,1`,
+    # para que `hit_by` siga coincidiendo con los subpasos.
+    for action in BALANCE.enemies[nombre].actions:
+        assert action.turn_rate * STEP <= 0.1
+
+
+@pytest.mark.parametrize("nombre", sorted(BALANCE.enemies))
 def test_cada_etapa_dura_al_menos_un_paso(nombre: str) -> None:
     for action in BALANCE.enemies[nombre].actions:
         for seconds in (action.telegraph, action.duration, action.cooldown):
             assert pasos(seconds) >= 1
+
+
+# --- La mirada ---
+
+
+def mirar(triangle: Enemy, seconds: float) -> list[float]:
+    """Los ángulos de `triangle` paso a paso, sin moverlo, con el jugador en el origen."""
+    angles = []
+    for _ in range(pasos(seconds)):
+        step_actions([triangle], Vector2(), random.Random(1))
+        triangle.velocity = Vector2()
+        triangle.step(Vector2())
+        angles.append(triangle.angle)
+    return angles
+
+
+def test_mira_al_jugador_con_una_punta() -> None:
+    # Más allá de `watch_distance`, observa: se da vuelta hasta apuntarle.
+    triangle = triangulo(Vector2(0, 600))
+    mirar(triangle, 1.0)
+    assert tuple(punta(triangle)) == pytest.approx((0.0, -1.0))
+
+
+def test_gira_a_lo_mas_turn_rate() -> None:
+    triangle = triangulo(Vector2(0, 600))
+    angles = mirar(triangle, 1.0)
+    giros = [abs(b - a) for a, b in zip([0.0, *angles], angles, strict=False)]
+    assert max(giros) <= CHARGE.turn_rate * STEP + 1e-12
+    assert max(giros) == pytest.approx(CHARGE.turn_rate * STEP)
+
+
+def test_ya_mirandolo_no_gira() -> None:
+    # Negativo: con la punta hacia el jugador, el ángulo no cambia.
+    triangle = triangulo(Vector2(0, 600))
+    mirar(triangle, 1.0)
+    antes = triangle.angle
+    mirar(triangle, 0.5)
+    assert triangle.angle == pytest.approx(antes)
+
+
+def test_gira_por_el_lado_mas_corto() -> None:
+    # Borde: del ángulo 0 (punta arriba) a mirar a +x hay −π/2 o +3π/2: va por −π/2.
+    triangle = triangulo(Vector2(-600, 0))
+    angles = mirar(triangle, 1.0)
+    assert all(b <= a for a, b in zip([0.0, *angles], angles, strict=False))
+    assert triangle.angle == pytest.approx(-math.pi / 2)
+
+
+def test_no_gira_al_embestir() -> None:
+    world = World(SIN_APARICIONES, random.Random(1), lethal=False, armed=False)
+    triangle = triangulo(Vector2(200, 0), lead_chance=0.0)
+    world.enemies = [triangle]
+    angles = []
+    for _ in range(pasos(CHARGE.telegraph + CHARGE.duration)):
+        world.update(Vector2(0, 1))
+        if embestida(triangle).state is ChargeState.CHARGING:
+            angles.append(triangle.angle)
+    assert len(angles) == pasos(CHARGE.duration)
+    assert len(set(angles)) == 1
+
+
+# --- El desvío ---
+
+
+def test_desvio_va_al_lado_con_menos_enemigos() -> None:
+    # Dos enemigos al lado +y del jugador: adivina que escapará hacia −y.
+    triangle = triangulo(Vector2(200, 0), lead_chance=1.0)
+    otros = [Enemy(HEXAGON, Vector2(-50, 120)), Enemy(HEXAGON, Vector2(50, 150))]
+    hasta_soltarse(triangle, [triangle, *otros], Vector2())
+    charge = embestida(triangle)
+    assert charge.state is ChargeState.CHARGING
+    assert charge.velocity is not None
+    lead = CHARGE.lead_angle
+    esperado = Vector2(-math.cos(lead), -math.sin(lead)) * CHARGE.speed
+    assert tuple(charge.velocity) == pytest.approx(tuple(esperado))
+
+
+def test_desvio_tapado_apunta_directo() -> None:
+    # Borde: el desvío iría hacia −y, pero ahí hay otro en la recta: apunta directo.
+    triangle = triangulo(Vector2(200, 0), lead_chance=1.0)
+    otros = [
+        Enemy(HEXAGON, Vector2(-50, 120)),
+        Enemy(HEXAGON, Vector2(50, 150)),
+        Enemy(HEXAGON, Vector2(57, -44)),
+    ]
+    hasta_soltarse(triangle, [triangle, *otros], Vector2())
+    charge = embestida(triangle)
+    assert charge.state is ChargeState.CHARGING
+    assert charge.velocity == Vector2(-CHARGE.speed, 0)
+
+
+def test_sin_suerte_no_se_desvia() -> None:
+    # Negativo: con `lead_chance = 0`, apunta directo aunque un lado esté lleno.
+    triangle = triangulo(Vector2(200, 0), lead_chance=0.0)
+    otros = [Enemy(HEXAGON, Vector2(-50, 120)), Enemy(HEXAGON, Vector2(50, 150))]
+    hasta_soltarse(triangle, [triangle, *otros], Vector2())
+    assert embestida(triangle).velocity == Vector2(-CHARGE.speed, 0)
+
+
+@given(
+    semilla=st.integers(min_value=0, max_value=2**32),
+    chance=st.sampled_from([0.0, 0.1, 1.0]),
+    otros=st.lists(
+        st.builds(
+            Vector2,
+            st.floats(min_value=-300, max_value=300),
+            st.floats(min_value=40, max_value=300) | st.floats(-300, -40),
+        ),
+        max_size=5,
+    ),
+)
+def test_al_soltarse_va_directo_o_a_lead_angle(
+    semilla: int, chance: float, otros: list[Vector2]
+) -> None:
+    # Con cualquier azar, una embestida sale hacia el jugador o a `±lead_angle` de él.
+    triangle = triangulo(Vector2(200, 0), lead_chance=chance)
+    enemies = [triangle, *(Enemy(HEXAGON, p) for p in otros)]
+    charge = embestida(triangle)
+    rng = random.Random(semilla)
+    charge.update(triangle, contexto(enemies, rng=rng))
+    for _ in range(pasos(CHARGE.telegraph)):
+        charge.update(triangle, contexto(enemies, rng=rng))
+    if charge.state is not ChargeState.CHARGING:
+        return
+    assert charge.velocity is not None
+    # `angle_to` da grados entre −360 y 360: se lleva a [−180, 180].
+    desvio = abs(math.remainder(Vector2(-1, 0).angle_to(charge.velocity), 360))
+    assert desvio == pytest.approx(0, abs=1e-9) or desvio == pytest.approx(
+        math.degrees(CHARGE.lead_angle)
+    )
+    if chance == 0.0:
+        assert desvio == pytest.approx(0, abs=1e-9)
 
 
 # --- La propiedad (Hypothesis) ---

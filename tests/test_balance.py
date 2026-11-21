@@ -174,9 +174,13 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                         "kind": "charge",
                         "watch_distance": 320.0,
                         "telegraph": 0.5,
+                        "recoil": 14.0,
                         "speed": 720.0,
                         "duration": 0.8,
                         "cooldown": 2.0,
+                        "turn_rate": 6.0,
+                        "lead_chance": 0.1,
+                        "lead_angle": 0.3,
                     }
                 ],
             },

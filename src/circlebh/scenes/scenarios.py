@@ -83,9 +83,10 @@ SCENARIOS: dict[str, Scenario] = {
         ),
         Scenario(
             "triangulo-embiste",
-            "Un triángulo junto al piloto, que no muere ni dispara. El triángulo avisa"
-            " con una línea fina, embiste en línea recta y el piloto lo esquiva al"
-            " seguir su vuelta. Después se recupera, vuelve a su distancia y repite.",
+            "Un triángulo junto al piloto, que no muere ni dispara. El triángulo lo mira"
+            " con una punta, avisa retrocediendo como un resorte, se suelta hacia donde"
+            " está y el piloto lo esquiva al seguir su vuelta. Después se recupera,"
+            " vuelve a su distancia y repite.",
             pilot=True,
             crowd=1,
             crowd_enemy="triangle",

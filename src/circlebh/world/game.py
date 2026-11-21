@@ -85,7 +85,7 @@ class World:
             return
         self._steps += 1
         self.player.step(intent)
-        self.events += step_actions(self.enemies, self.player.position)
+        self.events += step_actions(self.enemies, self.player.position, self.rng)
         self.separations += step_swarm(
             self.enemies,
             self.player.position,
