@@ -19,7 +19,7 @@ from circlebh.world.clock import STEP
 from circlebh.world.collisions import closest_point_on_segment
 from circlebh.world.enemy import Enemy
 from circlebh.world.polygon import first_hit, polygon_edge, vertex
-from circlebh.world.rigid import center_of_mass, to_local, to_world
+from circlebh.world.rigid import center_of_mass, rotate, to_local, to_world
 
 # Sin patrones ni carga, y rápido, para poder darle cualquier velocidad.
 CUADRADO = EnemySpec(
@@ -79,6 +79,15 @@ def test_sin_giro_el_angulo_no_cambia() -> None:
     for _ in range(10):
         enemy.step(Vector2(50, 0))
     assert (enemy.angle, enemy.previous_angle, enemy.omega) == (0.0, 0.0, 0.0)
+
+
+@pytest.mark.parametrize("angulo", [1e-6, -1e-6, math.pi / 2 - 1e-7])
+def test_rotar_un_angulo_casi_recto_no_se_redondea(angulo: float) -> None:
+    # Borde: pygame-ce 2.5.8 redondea `rotate_rad` cerca de los múltiplos de 90°, y no
+    # igual hacia los dos lados. `R(θ)·(0, −1) = (sen θ, −cos θ)`.
+    girado = rotate(Vector2(0, -1), angulo)
+    assert girado.x == pytest.approx(math.sin(angulo), rel=1e-12)
+    assert girado.y == pytest.approx(-math.cos(angulo), rel=1e-12)
 
 
 @given(

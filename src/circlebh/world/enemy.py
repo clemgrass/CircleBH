@@ -17,7 +17,7 @@ from circlebh.world.polygon import (
     first_hit,
     polygon_edge,
 )
-from circlebh.world.rigid import center_of_mass, to_local, to_world
+from circlebh.world.rigid import center_of_mass, rotate, to_local, to_world
 
 
 class Enemy:
@@ -87,10 +87,10 @@ class Enemy:
             return
         # `shift` es `c' − c` en el marco del enemigo, y `moved`, en el plano.
         shift = center_of_mass(self._local_lines())
-        moved = shift.rotate_rad(self.angle)
+        moved = rotate(shift, self.angle)
         self.offset -= shift
         self.position += moved
-        self.previous += shift.rotate_rad(self.previous_angle)
+        self.previous += rotate(shift, self.previous_angle)
         self.velocity += self.omega * Vector2(-moved.y, moved.x)
         self._radius = max(p.length() for line in self._local_lines() for p in line)
 
