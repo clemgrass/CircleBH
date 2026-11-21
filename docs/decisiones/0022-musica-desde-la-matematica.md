@@ -5,6 +5,8 @@ fecha: 2026-11-20
 
 # La música sale de la geometría del juego, sobre una base de techno
 
+> El tempo por sesión, de 120 a 126 BPM, quedó reemplazado por el [ADR 0025](0025-director-con-forma-de-tema.md): ahora es `director.bpm`, fijo en el balance. Lo demás sigue vigente.
+
 ## Contexto y problema
 
 El juego no tiene audio. El usuario quiere música que salga de la misma matemática que mueve el juego (las armas-curva, los ataques y la geometría de los polígonos), que suene bien, con aire de techno o house, y que sea distinta en cada partida, como un roguelike.
