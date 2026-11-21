@@ -7,25 +7,37 @@ cada semicorchea: la capa, las notas de los enemigos, los golpes del arma y los 
 import random
 from dataclasses import replace
 
+import pytest
 from pygame.math import Vector2
 
 from circlebh.audio import sounds
-from circlebh.audio.harmony import bpm_for, chord_at, variation_for
+from circlebh.audio.harmony import chord_at, variation_for
+from circlebh.audio.intensity import PHRASE_BARS
 from circlebh.audio.rhythm import SIXTEENTHS
 from circlebh.audio.sequencer import SAMPLES_PER_STEP, Sequencer
-from circlebh.balance import BALANCE, EnemySpec
+from circlebh.balance import BALANCE, EnemySpec, SectionSpec
 from circlebh.pilot import pilot_intent
 from circlebh.world.enemy import Enemy
 from circlebh.world.events import Death, Hit
 from circlebh.world.game import World
 
-# Sin apariciones: los tests ponen a los enemigos a mano.
+# Sin apariciones: los tests ponen a los enemigos a mano. Un director sin mazo no compra.
 SIN_APARICIONES = replace(
-    BALANCE, spawning=replace(BALANCE.spawning, interval=1e9, distance=5000.0)
+    BALANCE,
+    director=replace(
+        BALANCE.director,
+        sections=(replace(BALANCE.director.sections[0], deck=()),),
+    ),
 )
 # Sin patrones ni carga: el enemigo se queda donde lo ponen.
 QUIETO = EnemySpec(
-    sides=6, radius=24.0, speed=120.0, friction=0.0, charge_per_line=0.0, patterns=()
+    sides=6,
+    radius=24.0,
+    speed=120.0,
+    friction=0.0,
+    charge_per_line=0.0,
+    patterns=(),
+    threat=1.0,
 )
 
 
@@ -148,9 +160,11 @@ def test_al_crearse_deja_lista_la_bateria() -> None:
         assert sonido.cache_info().currsize == 1
     assert sounds.impact.cache_info().currsize == 1
     assert sounds.rim.cache_info().currsize == 1
-    assert sounds.riser.cache_info().currsize == 1
+    # El de un compás y el de la subida de una frase (ADR 0026).
+    assert sounds.riser.cache_info().currsize == 2
     sounds.riser(sequencer.grid.bar_seconds)
-    assert sounds.riser.cache_info().hits >= 1
+    sounds.riser(PHRASE_BARS * sequencer.grid.bar_seconds)
+    assert sounds.riser.cache_info().hits >= 2
 
 
 # --- La cuantización ---
@@ -205,7 +219,7 @@ def test_start_game_cambia_la_tonalidad_en_el_compas_siguiente() -> None:
     world = mundo(armed=False)
     tocar(sequencer, world, 20)  # a mitad del primer compás
     sequencer.start_game(7)
-    # El segundo compás empieza antes del paso 120 con cualquier tempo de 120 a 126.
+    # A 124 BPM, el segundo compás empieza en el paso 117.
     tocar(sequencer, world, 140)
     assert any(d.g >= SIXTEENTHS for d in sequencer.decisions)
     nueva = variation_for(7)
@@ -214,7 +228,14 @@ def test_start_game_cambia_la_tonalidad_en_el_compas_siguiente() -> None:
             assert decision.variation == variation_for(1)
         else:
             assert decision.variation == nueva
-    assert sequencer.grid.bpm == bpm_for(1)
+    # Al reiniciar, el tempo no cambia.
+    assert sequencer.grid.bpm == BALANCE.director.bpm
+
+
+def test_musica_toma_el_tempo_del_balance() -> None:
+    # ADR 0025: el tempo es del tema, no de la semilla.
+    tempos = {Sequencer(seed).grid.bpm for seed in range(8)}
+    assert tempos == {BALANCE.director.bpm}
 
 
 def test_al_reiniciar_tonalidad_acorde_inicial_e_impacto_caen_juntos() -> None:
@@ -235,12 +256,127 @@ def test_al_reiniciar_tonalidad_acorde_inicial_e_impacto_caen_juntos() -> None:
     assert por_g[3 * SIXTEENTHS].chord == chord_at(2, nueva)
 
 
-def test_el_mundo_queda_identico_con_y_sin_la_musica() -> None:
-    con, sin = World(BALANCE, random.Random(3)), World(BALANCE, random.Random(3))
-    tocar(Sequencer(3), con, 200, piloto=True)
+# --- El drop (ADR 0026) ---
+
+
+def seccion_vacia(name: str, layers: tuple[int, int]) -> SectionSpec:
+    """Una sección de 4 compases que no compra: solo importan sus capas."""
+    return replace(
+        BALANCE.director.sections[0],
+        name=name,
+        bars=4.0,
+        deck=(),
+        burst=0.0,
+        layers=layers,
+    )
+
+
+TEMA_CORTO = replace(
+    BALANCE,
+    director=replace(
+        BALANCE.director,
+        sections=(seccion_vacia("intro", (0, 3)), seccion_vacia("drop", (3, 3))),
+    ),
+)
+"""Una frase de intro y un drop en el compás 4 de la partida."""
+
+
+def test_reinicio_espera_el_compas_y_el_drop_cae_en_el_golpe() -> None:
+    # Como `GameScene` con R1: el jugador reinicia a mitad del compás 0. El mundo nuevo
+    # queda congelado mientras la música espera el compás, y parte con él.
+    sequencer = Sequencer(1)
+    tocar(sequencer, mundo(armed=False), 20)
+    sequencer.start_game(7)
+    world = World(TEMA_CORTO, random.Random(7), armed=False, lethal=False)
+    entra_al_drop = golpe_decidido = None
+    # La tonalidad entra en el compás 1, y el drop, 4 compases después.
+    golpe = (1 + 4) * SIXTEENTHS
+    for paso in range(800):
+        if not sequencer.waiting_for_bar:
+            world.update(Vector2())
+            if entra_al_drop is None and world.director.section.name == "drop":
+                entra_al_drop = paso
+        sequencer.step(world)
+        if golpe_decidido is None and sequencer.decisions[-1].g >= golpe:
+            golpe_decidido = paso
+    assert entra_al_drop is not None and golpe_decidido is not None
+    # El director entra al drop en el mismo paso o en el siguiente, nunca antes.
+    assert 0 <= entra_al_drop - golpe_decidido <= 1
+    por_g = {d.g: d for d in sequencer.decisions}
+    assert "build" in por_g[1 * SIXTEENTHS].cues
+    assert [g for g, d in por_g.items() if d.silent] == list(range(golpe - 4, golpe))
+    assert "impact" in por_g[golpe].cues
+    assert por_g[golpe].level == 3
+
+
+def test_reinicio_con_espera_es_la_misma_partida() -> None:
+    # Negativo (ADR 0026): esperar el compás solo corre la partida en el tiempo. Con
+    # los mismos pasos de mundo, queda igual a una que partió al tiro.
+    intro = replace(BALANCE.director.sections[0], budget_start=8.0, budget_end=8.0)
+    balance = replace(BALANCE, director=replace(BALANCE.director, sections=(intro,)))
+    sequencer = Sequencer(1)
+    tocar(sequencer, mundo(armed=False), 20)
+    sequencer.start_game(7)
+    congelado = World(balance, random.Random(7))
+    for _ in range(300):
+        if not sequencer.waiting_for_bar:
+            congelado.update(pilot_intent(congelado.steps))
+        sequencer.step(congelado)
+    suelto = World(balance, random.Random(7))
+    for _ in range(congelado.steps):
+        suelto.update(pilot_intent(suelto.steps))
+    assert congelado.steps < 300  # sí esperó
+    assert len(congelado.enemies) > 2
+    assert [e.position for e in congelado.enemies] == [
+        e.position for e in suelto.enemies
+    ]
+    assert congelado.rng.getstate() == suelto.rng.getstate()
+
+
+def test_mundo_con_otro_tempo_se_rechaza() -> None:
+    # Negativo: la grilla de la música y el reloj del director tienen que ir al mismo
+    # tempo, o los drops no caerían en el golpe.
+    otro = replace(BALANCE, director=replace(BALANCE.director, bpm=120.0))
+    with pytest.raises(ValueError, match="bpm"):
+        Sequencer(1).step(World(otro, random.Random(1)))
+
+
+def test_sin_reinicio_no_espera() -> None:
+    # Negativo: sin `start_game` pendiente, la escena no frena al mundo.
+    sequencer = Sequencer(1)
+    tocar(sequencer, mundo(armed=False), 200)
+    assert not sequencer.waiting_for_bar
+
+
+def test_morir_en_la_subida_corta_su_riser() -> None:
+    # El riser de la subida dura 4 compases (~7,7 s). Si el jugador muere a mitad, no
+    # puede seguir subiendo hacia un drop que no llega, encima de la pantalla de muerte
+    # y del inicio de la partida siguiente. Se mira la mezcla por dentro: sin escuchar,
+    # es la única forma de saber qué sigue sonando.
+    sequencer = Sequencer(1)
+    world = World(TEMA_CORTO, random.Random(1))
+    tocar(sequencer, world, 150)
+    riser = sounds.riser(PHRASE_BARS * sequencer.grid.bar_seconds)
+    assert any(voz.samples is riser for voz in sequencer._voices)
+    world.enemies = [Enemy(QUIETO, Vector2(25, 0))]
+    tocar(sequencer, world, 2)
+    assert world.game_over
+    assert not any(voz.samples is riser for voz in sequencer._voices)
+
+
+def test_musica_apagada_misma_partida() -> None:
+    # Negativo (ADR 0022 y 0025): la música lee al mundo, pero no lo cambia. Con una
+    # intro que compra rápido, en 200 pasos ya aparecieron varios enemigos.
+    intro = replace(BALANCE.director.sections[0], budget_start=8.0, budget_end=8.0)
+    balance = replace(BALANCE, director=replace(BALANCE.director, sections=(intro,)))
+    con, sin = World(balance, random.Random(3)), World(balance, random.Random(3))
+    sequencer = Sequencer(3)
     for _ in range(200):
+        con.update(pilot_intent(con.steps))
+        sequencer.step(con)
         sin.update(pilot_intent(sin.steps))
-    assert [e.position for e in con.enemies] == [e.position for e in sin.enemies]
+        assert [e.position for e in con.enemies] == [e.position for e in sin.enemies]
+    assert len(con.enemies) > 2
     assert con.rng.getstate() == sin.rng.getstate()
 
 

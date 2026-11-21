@@ -27,6 +27,7 @@ from circlebh.seeds import next_seed
 from circlebh.settings import Settings
 from circlebh.viewport import Viewport, camera_center
 from circlebh.world.clock import STEP
+from circlebh.world.director import bar_at
 from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
 from circlebh.world.swarm import lattice
@@ -148,8 +149,19 @@ class GameScene:
                 Enemy(hexagon, p) for p in lattice(Vector2(), demo.crowd, 90)
             ]
         self.dead_steps = 0
+        self.section = -1
+        """La última sección anotada en la consola."""
+        self.log_section()
         if self.music is not None:
             self.music.start_game(seed)
+
+    def log_section(self) -> None:
+        """Anota en la consola la sección del tema cuando cambia, con su compás."""
+        director = self.world.director
+        if director.section_index != self.section:
+            self.section = director.section_index
+            bar = bar_at(self.world.steps, director.spec.bpm)
+            print(f"compás {bar:.1f}: {director.section.name}")
 
     def restart(self) -> None:
         """Empieza la partida siguiente, con la semilla que le toca (`next_seed`)."""
@@ -177,7 +189,11 @@ class GameScene:
         La música avanza en todos los pasos, también con el jugador muerto.
         """
         if not self.world.game_over:
-            self.world.update(self.intent())
+            # R1 (ADR 0026): una partida nueva espera el compás de la música, para que
+            # cada drop caiga en el golpe. Sin música, no espera.
+            if self.music is None or not self.music.waiting_for_bar:
+                self.world.update(self.intent())
+                self.log_section()
         else:
             self.dead_steps += 1
             if self.demo is not None and self.dead_steps >= DEMO_RESTART_STEPS:

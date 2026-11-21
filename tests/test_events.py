@@ -16,7 +16,13 @@ from circlebh.world.game import World
 
 # Sin patrones ni carga: el enemigo se queda donde lo ponen.
 QUIETO = EnemySpec(
-    sides=6, radius=24.0, speed=120.0, friction=0.0, charge_per_line=0.0, patterns=()
+    sides=6,
+    radius=24.0,
+    speed=120.0,
+    friction=0.0,
+    charge_per_line=0.0,
+    patterns=(),
+    threat=1.0,
 )
 
 

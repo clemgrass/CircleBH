@@ -1,5 +1,6 @@
 """Tests de la partida: `World` avanza un paso por `update`."""
 
+import math
 import random
 from dataclasses import replace
 
@@ -8,13 +9,33 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE
+from circlebh.balance import BALANCE, Balance, DeckEntry, DirectorSpec, SectionSpec
 from circlebh.world.clock import STEP
-from circlebh.world.enemy import Enemy, spawn_position
+from circlebh.world.director import bar_at
+from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
 from circlebh.world.polygon import polygon_edge
 from circlebh.world.swarm import lattice
 from circlebh.world.weapons import PointWeapon
+
+SIN_APARICIONES = replace(
+    BALANCE,
+    director=replace(
+        BALANCE.director,
+        sections=(replace(BALANCE.director.sections[0], deck=()),),
+    ),
+)
+"""El balance real con un director sin mazo, que no compra: los tests ponen a mano a
+los enemigos."""
+
+
+def mundo_con_hexagono(
+    position: Vector2, balance: Balance = SIN_APARICIONES, **kwargs: bool
+) -> World:
+    """Un mundo sin apariciones, con un hexágono en `position`."""
+    world = World(balance, random.Random(1), **kwargs)
+    world.enemies = [Enemy(balance.enemies["hexagon"], position)]
+    return world
 
 
 def test_world_mueve_al_jugador() -> None:
@@ -23,11 +44,10 @@ def test_world_mueve_al_jugador() -> None:
     assert world.player.position.y == pytest.approx(BALANCE.player.speed * STEP)
 
 
-def test_world_empieza_con_un_hexagono_a_la_distancia_de_aparicion() -> None:
+def test_world_empieza_sin_enemigos() -> None:
+    # La intro parte en silencio: el presupuesto de su primer paso no alcanza para nada.
     world = World(BALANCE, random.Random(1))
-    [enemy] = world.enemies
-    assert len(enemy.edges) == BALANCE.enemies["hexagon"].sides
-    assert enemy.position.length() == pytest.approx(BALANCE.spawning.distance)
+    assert world.enemies == []
 
 
 def test_mundo_parte_con_el_arma_punto() -> None:
@@ -38,7 +58,7 @@ def test_mundo_parte_con_el_arma_punto() -> None:
 
 
 def test_la_bala_nace_donde_quedo_el_jugador() -> None:
-    world = World(BALANCE, random.Random(1))
+    world = mundo_con_hexagono(Vector2(BALANCE.spawning.distance, 0))
     world.update(Vector2(1, 0))
     [weapon] = world.weapons
     assert isinstance(weapon, PointWeapon)
@@ -46,16 +66,9 @@ def test_la_bala_nace_donde_quedo_el_jugador() -> None:
     assert bullet.position == world.player.position
 
 
-def test_misma_semilla_el_enemigo_aparece_en_el_mismo_lugar() -> None:
-    a = World(BALANCE, random.Random(7))
-    b = World(BALANCE, random.Random(7))
-    assert a.enemies[0].position == b.enemies[0].position
-
-
 def test_el_enemigo_persigue_la_posicion_nueva_del_jugador() -> None:
-    world = World(BALANCE, random.Random(1))
-    enemy = world.enemies[0]
-    enemy.position = Vector2(100, 0)
+    world = mundo_con_hexagono(Vector2(100, 0))
+    [enemy] = world.enemies
     # El jugador se mueve hacia arriba; el enemigo apunta a donde quedó, no al origen.
     world.update(Vector2(0, 1))
     hacia_el_jugador = world.player.position - Vector2(100, 0)
@@ -90,11 +103,8 @@ def mundo_con_hexagono_quieto(x: float) -> World:
     que mira al jugador es la arista 1, la vertical izquierda del hexágono.
     """
     hexagon = replace(BALANCE.enemies["hexagon"], speed=0.0)
-    world = World(replace(BALANCE, enemies={"hexagon": hexagon}), random.Random(1))
-    [enemy] = world.enemies
-    enemy.position = Vector2(x, 0)
-    enemy.previous = Vector2(enemy.position)
-    return world
+    balance = replace(SIN_APARICIONES, enemies={"hexagon": hexagon})
+    return mundo_con_hexagono(Vector2(x, 0), balance)
 
 
 def tangente() -> float:
@@ -139,15 +149,14 @@ def test_la_envolvente_sola_no_mata() -> None:
 
 
 def test_enemigo_lejos_no_termina_la_partida() -> None:
-    world = World(BALANCE, random.Random(1))
+    world = mundo_con_hexagono(Vector2(BALANCE.spawning.distance, 0))
     for _ in range(60):
         world.update(Vector2())
     assert world.game_over is False
 
 
 def test_tras_morir_update_no_avanza() -> None:
-    world = World(BALANCE, random.Random(1))
-    world.enemies[0].position = Vector2(tangente() - 5, 0)
+    world = mundo_con_hexagono(Vector2(tangente() - 5, 0))
     world.update(Vector2())
     assert world.game_over is True
 
@@ -164,43 +173,57 @@ def test_tras_morir_update_no_avanza() -> None:
     assert world.game_over is True
 
 
-# --- Oleadas ---
+# --- Las apariciones (ADR 0025) ---
 
-INTERVALO = round(BALANCE.spawning.interval / STEP)
-"""Pasos entre una aparición y la siguiente."""
+TASA = 4.0
+RAPIDO = replace(
+    BALANCE,
+    director=DirectorSpec(
+        bpm=124.0,
+        max_alive=300,
+        sections=(
+            SectionSpec(
+                name="rapida",
+                kind="build",
+                bars=64.0,
+                budget_start=TASA,
+                budget_end=TASA,
+                burst=0.0,
+                layers=(0, 3),
+                deck=(DeckEntry("hexagon", 1.0),),
+                formations=("single",),
+            ),
+        ),
+    ),
+)
+"""Un hexágono por cuarto de compás. Con la tasa constante, lo ganado es `4 · compás`."""
 
 
 def mundo_sin_armas(seed: int) -> World:
-    """Un mundo con los hexágonos quietos (`speed = 0`) y sin armas.
+    """Un mundo con `RAPIDO`, los hexágonos quietos (`speed = 0`) y sin armas.
 
     Así nadie muere ni mata, y la cuenta de enemigos solo cambia por las apariciones.
     """
     hexagon = replace(BALANCE.enemies["hexagon"], speed=0.0)
-    world = World(replace(BALANCE, enemies={"hexagon": hexagon}), random.Random(seed))
-    world.weapons = []
-    return world
+    balance = replace(RAPIDO, enemies={"hexagon": hexagon})
+    return World(balance, random.Random(seed), armed=False)
 
 
-def test_aparece_uno_cada_intervalo() -> None:
+def avanzar_hasta_que_haya(world: World, n: int, intent: Vector2) -> None:
+    while len(world.enemies) < n:
+        world.update(intent)
+
+
+def test_aparece_lo_que_gana_el_director() -> None:
     world = mundo_sin_armas(seed=1)
-    for _ in range(INTERVALO * 3):
+    for _ in range(300):
         world.update(Vector2())
-    assert len(world.enemies) == 1 + 3
-
-
-def test_aparece_justo_al_cumplirse_el_intervalo() -> None:
-    world = mundo_sin_armas(seed=1)
-    for _ in range(INTERVALO - 1):
-        world.update(Vector2())
-    assert len(world.enemies) == 1
-    world.update(Vector2())
-    assert len(world.enemies) == 2
+        assert len(world.enemies) == math.floor(TASA * bar_at(world.steps, 124.0))
 
 
 def test_aparece_a_la_distancia_del_jugador_donde_esta() -> None:
     world = mundo_sin_armas(seed=1)
-    for _ in range(INTERVALO):
-        world.update(Vector2(1, 0))
+    avanzar_hasta_que_haya(world, 1, Vector2(1, 0))
     nuevo = world.enemies[-1]
     assert nuevo.position.distance_to(world.player.position) == pytest.approx(
         BALANCE.spawning.distance
@@ -212,18 +235,19 @@ def test_dos_apariciones_no_comparten_posicion(seed: int) -> None:
     # Propiedad: cada aparición sortea su ángulo. Que dos ángulos al azar coincidan
     # tiene probabilidad prácticamente nula, así que es un error y no azar.
     world = mundo_sin_armas(seed)
-    for _ in range(INTERVALO):
-        world.update(Vector2())
+    avanzar_hasta_que_haya(world, 2, Vector2())
     primero, segundo = world.enemies
     assert primero.position != segundo.position
 
 
 def test_tras_morir_no_aparecen_mas() -> None:
     world = mundo_sin_armas(seed=1)
-    world.enemies[0].position = Vector2(tangente() - 5, 0)
+    world.enemies = [
+        Enemy(world.balance.enemies["hexagon"], Vector2(tangente() - 5, 0))
+    ]
     world.update(Vector2())
     assert world.game_over is True
-    for _ in range(INTERVALO * 2):
+    for _ in range(300):
         world.update(Vector2())
     assert len(world.enemies) == 1
 
@@ -254,10 +278,8 @@ def test_el_jugador_se_mueve_igual_con_enemigos_cerca() -> None:
 def test_enemigo_muerto_no_divide_por_cero() -> None:
     # Foco de revisión 1: una bala le quita la última línea en el paso, y el paso
     # siguiente no puede calcular con masa 0.
-    world = World(BALANCE, random.Random(1))
+    world = mundo_con_hexagono(Vector2(-150, 0))
     [enemy] = world.enemies
-    enemy.position = Vector2(-150, 0)
-    enemy.previous = Vector2(enemy.position)
     for k in [0, 1, 2, 3, 5]:
         enemy.remove_edge(k)
     for _ in range(40):
@@ -266,21 +288,22 @@ def test_enemigo_muerto_no_divide_por_cero() -> None:
 
 
 def test_aparecer_encima_de_otro_los_separa() -> None:
-    # Foco de revisión 4: el próximo enemigo aparece justo donde ya hay uno.
+    # Foco de revisión 4: el próximo enemigo aparece justo donde ya hay uno. Un mundo
+    # gemelo, con la misma semilla, dice dónde y en qué paso va a aparecer.
+    gemelo = mundo_sin_armas(seed=1)
+    avanzar_hasta_que_haya(gemelo, 1, Vector2())
     world = mundo_sin_armas(seed=1)
-    gemelo = random.Random()
-    gemelo.setstate(world.rng.getstate())
-    donde = spawn_position(world.player.position, BALANCE.spawning.distance, gemelo)
-    world.enemies[0].position = Vector2(donde)
-    for _ in range(INTERVALO + 1):
+    world.enemies = [
+        Enemy(world.balance.enemies["hexagon"], gemelo.enemies[0].position)
+    ]
+    for _ in range(gemelo.steps + 1):
         world.update(Vector2())
     a, b = world.enemies
     assert a.position.distance_to(b.position) >= a.radius + b.radius - 1e-9
 
 
 def test_sin_letalidad_no_termina() -> None:
-    world = World(BALANCE, random.Random(1), lethal=False)
-    world.enemies[0].position = Vector2(tangente() - 5, 0)
+    world = mundo_con_hexagono(Vector2(tangente() - 5, 0), lethal=False)
     world.update(Vector2())
     assert world.game_over is False
 

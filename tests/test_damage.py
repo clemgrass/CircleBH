@@ -18,7 +18,13 @@ from circlebh.world.weapons import PointWeapon
 SPEC = PointWeaponSpec(cooldown=0.5, speed=600.0, range=700.0)
 # Sin patrones ni carga: aquí solo importa dónde está.
 HEXAGON = EnemySpec(
-    sides=6, radius=24.0, speed=120.0, friction=0.0, charge_per_line=0.0, patterns=()
+    sides=6,
+    radius=24.0,
+    speed=120.0,
+    friction=0.0,
+    charge_per_line=0.0,
+    patterns=(),
+    threat=1.0,
 )
 ORIGEN = Vector2(0, 0)
 
@@ -105,9 +111,8 @@ def test_enemigo_que_avanza_no_deja_pasar_la_bala() -> None:
 
 def test_enemigo_sin_lineas_desaparece_del_mundo() -> None:
     world = World(BALANCE, random.Random(1))
-    [enemy] = world.enemies
-    enemy.position = Vector2(-150, 0)
-    enemy.previous = Vector2(enemy.position)
+    enemy = Enemy(BALANCE.enemies["hexagon"], Vector2(-150, 0))
+    world.enemies = [enemy]
     for k in [0, 2, 3, 4, 5]:
         enemy.remove_edge(k)
     # Solo le queda la arista 4, la que mira al jugador.

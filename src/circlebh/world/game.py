@@ -6,6 +6,7 @@ from pygame.math import Vector2
 
 from circlebh.balance import Balance
 from circlebh.world.clock import STEP
+from circlebh.world.director import Director
 from circlebh.world.enemy import Enemy, spawn_position
 from circlebh.world.events import Death, Event
 from circlebh.world.player import Player
@@ -33,9 +34,8 @@ class World:
         self.lethal = lethal
         self.player = Player(balance.player)
         self.enemies: list[Enemy] = []
-        self._spawn()
-        self._steps_to_spawn = self._spawn_steps()
-        """Pasos que faltan para la próxima aparición."""
+        self.director = Director(balance.director, balance.enemies, rng)
+        """Decide qué aparece y cuándo, con la forma del tema (ADR 0025)."""
         self.weapons: list[Weapon] = (
             [PointWeapon(balance.point_weapon)] if armed else []
         )
@@ -64,8 +64,8 @@ class World:
 
         El jugador se mueve primero, y el enjambre da su paso con el jugador donde quedó
         (`step_swarm`). Después las armas golpean y disparan. Los enemigos sin líneas
-        desaparecen y, si toca, aparece uno nuevo, que empieza a moverse en el paso
-        siguiente. Recién entonces se revisa el contacto: matar a uno en el mismo paso
+        desaparecen, y aparece lo que compró el director, que empieza a moverse en el
+        paso siguiente. Recién entonces se revisa el contacto: matar a uno en el mismo paso
         en que te tocaría te salva. Si alguno lo toca, la partida termina; desde ahí,
         `update` no hace nada.
 
@@ -87,22 +87,16 @@ class World:
             self.events += weapon.update(self.player.position, self.enemies)
         self.events += [Death(enemy) for enemy in self.enemies if not enemy.alive]
         self.enemies = [enemy for enemy in self.enemies if enemy.alive]
-        self._steps_to_spawn -= 1
-        if self._steps_to_spawn <= 0:
-            self._spawn()
-            self._steps_to_spawn = self._spawn_steps()
+        for name in self.director.update(self._steps):
+            self._spawn(name)
         self.game_over = self.lethal and any(
             enemy.touches(self.player.position, self.player.radius)
             for enemy in self.enemies
         )
 
-    def _spawn(self) -> None:
-        """Agrega un hexágono a `spawning.distance` del jugador, fuera de la vista."""
+    def _spawn(self, name: str) -> None:
+        """Agrega un enemigo del tipo `name` a `spawning.distance` del jugador, fuera de
+        la vista."""
         spawning = self.balance.spawning
         position = spawn_position(self.player.position, spawning.distance, self.rng)
-        self.enemies.append(Enemy(self.balance.enemies["hexagon"], position))
-
-    def _spawn_steps(self) -> int:
-        """Pasos entre dos apariciones: `interval` redondeado a pasos enteros, como el
-        `cooldown` de las armas."""
-        return round(self.balance.spawning.interval / STEP)
+        self.enemies.append(Enemy(self.balance.enemies[name], position))

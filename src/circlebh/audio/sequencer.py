@@ -22,12 +22,19 @@ from circlebh.audio.harmony import (
     A3,
     Chord,
     Variation,
-    bpm_for,
     chord_at,
     hz,
     variation_for,
 )
-from circlebh.audio.intensity import Arrangement, Cue, raw_intensity
+from circlebh.audio.intensity import (
+    FREE,
+    PHRASE,
+    PHRASE_BARS,
+    Arrangement,
+    Cue,
+    Layers,
+    raw_intensity,
+)
 from circlebh.audio.rhythm import RATE, SIXTEENTHS, Grid
 from circlebh.audio.voices import (
     EnemyView,
@@ -37,6 +44,7 @@ from circlebh.audio.voices import (
     voice_for,
     weapon_note,
 )
+from circlebh.balance import BALANCE
 from circlebh.world.clock import STEP
 from circlebh.world.events import Death, Event, Hit, Shot
 from circlebh.world.game import World
@@ -56,6 +64,8 @@ DUCK_SECONDS = 0.2
 DELAY_FEEDBACK = 0.38
 PAD_Q, BASS_Q = 0.7, 0.35
 """Amortiguación de los filtros resonantes: menos, más resonancia."""
+ROLL_EVERY = (4, 2, 1, 1)
+"""Cada cuántas semicorcheas suena el clap del redoble, en cada compás de la subida."""
 
 
 @dataclass(frozen=True)
@@ -74,6 +84,8 @@ class Decision:
     rims: int
     """Cuántos golpes de bala sonaron."""
     death: bool
+    silent: bool
+    """Si la base calló: el último pulso de una subida (ADR 0026)."""
 
 
 @dataclass(frozen=True)
@@ -113,6 +125,8 @@ class _Block:
     start: int
     size: int
     level: int
+    muted: bool
+    """Si el pad y el bajo callan en este bloque."""
     cutoff: float
     pad_steps: list[float]
     bass_step: float
@@ -128,8 +142,9 @@ class Sequencer:
     def __init__(
         self, seed: int, *, base_volume: float = 1.0, game_volume: float = 1.0
     ) -> None:
-        self.grid = Grid(bpm_for(seed))
-        """La grilla del tempo de la sesión: se elige una vez, con la primera semilla."""
+        self.grid = Grid(BALANCE.director.bpm)
+        """La grilla del tempo del tema, el mismo del director (ADR 0025). No cambia al
+        reiniciar."""
         self.ready: deque[bytes] = deque()
         self.decisions: deque[Decision] = deque(maxlen=HISTORY)
         self.base_volume = base_volume
@@ -180,6 +195,8 @@ class Sequencer:
         sounds.impact()
         sounds.rim()
         sounds.riser(self.grid.bar_seconds)
+        # La subida de una frase: cuesta unos 250 ms, mejor ahora que antes del drop.
+        sounds.riser(PHRASE_BARS * self.grid.bar_seconds)
 
     def start_game(self, seed: int) -> None:
         """Una partida nueva: su tonalidad entra en el compás siguiente, con su acorde
@@ -190,9 +207,15 @@ class Sequencer:
     def step(self, world: World) -> None:
         """Avanza un paso de la escena, con `world` como quedó después de su `update`."""
         if world is not self._world:
+            if world.director.spec.bpm != self.grid.bpm:
+                # Con otro tempo, los drops del director no caerían en el golpe.
+                raise ValueError(
+                    f"director.bpm del mundo ({world.director.spec.bpm}) no calza con"
+                    f" el de la música ({self.grid.bpm})"
+                )
             if self._world is not None:
                 # Si viene una tonalidad nueva, el impacto espera para caer con ella.
-                cues = self._arrangement.reset()
+                cues = self._reset_arrangement()
                 if self._next_variation is not None:
                     self._bar_cues += cues
                 else:
@@ -204,7 +227,7 @@ class Sequencer:
             self._pending = []
             self._armed.clear()
         if world.game_over and not self._was_over:
-            self._cues += self._arrangement.reset()
+            self._cues += self._reset_arrangement()
             self._was_over = True
 
         now = self._steps * SAMPLES_PER_STEP
@@ -237,15 +260,20 @@ class Sequencer:
             self._bar_cues = []
         start = self.grid.start(g)
         swung = start + self.grid.swing(g)
+        # Las frases y las secciones se cuentan desde el compás en que entró la partida
+        # (ADR 0026): con R1, es el mismo en que la partida dio su primer paso.
+        game_g = g - self._first_bar * SIXTEENTHS
         cues = self._cues + self._arrangement.advance(
-            self._snapshot.raw, g, self.grid.samples / RATE
+            self._snapshot.raw, game_g, self.grid.samples / RATE, self._layers_at
         )
         self._cues = []
         level = self._arrangement.level
         chord = chord_at(bar - self._first_bar, self._variation)
         root, voicing = chord
+        silent = self._arrangement.silent(game_g)
 
-        self._add_base(g, start, swung, level, cues, voicing)
+        if not silent:
+            self._add_base(game_g, start, swung, level, cues, voicing)
         weapon_hits = self._add_weapons(s, swung, voicing)
         notes = tuple(enemy_notes(self._snapshot.views, s, voicing))
         for note in notes:
@@ -253,8 +281,12 @@ class Sequencer:
             self._add(swung, sample, note.gain, game=True, send=0.35)
         rims, death = self._add_accents(g, start, swung, voicing)
 
-        bass_on = level >= 2 and (s % 4 == 2 or (level >= 3 and s == SIXTEENTHS - 1))
-        self._open_block(start, level, voicing, root, bass_on)
+        bass_on = (
+            not silent
+            and level >= 2
+            and (s % 4 == 2 or (level >= 3 and s == SIXTEENTHS - 1))
+        )
+        self._open_block(start, level, voicing, root, bass_on, muted=silent)
         self.decisions.append(
             Decision(
                 g,
@@ -266,8 +298,31 @@ class Sequencer:
                 weapon_hits,
                 rims,
                 death,
+                silent,
             )
         )
+
+    def _reset_arrangement(self) -> list[Cue]:
+        """Vuelve a la calma con un impacto, y corta el riser de una subida en curso: no
+        puede seguir subiendo hacia un drop que ya no llega."""
+        build = sounds.riser(PHRASE_BARS * self.grid.bar_seconds)
+        self._voices = [v for v in self._voices if v.samples is not build]
+        return self._arrangement.reset()
+
+    def _layers_at(self, bar: int) -> Layers:
+        """Las capas que permite la sección del compás `bar` de la partida. Con la
+        partida perdida, o sin partida, manda la intensidad."""
+        world = self._world
+        if world is None or world.game_over:
+            return FREE
+        return world.director.section_at(bar).layers
+
+    @property
+    def waiting_for_bar(self) -> bool:
+        """Si hay una partida nueva esperando su compás (R1, ADR 0026). Mientras tanto,
+        la escena no avanza el mundo: así la partida, la tonalidad y el impacto parten
+        en el mismo golpe."""
+        return self._next_variation is not None
 
     def _add(
         self,
@@ -296,6 +351,11 @@ class Sequencer:
         drums = {"game": False, "ducked": False}
         if "riser" in cues:
             self._add(start, sounds.riser(self.grid.bar_seconds), 0.5, **drums)
+        if "build" in cues:
+            seconds = PHRASE_BARS * self.grid.bar_seconds
+            self._add(start, sounds.riser(seconds), 0.55, **drums)
+        if self._arrangement.building(g):
+            self._add_roll(g, start)
         if "impact" in cues:
             self._add(start, sounds.impact(), 0.5, **drums)
         # Antes de subir, el bombo calla en el último pulso del compás.
@@ -312,6 +372,15 @@ class Sequencer:
             self._add(swung, sounds.open_hat(), 0.12, **drums)
         if level >= 3 and s in (3, 10):
             self._add(swung, sounds.stab(voicing), 0.35, game=False, send=0.3)
+
+    def _add_roll(self, g: int, start: int) -> None:
+        """El redoble de la subida: un clap por pulso en su primer compás, por corchea
+        en el segundo y por semicorchea en los dos últimos, cada vez más fuerte."""
+        k = g % PHRASE
+        every = ROLL_EVERY[k // SIXTEENTHS]
+        if k % every == 0:
+            gain = 0.15 + 0.30 * k / PHRASE
+            self._add(start, sounds.clap(), gain, game=False, ducked=False)
 
     def _add_weapons(self, s: int, swung: int, voicing: tuple[int, ...]) -> int:
         """Cada arma suena en su loop, solo si disparó desde su golpe anterior."""
@@ -350,12 +419,15 @@ class Sequencer:
         voicing: tuple[int, ...],
         root: int,
         bass_on: bool,
+        *,
+        muted: bool,
     ) -> None:
         self._block = _Block(
             start=start,
             size=self.grid.start(self._g + 1) - start,
             level=level,
-            cutoff=250 * 2 ** (self._arrangement.smooth * 4.2),
+            muted=muted,
+            cutoff=250 * 2 ** (self._arrangement.brightness * 4.2),
             pad_steps=[
                 hz(n, A3) / RATE * d for n, d in zip(voicing, DETUNE, strict=True)
             ],
@@ -409,8 +481,10 @@ class Sequencer:
         el delay ping-pong. Escribe el resultado saturado en `block.out`."""
         tanh, sin, tau, pi = math.tanh, math.sin, math.tau, math.pi
         level, cutoff = block.level, block.cutoff
-        pad_gain = (0.10 if level == 0 else 0.07) * self.base_volume
-        bass_gain = 0.42 * self.base_volume
+        # En el silencio de la subida, el pad y el bajo siguen oscilando, pero callan.
+        on = 0.0 if block.muted else self.base_volume
+        pad_gain = (0.10 if level == 0 else 0.07) * on
+        bass_gain = 0.42 * on
         ducking = level >= 1 and self.base_volume > 0
         duck_samples = DUCK_SECONDS * RATE
         phases, pad_steps = self._pad_phases, block.pad_steps

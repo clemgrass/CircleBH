@@ -28,8 +28,15 @@ WARMUP_STEPS = 60
 MEASURED_STEPS = 600
 BUDGET_MS = 1000 / 60
 
-QUIET = replace(BALANCE, spawning=replace(BALANCE.spawning, interval=1e9))
-"""El balance real, sin apariciones durante la medición."""
+QUIET = replace(
+    BALANCE,
+    director=replace(
+        BALANCE.director,
+        sections=(replace(BALANCE.director.sections[0], deck=()),),
+    ),
+)
+"""El balance real, sin apariciones durante la medición: un director sin mazo no
+compra."""
 
 
 def swarm_world() -> World:

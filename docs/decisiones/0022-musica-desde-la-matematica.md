@@ -5,7 +5,13 @@ fecha: 2026-11-20
 
 # La música sale de la geometría del juego, sobre una base de techno
 
-> El tempo por sesión, de 120 a 126 BPM, quedó reemplazado por el [ADR 0025](0025-director-con-forma-de-tema.md): ahora es `director.bpm`, fijo en el balance. Lo demás sigue vigente.
+> El tempo por sesión, de 120 a 126 BPM, quedó reemplazado por el [ADR 0025](0025-director-con-forma-de-tema.md): ahora es `director.bpm`, fijo en el balance.
+>
+> El [ADR 0026](0026-la-musica-sigue-las-secciones.md) reemplaza dos puntos más:
+> - la capa ya no sale solo de la intensidad, porque cada sección del tema la acota;
+> - con la música prendida, una partida nueva espera el compás siguiente.
+>
+> Lo demás sigue vigente.
 
 ## Contexto y problema
 
