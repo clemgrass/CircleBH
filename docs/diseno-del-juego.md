@@ -83,7 +83,8 @@ Al terminar el MVP se hace una revisión de cómo expandir el juego. El autor qu
 - combinar curvas, por ejemplo seno con círculo para formar una figura de Lissajous;
 - esconder cosas en coordenadas del plano, como un final secreto;
 - sumar color;
-- un editor visual de enemigos, armas y otras piezas, parecido a un editor de niveles: arma una pieza desde sus parámetros y muestra cómo se ven las combinaciones de ataques. Más adelante podría servir para diseñar un jugador que no sea un círculo.
+- un editor visual de enemigos, armas y otras piezas, parecido a un editor de niveles: arma una pieza desde sus parámetros y muestra cómo se ven las combinaciones de ataques. Más adelante podría servir para diseñar un jugador que no sea un círculo;
+- **romper la ley de Coulomb** *(idea del autor, 2026-11-21)*: al destruir al primer jefe se destruye la ley de cargas, y empieza otra ronda igual pero sin ella. Los enemigos dejan de moverse como cargas: se saben unos a otros y se coordinan para atrapar al jugador en equipo, casi como si se entendieran y hicieran trampa. Para compensar, el jugador llega con buenas mejoras y la mejora del jefe. Queda abierto cómo se mueven sin Coulomb y con qué idea matemática se coordinan. Toca al ADR 0021 (una sola ley de cargas), así que necesita un ADR propio.
 
 Para no cerrarle la puerta al editor, el MVP define los enemigos y las armas por sus parámetros (lados, velocidad, la curva y sus valores), no con código escrito a mano para cada uno. *(Lo propuso Claude: es lo mismo que pide el equilibrio, que los números vivan en un lugar fácil de cambiar.)* El editor no se construye en el MVP.
 
