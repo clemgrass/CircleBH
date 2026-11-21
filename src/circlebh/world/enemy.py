@@ -1,5 +1,6 @@
 """Los enemigos: polígonos regulares hechos de líneas, que se mueven por sus patrones, con
-inercia y roce (ADR 0021), y algunos giran (ADR 0027).
+inercia y roce (ADR 0021), y algunos giran (ADR 0027). Algunos tienen acciones, como la
+embestida, que pueden apagar sus patrones (`world/actions.py`).
 
 Cada línea es una parte del enemigo: la bala quita la que golpea, y sin líneas el enemigo
 muere. Chocan por sus líneas, y el círculo envolvente es el primer descarte (ADR 0020).
@@ -8,6 +9,7 @@ muere. Chocan por sus líneas, y el círculo envolvente es el primer descarte (A
 from pygame.math import Vector2
 
 from circlebh.balance import EnemySpec
+from circlebh.world.actions import make_action
 from circlebh.world.clock import STEP
 from circlebh.world.collisions import circles_touch, segment_touches_circle
 from circlebh.world.patterns import Context, make_pattern
@@ -45,6 +47,8 @@ class Enemy:
         self._radius = spec.radius
         self.patterns = [make_pattern(pattern) for pattern in spec.patterns]
         """Su conducta: instancias propias de los patrones de su tipo (ADR 0021)."""
+        self.actions = [make_action(action) for action in spec.actions]
+        """Sus acciones, con su propio estado: lo que hace y no es una fuerza."""
 
     @property
     def mass(self) -> float:
@@ -161,8 +165,12 @@ class Enemy:
         )
 
     def acceleration(self, context: Context) -> Vector2:
-        """La suma de lo que aporta cada patrón, menos el roce: `a = Σ patrón − γ·v`."""
+        """La suma de lo que aporta cada patrón, menos el roce: `a = Σ patrón − γ·v`.
+
+        Si una acción apaga los patrones, queda solo el roce."""
         total = -self.velocity * self.spec.friction
+        if any(action.controls_motion for action in self.actions):
+            return total
         for pattern in self.patterns:
             total += pattern.acceleration(self, context)
         return total
@@ -174,11 +182,19 @@ class Enemy:
         `v ← v + a·dt`, acotada a `speed`, y `p ← p + v·dt`. Es estable con roce, y el tope
         hace que nadie avance más de `speed·dt` por paso, aunque una fuerza sea enorme.
         El giro avanza igual: `θ ← θ + ω·dt`.
+
+        Si una acción fija la velocidad, como la embestida, `v` es esa, sin tope.
         """
         self.previous = Vector2(self.position)
         self.previous_angle = self.angle
         self.angle += self.omega * STEP
-        self.velocity = (self.velocity + acceleration * STEP).clamp_magnitude(
-            self.spec.speed
+        imposed = next(
+            (a.velocity for a in self.actions if a.velocity is not None), None
         )
+        if imposed is not None:
+            self.velocity = Vector2(imposed)
+        else:
+            self.velocity = (self.velocity + acceleration * STEP).clamp_magnitude(
+                self.spec.speed
+            )
         self.position = self.position + self.velocity * STEP

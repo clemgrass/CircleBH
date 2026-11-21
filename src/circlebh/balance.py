@@ -86,8 +86,60 @@ class CoulombSpec:
     kind: Literal["coulomb"] = "coulomb"
 
 
-type PatternSpec = SeekSpec | CoulombSpec
+@dataclass(frozen=True, kw_only=True)
+class OrbitSpec:
+    """Patrón: un resorte que lo lleva a distancia `radius` del jugador, y un empuje que
+    lo hace girar a su alrededor. En polares desde el jugador:
+
+    `a = −stiffness·(r − R)·r̂ + tangential·θ̂`.
+    """
+
+    kind: Literal["orbit"] = "orbit"
+
+    radius: float
+    """`R`: la distancia al jugador a la que tira el resorte, en unidades del plano."""
+
+    stiffness: float
+    """La rigidez del resorte, en 1/s². Con roce `γ`, oscila amortiguado si
+    `γ² < 4·stiffness`."""
+
+    tangential: float
+    """El empuje tangencial, en unidades / s², antihorario si es positivo. Con 0, solo
+    mantiene la distancia."""
+
+
+type PatternSpec = SeekSpec | CoulombSpec | OrbitSpec
 """Un patrón de movimiento. En el JSON, su campo `kind` dice cuál es."""
+
+
+@dataclass(frozen=True, kw_only=True)
+class ChargeSpec:
+    """Acción: la embestida. Observa, y si ve al jugador con la recta libre, avisa,
+    embiste en línea recta sin corregir el rumbo y se recupera (`world/actions.py`)."""
+
+    kind: Literal["charge"] = "charge"
+
+    watch_distance: float
+    """Solo avisa si el jugador está a esta distancia o menos. Tiene que caber en la
+    vista, para que nadie embista desde fuera de la pantalla."""
+
+    telegraph: float
+    """Cuánto dura el aviso, en segundos. La dirección queda fija al empezarlo."""
+
+    speed: float
+    """La rapidez de la embestida, en unidades del plano por segundo. Pasa el tope
+    `EnemySpec.speed`."""
+
+    duration: float
+    """Cuánto dura la embestida, en segundos."""
+
+    cooldown: float
+    """Cuánto se recupera después, en segundos, antes de volver a observar."""
+
+
+type ActionSpec = ChargeSpec
+"""Una acción: lo que el enemigo hace y no es una fuerza (ADR 0021). En el JSON, su
+campo `kind` dice cuál es."""
 
 
 @dataclass(frozen=True)
@@ -122,6 +174,10 @@ class EnemySpec:
 
     threat: float
     """Su amenaza: lo que le cuesta al director comprarlo (ADR 0025)."""
+
+    actions: tuple[ActionSpec, ...]
+    """Sus acciones, como la embestida. Mientras una está activa, puede apagar sus
+    patrones."""
 
 
 @dataclass(frozen=True)
@@ -270,6 +326,7 @@ BALANCE = Balance(
                 CoulombSpec(kind="coulomb"),
             ),
             threat=1.0,
+            actions=(),
         ),
         "square": EnemySpec(
             sides=4,
@@ -283,6 +340,30 @@ BALANCE = Balance(
                 CoulombSpec(kind="coulomb"),
             ),
             threat=1.0,
+            actions=(),
+        ),
+        "triangle": EnemySpec(
+            sides=3,
+            radius=14.0,
+            speed=150.0,
+            friction=3.0,
+            spin=0.0,
+            charge_per_line=1.0,
+            patterns=(
+                OrbitSpec(kind="orbit", radius=280.0, stiffness=4.0, tangential=0.0),
+                CoulombSpec(kind="coulomb"),
+            ),
+            threat=1.5,
+            actions=(
+                ChargeSpec(
+                    kind="charge",
+                    watch_distance=320.0,
+                    telegraph=0.5,
+                    speed=720.0,
+                    duration=0.8,
+                    cooldown=2.0,
+                ),
+            ),
         ),
     },
     spawning=SpawningSpec(
@@ -317,6 +398,7 @@ BALANCE = Balance(
                 deck=(
                     DeckEntry(enemy="hexagon", weight=1.0),
                     DeckEntry(enemy="square", weight=1.0),
+                    DeckEntry(enemy="triangle", weight=1.0),
                 ),
                 formations=("single", "line"),
             ),
@@ -331,6 +413,7 @@ BALANCE = Balance(
                 deck=(
                     DeckEntry(enemy="hexagon", weight=1.0),
                     DeckEntry(enemy="square", weight=1.0),
+                    DeckEntry(enemy="triangle", weight=1.0),
                 ),
                 formations=("ring", "line", "cluster"),
             ),
@@ -345,6 +428,7 @@ BALANCE = Balance(
                 deck=(
                     DeckEntry(enemy="hexagon", weight=1.0),
                     DeckEntry(enemy="square", weight=1.0),
+                    DeckEntry(enemy="triangle", weight=1.0),
                 ),
                 formations=("single",),
             ),
@@ -359,6 +443,7 @@ BALANCE = Balance(
                 deck=(
                     DeckEntry(enemy="hexagon", weight=1.0),
                     DeckEntry(enemy="square", weight=1.0),
+                    DeckEntry(enemy="triangle", weight=1.0),
                 ),
                 formations=("single", "line", "cluster"),
             ),
@@ -373,6 +458,7 @@ BALANCE = Balance(
                 deck=(
                     DeckEntry(enemy="hexagon", weight=1.0),
                     DeckEntry(enemy="square", weight=1.0),
+                    DeckEntry(enemy="triangle", weight=1.0),
                 ),
                 formations=("ring", "line", "cluster"),
             ),
