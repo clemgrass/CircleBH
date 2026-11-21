@@ -39,6 +39,32 @@ def earned(section: SectionSpec, bars: float) -> float:
     return section.burst + area + end * max(0.0, bars - length)
 
 
+def _validate(spec: DirectorSpec, enemies: Mapping[str, EnemySpec]) -> None:
+    """Rechaza un tema que colgaría o rompería la partida a mitad de camino.
+
+    Con amenaza 0 el director compraría sin fin en un solo paso; sin compases, `earned`
+    dividiría por 0; y un tipo desconocido o un peso no positivo fallarían recién al
+    llegar a esa sección. Mejor fallar al empezar, nombrando el campo.
+    """
+    if not spec.sections:
+        raise ValueError("director.sections: el tema necesita al menos una sección")
+    for section in spec.sections:
+        where = f"director.sections[{section.name}]"
+        if section.bars <= 0:
+            raise ValueError(f"{where}.bars: tiene que ser mayor que 0")
+        for entry in section.deck:
+            if entry.enemy not in enemies:
+                raise ValueError(f"{where}.deck: no existe el enemigo {entry.enemy}")
+            if entry.weight <= 0:
+                raise ValueError(
+                    f"{where}.deck[{entry.enemy}].weight: tiene que ser mayor que 0"
+                )
+            if enemies[entry.enemy].threat <= 0:
+                raise ValueError(
+                    f"enemies.{entry.enemy}.threat: tiene que ser mayor que 0"
+                )
+
+
 class Director:
     """Recorre el tema y decide qué se compra en cada paso."""
 
@@ -48,6 +74,7 @@ class Director:
         enemies: Mapping[str, EnemySpec],
         rng: random.Random,
     ) -> None:
+        _validate(spec, enemies)
         self.spec = spec
         self.enemies = enemies
         self.rng = rng

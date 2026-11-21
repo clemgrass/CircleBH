@@ -206,6 +206,34 @@ def test_secciones_empiezan_en_una_frase() -> None:
     assert all(b % PHRASE_BARS == 0 for b in inicios(BALANCE.director))
 
 
+@pytest.mark.parametrize(
+    ("spec", "enemigos", "campo"),
+    [
+        # Con amenaza 0, el director compraría sin fin en un solo paso.
+        (CALMA_Y_RAFAGA, {"hexagon": replace(HEXAGONO, threat=0.0)}, "threat"),
+        (tema(seccion("x", 0.0, 1.0, 1.0, ())), ENEMIGOS, "bars"),
+        (
+            tema(seccion("x", 4.0, 1.0, 1.0, (DeckEntry("nadie", 1.0),))),
+            ENEMIGOS,
+            "nadie",
+        ),
+        (
+            tema(seccion("x", 4.0, 1.0, 1.0, (DeckEntry("hexagon", 0.0),))),
+            ENEMIGOS,
+            "weight",
+        ),
+        (tema(), ENEMIGOS, "sections"),
+    ],
+)
+def test_tema_invalido_se_rechaza_al_crear_el_director(
+    spec: DirectorSpec, enemigos: dict, campo: str
+) -> None:
+    # Negativo: un tema que colgaría o rompería la partida a mitad de camino se
+    # rechaza al empezar, nombrando el campo.
+    with pytest.raises(ValueError, match=campo):
+        Director(spec, enemigos, random.Random(1))
+
+
 def test_sin_mazo_no_compra() -> None:
     spec = tema(seccion("vacia", 8.0, 50.0, 50.0, ()))
     director = Director(spec, ENEMIGOS, random.Random(1))

@@ -315,6 +315,22 @@ def test_sin_reinicio_no_espera() -> None:
     assert not sequencer.waiting_for_bar
 
 
+def test_morir_en_la_subida_corta_su_riser() -> None:
+    # El riser de la subida dura 4 compases (~7,7 s). Si el jugador muere a mitad, no
+    # puede seguir subiendo hacia un drop que no llega, encima de la pantalla de muerte
+    # y del inicio de la partida siguiente. Se mira la mezcla por dentro: sin escuchar,
+    # es la única forma de saber qué sigue sonando.
+    sequencer = Sequencer(1)
+    world = World(TEMA_CORTO, random.Random(1))
+    tocar(sequencer, world, 150)
+    riser = sounds.riser(PHRASE_BARS * sequencer.grid.bar_seconds)
+    assert any(voz.samples is riser for voz in sequencer._voices)
+    world.enemies = [Enemy(QUIETO, Vector2(25, 0))]
+    tocar(sequencer, world, 2)
+    assert world.game_over
+    assert not any(voz.samples is riser for voz in sequencer._voices)
+
+
 def test_musica_apagada_misma_partida() -> None:
     # Negativo (ADR 0022 y 0025): la música lee al mundo, pero no lo cambia. Con una
     # intro que compra rápido, en 200 pasos ya aparecieron varios enemigos.

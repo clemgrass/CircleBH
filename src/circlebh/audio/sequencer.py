@@ -209,7 +209,7 @@ class Sequencer:
         if world is not self._world:
             if self._world is not None:
                 # Si viene una tonalidad nueva, el impacto espera para caer con ella.
-                cues = self._arrangement.reset()
+                cues = self._reset_arrangement()
                 if self._next_variation is not None:
                     self._bar_cues += cues
                 else:
@@ -221,7 +221,7 @@ class Sequencer:
             self._pending = []
             self._armed.clear()
         if world.game_over and not self._was_over:
-            self._cues += self._arrangement.reset()
+            self._cues += self._reset_arrangement()
             self._was_over = True
 
         now = self._steps * SAMPLES_PER_STEP
@@ -295,6 +295,13 @@ class Sequencer:
                 silent,
             )
         )
+
+    def _reset_arrangement(self) -> list[Cue]:
+        """Vuelve a la calma con un impacto, y corta el riser de una subida en curso: no
+        puede seguir subiendo hacia un drop que ya no llega."""
+        build = sounds.riser(PHRASE_BARS * self.grid.bar_seconds)
+        self._voices = [v for v in self._voices if v.samples is not build]
+        return self._arrangement.reset()
 
     def _layers_at(self, bar: int) -> Layers:
         """Las capas que permite la sección del compás `bar` de la partida. Con la
