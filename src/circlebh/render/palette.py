@@ -1,7 +1,8 @@
-"""Los colores del juego: un fondo y un trazo, y nada más hasta que llegue el acento.
+"""Los colores del juego: un fondo, un trazo y un acento para el peligro.
 
-Todo lo que se dibuja usa el trazo. Lo que tapa o desvanece la escena usa el fondo.
-Así, invertir los colores es invertir la paleta y nada más (ADR 0023).
+Todo lo que se dibuja usa el trazo, salvo lo que mata sin ser un enemigo, como las balas
+enemigas, que usa el acento. Lo que tapa o desvanece la escena usa el fondo. Así,
+invertir los colores es invertir el fondo y el trazo (ADR 0023).
 """
 
 from dataclasses import dataclass
@@ -15,13 +16,20 @@ class Palette:
     foreground: pygame.Color
     letterbox: pygame.Color
     """Las franjas fuera del área útil: apenas distintas del fondo."""
+    accent: pygame.Color
+    """El peligro. Es el mismo en las dos paletas: tiene que leerse sobre el negro y
+    sobre el blanco."""
 
     def inverted(self) -> Palette:
-        """El negativo de cada color: el fondo negro pasa a blanco, y el trazo, a negro."""
+        """El negativo de cada color: el fondo negro pasa a blanco, y el trazo, a negro.
+
+        El acento no se invierte: su negativo cambia de tono (el rojo pasa a cian), y el
+        peligro dejaría de verse igual (ADR 0023)."""
         return Palette(
             negative(self.background),
             negative(self.foreground),
             negative(self.letterbox),
+            self.accent,
         )
 
 
@@ -34,5 +42,6 @@ DARK = Palette(
     background=pygame.Color("black"),
     foreground=pygame.Color("white"),
     letterbox=pygame.Color("#202020"),
+    accent=pygame.Color("#ff3b30"),
 )
 """La paleta de fábrica: fondo negro y trazo blanco."""

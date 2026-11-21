@@ -62,7 +62,15 @@ def contexto(
         player_position=player or Vector2(),
         enemies=enemies,
         rng=rng or random.Random(1),
+        bullets=[],
+        bullet_spec=BALANCE.enemy_bullet,
     )
+
+
+def embestidas(nombre: str) -> list[ChargeSpec]:
+    """Las embestidas de un tipo de enemigo. Las otras acciones tienen sus propios tests
+    de coherencia."""
+    return [a for a in BALANCE.enemies[nombre].actions if isinstance(a, ChargeSpec)]
 
 
 def triangulo(position: Vector2, **cambios: float) -> Enemy:
@@ -200,7 +208,7 @@ def test_watch_distance_cabe_en_la_vista(nombre: str) -> None:
     # Lo más cercano que deja de verse es el borde de arriba o de abajo, a `fov / 2`.
     camera = load_settings().camera
     spec = BALANCE.enemies[nombre]
-    for action in spec.actions:
+    for action in embestidas(nombre):
         reach = action.watch_distance + spec.radius
         assert reach <= camera.fov / 2 - Vector2(camera.offset).length()
 
@@ -328,7 +336,7 @@ def test_la_embestida_no_atraviesa_al_jugador(nombre: str) -> None:
     # Coherencia: como en `test_jugador_no_atraviesa_una_linea_en_un_paso`, pero con la
     # rapidez de la embestida, que pasa el tope del enemigo.
     player = BALANCE.player
-    for action in BALANCE.enemies[nombre].actions:
+    for action in embestidas(nombre):
         assert (player.speed + action.speed) * STEP < 2 * player.radius
 
 
@@ -336,13 +344,13 @@ def test_la_embestida_no_atraviesa_al_jugador(nombre: str) -> None:
 def test_la_mirada_cabe_en_la_cota_del_golpe(nombre: str) -> None:
     # Coherencia (ADR 0027): como `spin`, el giro de la mirada cumple `|ω·dt| ≤ 0,1`,
     # para que `hit_by` siga coincidiendo con los subpasos.
-    for action in BALANCE.enemies[nombre].actions:
+    for action in embestidas(nombre):
         assert action.turn_rate * STEP <= 0.1
 
 
 @pytest.mark.parametrize("nombre", sorted(BALANCE.enemies))
 def test_cada_etapa_dura_al_menos_un_paso(nombre: str) -> None:
-    for action in BALANCE.enemies[nombre].actions:
+    for action in embestidas(nombre):
         for seconds in (action.telegraph, action.duration, action.cooldown):
             assert pasos(seconds) >= 1
 
@@ -354,7 +362,7 @@ def mirar(triangle: Enemy, seconds: float) -> list[float]:
     """Los ángulos de `triangle` paso a paso, sin moverlo, con el jugador en el origen."""
     angles = []
     for _ in range(pasos(seconds)):
-        step_actions([triangle], Vector2(), random.Random(1))
+        step_actions([triangle], Vector2(), random.Random(1), [], BALANCE.enemy_bullet)
         triangle.velocity = Vector2()
         triangle.step(Vector2())
         angles.append(triangle.angle)

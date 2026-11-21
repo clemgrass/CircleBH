@@ -93,5 +93,16 @@ SCENARIOS: dict[str, Scenario] = {
             lethal=False,
             armed=False,
         ),
+        Scenario(
+            "pentagono-dispara",
+            "3 pentágonos junto al piloto, que no muere ni dispara. Se alejan a su"
+            " distancia, avisan dejando de girar y disparan una ráfaga: cada punta deja"
+            " un brazo de espiral, con el color de acento.",
+            pilot=True,
+            crowd=3,
+            crowd_enemy="pentagon",
+            lethal=False,
+            armed=False,
+        ),
     ]
 }

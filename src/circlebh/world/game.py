@@ -9,6 +9,7 @@ from circlebh.world.actions import step_actions
 from circlebh.world.clock import STEP
 from circlebh.world.director import Director, Purchase
 from circlebh.world.enemy import Enemy
+from circlebh.world.enemy_bullets import EnemyBullet, bullet_hits_player, step_bullets
 from circlebh.world.events import Death, Event
 from circlebh.world.player import Player
 from circlebh.world.spawning import SpawnQueue, check_formations, place_formation
@@ -48,8 +49,11 @@ class World:
             [PointWeapon(balance.point_weapon)] if armed else []
         )
         """Las armas del jugador. Por ahora, solo el arma punto."""
+        self.enemy_bullets: list[EnemyBullet] = []
+        """Las balas de los enemigos. Atraviesan a los demás enemigos y matan al jugador."""
         self.game_over = False
-        """Pasa a `True` cuando un enemigo toca al jugador, y no vuelve atrás."""
+        """Pasa a `True` cuando un enemigo o una bala enemiga toca al jugador, y no vuelve
+        atrás."""
         self.separations = 0
         """Cuántos pares corrigió la red de seguridad en toda la partida. Con la ley de
         cargas bien afinada, debería quedar en 0 (ADR 0021)."""
@@ -70,12 +74,15 @@ class World:
     def update(self, intent: Vector2) -> None:
         """Avanza un paso, con la intención de movimiento del jugador (largo 0 a 1).
 
-        El jugador se mueve primero. Después, las acciones de los enemigos miran dónde
-        quedó, y el enjambre da su paso (`step_swarm`). Después las armas golpean y disparan. Los enemigos sin líneas
+        El jugador se mueve primero, y las balas enemigas avanzan: si alguna lo cruzó en
+        este paso, lo mató. Después, las acciones de los enemigos miran dónde quedó, y las
+        balas que disparan empiezan a moverse en el paso siguiente. El enjambre da su paso
+        (`step_swarm`), y las armas golpean y disparan. Los enemigos sin líneas
         desaparecen. Lo que compró el director entra a la cola, y de ella aparecen hasta
         `spawning.max_per_step`, que empiezan a moverse en el paso siguiente. Recién
         entonces se revisa el contacto: matar a uno en el mismo paso en que te tocaría te
-        salva. Si alguno lo toca, la partida termina; desde ahí, `update` no hace nada.
+        salva. Si una bala o un enemigo lo toca, la partida termina; desde ahí, `update`
+        no hace nada.
 
         `events` queda con lo que pasó en este paso: los avisos de ataque, los disparos
         y golpes de las armas, y una muerte por cada enemigo que perdió su última línea.
@@ -85,7 +92,17 @@ class World:
             return
         self._steps += 1
         self.player.step(intent)
-        self.events += step_actions(self.enemies, self.player.position, self.rng)
+        bullet = self.balance.enemy_bullet
+        self.enemy_bullets = step_bullets(
+            self.enemy_bullets, self.player.position, self.balance.spawning.distance
+        )
+        shot = any(
+            bullet_hits_player(b, self.player, bullet.radius)
+            for b in self.enemy_bullets
+        )
+        self.events += step_actions(
+            self.enemies, self.player.position, self.rng, self.enemy_bullets, bullet
+        )
         self.separations += step_swarm(
             self.enemies,
             self.player.position,
@@ -101,9 +118,12 @@ class World:
         for name, offset in self.queue.pop(self.balance.spawning.max_per_step):
             position = self.player.position + offset
             self.enemies.append(Enemy(self.balance.enemies[name], position))
-        self.game_over = self.lethal and any(
-            enemy.touches(self.player.position, self.player.radius)
-            for enemy in self.enemies
+        self.game_over = self.lethal and (
+            shot
+            or any(
+                enemy.touches(self.player.position, self.player.radius)
+                for enemy in self.enemies
+            )
         )
 
     def _enqueue(self, purchase: Purchase) -> None:

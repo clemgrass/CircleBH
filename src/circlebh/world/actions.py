@@ -19,10 +19,12 @@ from typing import TYPE_CHECKING
 
 from pygame.math import Vector2
 
-from circlebh.balance import ActionSpec, ChargeSpec
+from circlebh.balance import ActionSpec, ChargeSpec, EnemyBulletSpec, VolleySpec
 from circlebh.world.clock import STEP
 from circlebh.world.collisions import segment_touches_circle
+from circlebh.world.enemy_bullets import EnemyBullet
 from circlebh.world.events import Event, Telegraph
+from circlebh.world.polygon import vertex
 from circlebh.world.rigid import rotate
 
 if TYPE_CHECKING:
@@ -38,6 +40,10 @@ class ActionContext:
     """Todos los enemigos vivos, también el que actúa."""
     rng: random.Random
     """La `Random` del mundo, el único azar de la partida (ADR 0005)."""
+    bullets: list[EnemyBullet]
+    """Las balas enemigas del mundo. Una acción que dispara agrega las suyas aquí."""
+    bullet_spec: EnemyBulletSpec
+    """Cómo son esas balas."""
 
 
 class Action(ABC):
@@ -259,22 +265,120 @@ class Charge(Action):
         return clear_line(enemy.position, context.player_position, enemy.radius, others)
 
 
+class VolleyState(Enum):
+    WATCHING = auto()
+    """Lo mueven sus patrones y gira con su `spin`. Espera al jugador a distancia."""
+    TELEGRAPHING = auto()
+    """Avisa: deja de girar, y sus puntas muestran hacia dónde van a salir las balas."""
+    FIRING = auto()
+    """Dispara una salva cada `interval`, girando con su `spin`."""
+    RECOVERING = auto()
+    """Lo mueven sus patrones y gira, pero todavía no puede avisar."""
+
+
+class Volley(Action):
+    """La ráfaga del pentágono: observa, avisa congelándose, dispara y se recupera.
+
+    Solo avisa con el jugador entre `min_distance` y `max_distance`. Cada salva vuelve a
+    mirar esa distancia: si el jugador quedó fuera, la ráfaga termina sin disparar. Cada
+    salva es una bala por vértice, y como entre una y otra gira `ω·interval`, cada punta
+    deja un brazo de la espiral de Arquímedes `r = (v/ω)·θ` (decisiones 31 a 33).
+    """
+
+    def __init__(self, spec: VolleySpec) -> None:
+        self.spec = spec
+        self.state = VolleyState.WATCHING
+        self._interval = steps_of(spec.interval)
+        self._durations = {
+            VolleyState.TELEGRAPHING: steps_of(spec.telegraph),
+            VolleyState.FIRING: spec.shots * self._interval,
+            VolleyState.RECOVERING: steps_of(spec.cooldown),
+        }
+        self._left = 0
+        """Los pasos que le quedan a la etapa, contando el actual."""
+
+    @property
+    def omega(self) -> float | None:
+        return 0.0 if self.state is VolleyState.TELEGRAPHING else None
+
+    def update(self, enemy: Enemy, context: ActionContext) -> list[Event]:
+        if self.state is not VolleyState.WATCHING:
+            self._left -= 1
+            if self._left > 0:
+                if self.state is VolleyState.FIRING and self._salvo_due():
+                    if self._in_range(enemy, context):
+                        self._fire(enemy, context)
+                    else:
+                        self._enter(VolleyState.RECOVERING)
+                return []
+            if self.state is VolleyState.TELEGRAPHING:
+                if self._in_range(enemy, context):
+                    self._enter(VolleyState.FIRING)
+                    self._fire(enemy, context)
+                    return []
+                # A quemarropa o fuera de la vista al soltarse: no dispara.
+                self._enter(VolleyState.WATCHING)
+            elif self.state is VolleyState.FIRING:
+                self._enter(VolleyState.RECOVERING)
+                return []
+            else:
+                self._enter(VolleyState.WATCHING)
+        # Al terminar la recuperación, ya mira en este mismo paso.
+        if self.state is VolleyState.WATCHING and self._in_range(enemy, context):
+            self._enter(VolleyState.TELEGRAPHING)
+            return [Telegraph(enemy)]
+        return []
+
+    def _salvo_due(self) -> bool:
+        """Si en este paso de la ráfaga toca una salva: una al entrar, y otra cada
+        `interval` pasos."""
+        elapsed = self._durations[VolleyState.FIRING] - self._left
+        return elapsed % self._interval == 0
+
+    def _fire(self, enemy: Enemy, context: ActionContext) -> None:
+        """Una salva: una bala por cada vértice que le queda, desde el vértice y hacia
+        afuera del centro del polígono."""
+        sides = enemy.spec.sides
+        # El vértice `k` es el comienzo de la arista `k` y el final de la `k − 1`.
+        tips = sorted({k for e in enemy.edges for k in (e, (e + 1) % sides)})
+        center = enemy.position + rotate(enemy.offset, enemy.angle)
+        speed = context.bullet_spec.speed
+        for k in tips:
+            tip = rotate(vertex(enemy.spec.radius, sides, k), enemy.angle)
+            context.bullets.append(EnemyBullet(center + tip, tip.normalize() * speed))
+
+    def _in_range(self, enemy: Enemy, context: ActionContext) -> bool:
+        distance = enemy.position.distance_to(context.player_position)
+        return self.spec.min_distance <= distance <= self.spec.max_distance
+
+    def _enter(self, state: VolleyState) -> None:
+        self.state = state
+        self._left = self._durations.get(state, 0)
+
+
 def make_action(spec: ActionSpec) -> Action:
     """La instancia de la acción que describe `spec`, nueva para cada enemigo."""
     match spec:
         case ChargeSpec():
             return Charge(spec)
+        case VolleySpec():
+            return Volley(spec)
 
 
 def step_actions(
-    enemies: Sequence[Enemy], player_position: Vector2, rng: random.Random
+    enemies: Sequence[Enemy],
+    player_position: Vector2,
+    rng: random.Random,
+    bullets: list[EnemyBullet],
+    bullet_spec: EnemyBulletSpec,
 ) -> list[Event]:
     """Avanza un paso las acciones de todos los enemigos vivos, y devuelve sus eventos.
+    Las balas que disparen quedan en `bullets`.
 
     Van en el orden de la lista, que es el de aparición: así, lo que sacan de `rng` es
     siempre lo mismo con la misma semilla."""
     alive = [enemy for enemy in enemies if enemy.alive]
-    context = ActionContext(Vector2(player_position), alive, rng)
+    context = ActionContext(Vector2(player_position), alive, rng, bullets, bullet_spec)
     events: list[Event] = []
     for enemy in alive:
         for action in enemy.actions:
