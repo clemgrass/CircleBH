@@ -19,6 +19,7 @@ from circlebh.balance_tools import (
     load_json,
 )
 from circlebh.datafile import DataFileError, dump
+from circlebh.world.clock import STEP
 
 BALANCE_PY = Path(circlebh.balance.__file__)
 
@@ -134,10 +135,21 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "radius": 24.0,
                 "speed": 120.0,
                 "friction": 2.0,
+                "spin": 0.0,
                 "charge_per_line": 1.0,
                 "patterns": [{"kind": "seek", "strength": 240.0}, {"kind": "coulomb"}],
                 "threat": 1.0,
-            }
+            },
+            "square": {
+                "sides": 4,
+                "radius": 20.0,
+                "speed": 120.0,
+                "friction": 2.0,
+                "spin": 1.5,
+                "charge_per_line": 1.0,
+                "patterns": [{"kind": "seek", "strength": 240.0}, {"kind": "coulomb"}],
+                "threat": 1.0,
+            },
         },
         "spawning": {
             "distance": 800.0,
@@ -217,6 +229,13 @@ def test_rapidez_terminal_de_seek_no_pasa_speed(nombre: str) -> None:
     for pattern in enemy.patterns:
         if isinstance(pattern, SeekSpec):
             assert pattern.strength / enemy.friction <= enemy.speed
+
+
+@pytest.mark.parametrize("nombre", sorted(BALANCE.enemies))
+def test_el_giro_cabe_en_la_cota_del_golpe(nombre: str) -> None:
+    # Coherencia (ADR 0027): `hit_by` coincide con los subpasos para `|ω·dt| ≤ 0,1`
+    # (`test_rigid.py`). Un giro más rápido queda fuera de lo verificado.
+    assert abs(BALANCE.enemies[nombre].spin * STEP) <= 0.1
 
 
 @pytest.mark.parametrize("nombre", sorted(BALANCE.enemies))

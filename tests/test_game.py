@@ -331,7 +331,7 @@ def test_formacion_que_no_cabe_se_rechaza_al_crear_el_mundo() -> None:
     # Negativo: con hexágonos enormes, la fila de 6 de la subida no cabe en un
     # cuadrante. Falla al empezar, no a mitad de la partida.
     hexagon = replace(BALANCE.enemies["hexagon"], radius=300.0)
-    balance = replace(BALANCE, enemies={"hexagon": hexagon})
+    balance = replace(BALANCE, enemies={**BALANCE.enemies, "hexagon": hexagon})
     with pytest.raises(ValueError, match="cuadrante"):
         World(balance, random.Random(1))
 

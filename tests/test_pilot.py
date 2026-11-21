@@ -69,6 +69,6 @@ def test_simulacion_corta_la_ultima_partida() -> None:
 
 
 def test_simulacion_sin_peligro_es_una_sola_partida() -> None:
-    quieto = replace(BALANCE.enemies["hexagon"], speed=0.0)
-    inofensivo = replace(BALANCE, enemies={"hexagon": quieto})
+    quietos = {name: replace(spec, speed=0.0) for name, spec in BALANCE.enemies.items()}
+    inofensivo = replace(BALANCE, enemies=quietos)
     assert simulate(inofensivo, seconds=5.0, seed=7) == [pytest.approx(5.0)]

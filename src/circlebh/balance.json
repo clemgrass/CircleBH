@@ -19,6 +19,25 @@
       "radius": 24.0,
       "speed": 120.0,
       "friction": 2.0,
+      "spin": 0.0,
+      "charge_per_line": 1.0,
+      "patterns": [
+        {
+          "kind": "seek",
+          "strength": 240.0
+        },
+        {
+          "kind": "coulomb"
+        }
+      ],
+      "threat": 1.0
+    },
+    "square": {
+      "sides": 4,
+      "radius": 20.0,
+      "speed": 120.0,
+      "friction": 2.0,
+      "spin": 1.5,
       "charge_per_line": 1.0,
       "patterns": [
         {
@@ -60,6 +79,10 @@
           {
             "enemy": "hexagon",
             "weight": 1.0
+          },
+          {
+            "enemy": "square",
+            "weight": 1.0
           }
         ],
         "formations": [
@@ -80,6 +103,10 @@
         "deck": [
           {
             "enemy": "hexagon",
+            "weight": 1.0
+          },
+          {
+            "enemy": "square",
             "weight": 1.0
           }
         ],
@@ -102,6 +129,10 @@
         "deck": [
           {
             "enemy": "hexagon",
+            "weight": 1.0
+          },
+          {
+            "enemy": "square",
             "weight": 1.0
           }
         ],
@@ -126,6 +157,10 @@
           {
             "enemy": "hexagon",
             "weight": 1.0
+          },
+          {
+            "enemy": "square",
+            "weight": 1.0
           }
         ],
         "formations": [
@@ -146,6 +181,10 @@
         "deck": [
           {
             "enemy": "hexagon",
+            "weight": 1.0
+          },
+          {
+            "enemy": "square",
             "weight": 1.0
           }
         ],
@@ -169,6 +208,10 @@
         "deck": [
           {
             "enemy": "hexagon",
+            "weight": 1.0
+          },
+          {
+            "enemy": "square",
             "weight": 1.0
           }
         ],

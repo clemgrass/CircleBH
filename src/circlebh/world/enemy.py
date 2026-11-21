@@ -1,5 +1,5 @@
 """Los enemigos: polígonos regulares hechos de líneas, que se mueven por sus patrones, con
-inercia y roce (ADR 0021).
+inercia y roce (ADR 0021), y algunos giran (ADR 0027).
 
 Cada línea es una parte del enemigo: la bala quita la que golpea, y sin líneas el enemigo
 muere. Chocan por sus líneas, y el círculo envolvente es el primer descarte (ADR 0020).
@@ -17,6 +17,7 @@ from circlebh.world.polygon import (
     first_hit,
     polygon_edge,
 )
+from circlebh.world.rigid import to_local, to_world
 
 
 class Enemy:
@@ -31,6 +32,12 @@ class Enemy:
         """Las aristas que le quedan, de menor a mayor (ver `polygon.py`)."""
         self.velocity = Vector2()
         """Unidades del plano por segundo. Parte quieto."""
+        self.angle = 0.0
+        """Su orientación `θ`, en radianes y antihoraria. Todos parten en 0."""
+        self.previous_angle = 0.0
+        """Su orientación antes del último `step`. La usa `hit_by`, como `previous`."""
+        self.omega = spec.spin
+        """Su velocidad angular `ω`, en rad/s. Parte en `spec.spin`."""
         self.patterns = [make_pattern(pattern) for pattern in spec.patterns]
         """Su conducta: instancias propias de los patrones de su tipo (ADR 0021)."""
 
@@ -61,9 +68,12 @@ class Enemy:
         self.edges.remove(k)
 
     def lines(self) -> list[tuple[Vector2, Vector2]]:
-        """Las líneas que le quedan, en coordenadas del plano."""
+        """Las líneas que le quedan, en coordenadas del plano, giradas en `angle`."""
         return [
-            (self.position + a, self.position + b)
+            (
+                to_world(a, self.position, self.angle),
+                to_world(b, self.position, self.angle),
+            )
             for a, b in (
                 polygon_edge(self.spec.radius, self.spec.sides, k) for k in self.edges
             )
@@ -87,12 +97,16 @@ class Enemy:
         """La primera línea que cruza el tramo de una bala en el último paso, como `(t, k)`.
 
         `start` y `end` son dónde estaba la bala antes y después del paso. El tramo se
-        mide desde el enemigo, que también se movió: de `start − previous` a
-        `end − position`. Como el enemigo solo se traslada, ese tramo relativo es exacto, y
-        un enemigo que avanza hacia la bala no la deja pasar entre dos pasos.
+        mide en el marco del enemigo, que también se movió: `start` con la pose de antes
+        y `end` con la de ahora, `R(−θ)·(p − c)`. Así un enemigo que avanza hacia la
+        bala no la deja pasar entre dos pasos.
+
+        Sin giro, ese tramo es exacto. Con giro, el camino de la bala en el marco del
+        enemigo es una curva, y el tramo recto entre sus extremos se aparta de ella a lo
+        más `(2·|ω·dt|·|Δr| + (ω·dt)²·|r|) / 8` (ADR 0027).
         """
-        relative_start = start - self.previous
-        relative_end = end - self.position
+        relative_start = to_local(start, self.previous, self.previous_angle)
+        relative_end = to_local(end, self.position, self.angle)
         if not segment_touches_circle(
             relative_start, relative_end, Vector2(), self.radius + ENVELOPE_SLACK
         ):
@@ -118,8 +132,11 @@ class Enemy:
 
         `v ← v + a·dt`, acotada a `speed`, y `p ← p + v·dt`. Es estable con roce, y el tope
         hace que nadie avance más de `speed·dt` por paso, aunque una fuerza sea enorme.
+        El giro avanza igual: `θ ← θ + ω·dt`.
         """
         self.previous = Vector2(self.position)
+        self.previous_angle = self.angle
+        self.angle += self.omega * STEP
         self.velocity = (self.velocity + acceleration * STEP).clamp_magnitude(
             self.spec.speed
         )
