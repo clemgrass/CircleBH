@@ -10,7 +10,7 @@ from dataclasses import replace
 from pygame.math import Vector2
 
 from circlebh.audio import sounds
-from circlebh.audio.harmony import bpm_for, chord_at, variation_for
+from circlebh.audio.harmony import chord_at, variation_for
 from circlebh.audio.rhythm import SIXTEENTHS
 from circlebh.audio.sequencer import SAMPLES_PER_STEP, Sequencer
 from circlebh.balance import BALANCE, EnemySpec
@@ -19,13 +19,23 @@ from circlebh.world.enemy import Enemy
 from circlebh.world.events import Death, Hit
 from circlebh.world.game import World
 
-# Sin apariciones: los tests ponen a los enemigos a mano.
+# Sin apariciones: los tests ponen a los enemigos a mano. Un director sin mazo no compra.
 SIN_APARICIONES = replace(
-    BALANCE, spawning=replace(BALANCE.spawning, interval=1e9, distance=5000.0)
+    BALANCE,
+    director=replace(
+        BALANCE.director,
+        sections=(replace(BALANCE.director.sections[0], deck=()),),
+    ),
 )
 # Sin patrones ni carga: el enemigo se queda donde lo ponen.
 QUIETO = EnemySpec(
-    sides=6, radius=24.0, speed=120.0, friction=0.0, charge_per_line=0.0, patterns=()
+    sides=6,
+    radius=24.0,
+    speed=120.0,
+    friction=0.0,
+    charge_per_line=0.0,
+    patterns=(),
+    threat=1.0,
 )
 
 
@@ -205,7 +215,7 @@ def test_start_game_cambia_la_tonalidad_en_el_compas_siguiente() -> None:
     world = mundo(armed=False)
     tocar(sequencer, world, 20)  # a mitad del primer compás
     sequencer.start_game(7)
-    # El segundo compás empieza antes del paso 120 con cualquier tempo de 120 a 126.
+    # A 124 BPM, el segundo compás empieza en el paso 117.
     tocar(sequencer, world, 140)
     assert any(d.g >= SIXTEENTHS for d in sequencer.decisions)
     nueva = variation_for(7)
@@ -214,7 +224,14 @@ def test_start_game_cambia_la_tonalidad_en_el_compas_siguiente() -> None:
             assert decision.variation == variation_for(1)
         else:
             assert decision.variation == nueva
-    assert sequencer.grid.bpm == bpm_for(1)
+    # Al reiniciar, el tempo no cambia.
+    assert sequencer.grid.bpm == BALANCE.director.bpm
+
+
+def test_musica_toma_el_tempo_del_balance() -> None:
+    # ADR 0025: el tempo es del tema, no de la semilla.
+    tempos = {Sequencer(seed).grid.bpm for seed in range(8)}
+    assert tempos == {BALANCE.director.bpm}
 
 
 def test_al_reiniciar_tonalidad_acorde_inicial_e_impacto_caen_juntos() -> None:
@@ -235,12 +252,19 @@ def test_al_reiniciar_tonalidad_acorde_inicial_e_impacto_caen_juntos() -> None:
     assert por_g[3 * SIXTEENTHS].chord == chord_at(2, nueva)
 
 
-def test_el_mundo_queda_identico_con_y_sin_la_musica() -> None:
-    con, sin = World(BALANCE, random.Random(3)), World(BALANCE, random.Random(3))
-    tocar(Sequencer(3), con, 200, piloto=True)
+def test_musica_apagada_misma_partida() -> None:
+    # Negativo (ADR 0022 y 0025): la música lee al mundo, pero no lo cambia. Con una
+    # intro que compra rápido, en 200 pasos ya aparecieron varios enemigos.
+    intro = replace(BALANCE.director.sections[0], budget_start=8.0, budget_end=8.0)
+    balance = replace(BALANCE, director=replace(BALANCE.director, sections=(intro,)))
+    con, sin = World(balance, random.Random(3)), World(balance, random.Random(3))
+    sequencer = Sequencer(3)
     for _ in range(200):
+        con.update(pilot_intent(con.steps))
+        sequencer.step(con)
         sin.update(pilot_intent(sin.steps))
-    assert [e.position for e in con.enemies] == [e.position for e in sin.enemies]
+        assert [e.position for e in con.enemies] == [e.position for e in sin.enemies]
+    assert len(con.enemies) > 2
     assert con.rng.getstate() == sin.rng.getstate()
 
 

@@ -38,8 +38,9 @@ SCENARIOS: dict[str, Scenario] = {
         ),
         Scenario(
             "oleadas",
-            "El piloto se mueve y llega un hexágono nuevo cada `spawning.interval`"
-            " segundos. Al morir, la partida se reinicia sola.",
+            "El piloto se mueve, y los hexágonos llegan con la forma del tema"
+            " (ADR 0025). La consola anota cada sección. Al morir, la partida se"
+            " reinicia sola.",
             pilot=True,
         ),
         Scenario(

@@ -18,7 +18,13 @@ from circlebh.world.patterns import Context
 from circlebh.world.polygon import polygon_edge
 
 SPEC = EnemySpec(
-    sides=6, radius=24.0, speed=120.0, friction=0.0, charge_per_line=0.0, patterns=()
+    sides=6,
+    radius=24.0,
+    speed=120.0,
+    friction=0.0,
+    charge_per_line=0.0,
+    patterns=(),
+    threat=1.0,
 )
 
 coordenadas = st.floats(min_value=-1e4, max_value=1e4)

@@ -136,9 +136,12 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "friction": 2.0,
                 "charge_per_line": 1.0,
                 "patterns": [{"kind": "seek", "strength": 240.0}, {"kind": "coulomb"}],
+                "threat": 1.0,
             }
         },
-        "spawning": {"distance": 800.0, "interval": 2.0},
+        "spawning": {"distance": 800.0},
+        # El tema es largo; basta con que salga entero y en su lugar.
+        "director": dump(BALANCE.director),
         "point_weapon": {"cooldown": 0.6, "speed": 300.0, "range": 700.0},
     }
 

@@ -8,7 +8,6 @@ from circlebh.audio.harmony import (
     A3,
     CHORDS,
     Variation,
-    bpm_for,
     chord_at,
     hz,
     variation_for,
@@ -47,9 +46,8 @@ def test_el_acorde_inicial_rota_la_progresion() -> None:
 # --- La variación con la semilla ---
 
 
-def test_misma_semilla_misma_variacion_y_tempo() -> None:
+def test_misma_semilla_misma_variacion() -> None:
     assert variation_for(42) == variation_for(42)
-    assert bpm_for(42) == bpm_for(42)
 
 
 @given(st.integers(0, 2**32 - 1))
@@ -57,11 +55,9 @@ def test_la_variacion_queda_en_sus_rangos(seed: int) -> None:
     variation = variation_for(seed)
     assert -5 <= variation.transpose <= 2
     assert 0 <= variation.first_chord <= 3
-    assert 120 <= bpm_for(seed) <= 126
 
 
 def test_muchas_semillas_dan_variedad() -> None:
     variaciones = [variation_for(seed) for seed in range(200)]
     assert len({v.transpose for v in variaciones}) >= 4
     assert {v.first_chord for v in variaciones} == {0, 1, 2, 3}
-    assert len({bpm_for(seed) for seed in range(200)}) >= 4

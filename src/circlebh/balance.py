@@ -116,6 +116,9 @@ class EnemySpec:
     patterns: tuple[PatternSpec, ...]
     """Su conducta: los patrones de movimiento, cuyas aceleraciones se suman."""
 
+    threat: float
+    """Su amenaza: lo que le cuesta al director comprarlo (ADR 0025)."""
+
 
 @dataclass(frozen=True)
 class SpawningSpec:
@@ -125,8 +128,59 @@ class SpawningSpec:
     """Distancia al jugador a la que aparecen, en unidades del plano. Tiene que quedar
     fuera de la vista: más que la esquina de la pantalla, más el radio del enemigo."""
 
-    interval: float
-    """Segundos entre una aparición y la siguiente. El primero aparece al empezar."""
+
+@dataclass(frozen=True)
+class DeckEntry:
+    """Un tipo de enemigo en el mazo de una sección."""
+
+    enemy: str
+    """El nombre del tipo, una clave de `enemies`."""
+
+    weight: float
+    """Su peso al sortear: con pesos 1 y 3, el segundo sale tres veces más."""
+
+
+@dataclass(frozen=True)
+class SectionSpec:
+    """Una sección del tema: intro, subida, drop o respiro (ADR 0025)."""
+
+    name: str
+    """Su nombre, para el registro de la demo."""
+
+    kind: Literal["build", "wave"]
+    """`build` compra de a poco a lo largo de sus compases. `wave`, la oleada de un
+    drop, llega en la tarea de las oleadas."""
+
+    bars: float
+    """Su largo, en compases. La última sección sigue después de ellos."""
+
+    budget_start: float
+    """El presupuesto al empezar, en amenaza por compás."""
+
+    budget_end: float
+    """El presupuesto al terminar, en amenaza por compás. Entre los dos, la tasa cambia
+    de forma lineal, y lo que gana la sección es su integral."""
+
+    deck: tuple[DeckEntry, ...]
+    """Los tipos que puede comprar, con sus pesos. Sin mazo, no compra."""
+
+    formations: tuple[str, ...]
+    """Las formaciones que puede usar. Por ahora solo hay `single`."""
+
+
+@dataclass(frozen=True)
+class DirectorSpec:
+    """El director: la forma del tema que sigue la partida (ADR 0025)."""
+
+    bpm: float
+    """El tempo, en pulsos por minuto. Un compás son 4 pulsos. La música lo lee de aquí."""
+
+    max_alive: int
+    """El tope de cuerpos vivos del modo infinito. Es provisorio: el valor medido sale
+    del #42."""
+
+    sections: tuple[SectionSpec, ...]
+    """Las secciones, en orden."""
 
 
 @dataclass(frozen=True)
@@ -160,6 +214,9 @@ class Balance:
     spawning: SpawningSpec
     """Cómo aparecen los enemigos."""
 
+    director: DirectorSpec
+    """La forma del tema: cuándo y qué se compra."""
+
     point_weapon: PointWeaponSpec
     """El arma punto."""
 
@@ -187,9 +244,70 @@ BALANCE = Balance(
                 SeekSpec(kind="seek", strength=240.0),
                 CoulombSpec(kind="coulomb"),
             ),
+            threat=1.0,
         )
     },
-    spawning=SpawningSpec(distance=800.0, interval=2.0),
+    spawning=SpawningSpec(distance=800.0),
+    director=DirectorSpec(
+        bpm=124.0,
+        max_alive=300,
+        sections=(
+            SectionSpec(
+                name="intro",
+                kind="build",
+                bars=24.0,
+                budget_start=0.5,
+                budget_end=1.0,
+                deck=(DeckEntry(enemy="hexagon", weight=1.0),),
+                formations=("single",),
+            ),
+            SectionSpec(
+                name="subida",
+                kind="build",
+                bars=24.0,
+                budget_start=1.0,
+                budget_end=2.0,
+                deck=(DeckEntry(enemy="hexagon", weight=1.0),),
+                formations=("single",),
+            ),
+            SectionSpec(
+                name="drop_1",
+                kind="build",
+                bars=32.0,
+                budget_start=2.5,
+                budget_end=2.5,
+                deck=(DeckEntry(enemy="hexagon", weight=1.0),),
+                formations=("single",),
+            ),
+            SectionSpec(
+                name="respiro",
+                kind="build",
+                bars=24.0,
+                budget_start=0.5,
+                budget_end=0.5,
+                deck=(DeckEntry(enemy="hexagon", weight=1.0),),
+                formations=("single",),
+            ),
+            SectionSpec(
+                name="subida_2",
+                kind="build",
+                bars=16.0,
+                budget_start=1.0,
+                budget_end=2.5,
+                deck=(DeckEntry(enemy="hexagon", weight=1.0),),
+                formations=("single",),
+            ),
+            SectionSpec(
+                name="drop_2",
+                kind="build",
+                bars=32.0,
+                budget_start=3.0,
+                budget_end=3.0,
+                deck=(DeckEntry(enemy="hexagon", weight=1.0),),
+                formations=("single",),
+            ),
+        ),
+    ),
     point_weapon=PointWeaponSpec(cooldown=0.6, speed=300.0, range=700.0),
 )
 # <<< datos

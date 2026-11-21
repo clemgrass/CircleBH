@@ -53,12 +53,6 @@ def variation_for(seed: int) -> Variation:
     return Variation(transpose=rng.randint(-5, 2), first_chord=rng.randrange(4))
 
 
-def bpm_for(seed: int) -> int:
-    """El tempo de la sesión, de 120 a 126 BPM. Se elige una vez: cambiarlo a mitad de
-    la música obligaría a rehacer la grilla."""
-    return random.Random(f"musica-tempo-{seed}").randint(120, 126)
-
-
 def chord_at(bar: int, variation: Variation) -> Chord:
     """El acorde del compás `bar`, rotado y transpuesto según `variation`."""
     index = (bar // BARS_PER_CHORD + variation.first_chord) % len(CHORDS)

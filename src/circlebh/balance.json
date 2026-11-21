@@ -28,12 +28,114 @@
         {
           "kind": "coulomb"
         }
-      ]
+      ],
+      "threat": 1.0
     }
   },
   "spawning": {
-    "distance": 800.0,
-    "interval": 2.0
+    "distance": 800.0
+  },
+  "director": {
+    "bpm": 124.0,
+    "max_alive": 300,
+    "sections": [
+      {
+        "name": "intro",
+        "kind": "build",
+        "bars": 24.0,
+        "budget_start": 0.5,
+        "budget_end": 1.0,
+        "deck": [
+          {
+            "enemy": "hexagon",
+            "weight": 1.0
+          }
+        ],
+        "formations": [
+          "single"
+        ]
+      },
+      {
+        "name": "subida",
+        "kind": "build",
+        "bars": 24.0,
+        "budget_start": 1.0,
+        "budget_end": 2.0,
+        "deck": [
+          {
+            "enemy": "hexagon",
+            "weight": 1.0
+          }
+        ],
+        "formations": [
+          "single"
+        ]
+      },
+      {
+        "name": "drop_1",
+        "kind": "build",
+        "bars": 32.0,
+        "budget_start": 2.5,
+        "budget_end": 2.5,
+        "deck": [
+          {
+            "enemy": "hexagon",
+            "weight": 1.0
+          }
+        ],
+        "formations": [
+          "single"
+        ]
+      },
+      {
+        "name": "respiro",
+        "kind": "build",
+        "bars": 24.0,
+        "budget_start": 0.5,
+        "budget_end": 0.5,
+        "deck": [
+          {
+            "enemy": "hexagon",
+            "weight": 1.0
+          }
+        ],
+        "formations": [
+          "single"
+        ]
+      },
+      {
+        "name": "subida_2",
+        "kind": "build",
+        "bars": 16.0,
+        "budget_start": 1.0,
+        "budget_end": 2.5,
+        "deck": [
+          {
+            "enemy": "hexagon",
+            "weight": 1.0
+          }
+        ],
+        "formations": [
+          "single"
+        ]
+      },
+      {
+        "name": "drop_2",
+        "kind": "build",
+        "bars": 32.0,
+        "budget_start": 3.0,
+        "budget_end": 3.0,
+        "deck": [
+          {
+            "enemy": "hexagon",
+            "weight": 1.0
+          }
+        ],
+        "formations": [
+          "single"
+        ]
+      }
+    ]
   },
   "point_weapon": {
     "cooldown": 0.6,

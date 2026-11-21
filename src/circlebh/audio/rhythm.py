@@ -27,9 +27,9 @@ def euclid(k: int, n: int) -> list[bool]:
 
 @dataclass(frozen=True)
 class Grid:
-    """Dónde empieza cada semicorchea, en muestras, con el tempo de la sesión."""
+    """Dónde empieza cada semicorchea, en muestras, con el tempo del tema (ADR 0025)."""
 
-    bpm: int
+    bpm: float
 
     @property
     def samples(self) -> float:

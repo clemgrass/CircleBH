@@ -22,7 +22,6 @@ from circlebh.audio.harmony import (
     A3,
     Chord,
     Variation,
-    bpm_for,
     chord_at,
     hz,
     variation_for,
@@ -37,6 +36,7 @@ from circlebh.audio.voices import (
     voice_for,
     weapon_note,
 )
+from circlebh.balance import BALANCE
 from circlebh.world.clock import STEP
 from circlebh.world.events import Death, Event, Hit, Shot
 from circlebh.world.game import World
@@ -128,8 +128,9 @@ class Sequencer:
     def __init__(
         self, seed: int, *, base_volume: float = 1.0, game_volume: float = 1.0
     ) -> None:
-        self.grid = Grid(bpm_for(seed))
-        """La grilla del tempo de la sesión: se elige una vez, con la primera semilla."""
+        self.grid = Grid(BALANCE.director.bpm)
+        """La grilla del tempo del tema, el mismo del director (ADR 0025). No cambia al
+        reiniciar."""
         self.ready: deque[bytes] = deque()
         self.decisions: deque[Decision] = deque(maxlen=HISTORY)
         self.base_volume = base_volume
