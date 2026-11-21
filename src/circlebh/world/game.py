@@ -72,9 +72,8 @@ class World:
         (`step_swarm`). Después las armas golpean y disparan. Los enemigos sin líneas
         desaparecen. Lo que compró el director entra a la cola, y de ella aparecen hasta
         `spawning.max_per_step`, que empiezan a moverse en el paso siguiente. Recién
-        entonces se revisa el contacto: matar a uno en el mismo paso
-        en que te tocaría te salva. Si alguno lo toca, la partida termina; desde ahí,
-        `update` no hace nada.
+        entonces se revisa el contacto: matar a uno en el mismo paso en que te tocaría te
+        salva. Si alguno lo toca, la partida termina; desde ahí, `update` no hace nada.
 
         `events` queda con lo que pasó en este paso: los disparos y golpes de las armas,
         y una muerte por cada enemigo que perdió su última línea.
