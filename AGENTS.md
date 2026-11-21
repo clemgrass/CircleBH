@@ -117,7 +117,7 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
   - la plantilla trae Qué cambia, Por qué, Verificación y Prueba manual. Tú escribes los pasos y el usuario, el resultado;
   - si hay una revisión abierta, `main` se integra con merge, no con rebase;
   - el squash merge, con el título del PR, lo hace el usuario.
-- **Versiones:** SemVer 0.x, y 1.0.0 es el MVP completo. Un tag `vX.Y.Z` en `main` dispara el release.
+- **Versiones:** SemVer 0.x, y 1.0.0 es el MVP completo. Un tag `vX.Y.Z` en `main` dispara el release, y no se crea ninguno antes de la 1.0.0 (ADR 0024).
 
 ## Preguntas abiertas
 - El nombre del juego. `circlebh` es provisorio.
