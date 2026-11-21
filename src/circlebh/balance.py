@@ -109,6 +109,10 @@ class EnemySpec:
     """Roce `γ`, en 1/s: resta `γ·v` a la aceleración. Sin roce, se desliza para
     siempre."""
 
+    spin: float
+    """Su velocidad angular al aparecer, `ω` en rad/s, antihoraria si es positiva. Con
+    0 no gira. No es un patrón: los patrones son aceleraciones lineales (ADR 0027)."""
+
     charge_per_line: float
     """Carga de cada línea. Su carga es esto por las líneas que le quedan, y su masa,
     las líneas que le quedan."""
@@ -259,13 +263,27 @@ BALANCE = Balance(
             radius=24.0,
             speed=120.0,
             friction=2.0,
+            spin=0.0,
             charge_per_line=1.0,
             patterns=(
                 SeekSpec(kind="seek", strength=240.0),
                 CoulombSpec(kind="coulomb"),
             ),
             threat=1.0,
-        )
+        ),
+        "square": EnemySpec(
+            sides=4,
+            radius=20.0,
+            speed=120.0,
+            friction=2.0,
+            spin=1.5,
+            charge_per_line=1.0,
+            patterns=(
+                SeekSpec(kind="seek", strength=240.0),
+                CoulombSpec(kind="coulomb"),
+            ),
+            threat=1.0,
+        ),
     },
     spawning=SpawningSpec(
         distance=800.0, max_per_step=4, formation_gap=20.0, formation_size=(3, 6)
@@ -282,7 +300,10 @@ BALANCE = Balance(
                 budget_end=1.0,
                 burst=0.0,
                 layers=(0, 3),
-                deck=(DeckEntry(enemy="hexagon", weight=1.0),),
+                deck=(
+                    DeckEntry(enemy="hexagon", weight=1.0),
+                    DeckEntry(enemy="square", weight=1.0),
+                ),
                 formations=("single",),
             ),
             SectionSpec(
@@ -293,7 +314,10 @@ BALANCE = Balance(
                 budget_end=2.0,
                 burst=0.0,
                 layers=(1, 3),
-                deck=(DeckEntry(enemy="hexagon", weight=1.0),),
+                deck=(
+                    DeckEntry(enemy="hexagon", weight=1.0),
+                    DeckEntry(enemy="square", weight=1.0),
+                ),
                 formations=("single", "line"),
             ),
             SectionSpec(
@@ -304,7 +328,10 @@ BALANCE = Balance(
                 budget_end=2.5,
                 burst=12.0,
                 layers=(3, 3),
-                deck=(DeckEntry(enemy="hexagon", weight=1.0),),
+                deck=(
+                    DeckEntry(enemy="hexagon", weight=1.0),
+                    DeckEntry(enemy="square", weight=1.0),
+                ),
                 formations=("ring", "line", "cluster"),
             ),
             SectionSpec(
@@ -315,7 +342,10 @@ BALANCE = Balance(
                 budget_end=0.5,
                 burst=0.0,
                 layers=(0, 1),
-                deck=(DeckEntry(enemy="hexagon", weight=1.0),),
+                deck=(
+                    DeckEntry(enemy="hexagon", weight=1.0),
+                    DeckEntry(enemy="square", weight=1.0),
+                ),
                 formations=("single",),
             ),
             SectionSpec(
@@ -326,7 +356,10 @@ BALANCE = Balance(
                 budget_end=2.5,
                 burst=0.0,
                 layers=(1, 3),
-                deck=(DeckEntry(enemy="hexagon", weight=1.0),),
+                deck=(
+                    DeckEntry(enemy="hexagon", weight=1.0),
+                    DeckEntry(enemy="square", weight=1.0),
+                ),
                 formations=("single", "line", "cluster"),
             ),
             SectionSpec(
@@ -337,7 +370,10 @@ BALANCE = Balance(
                 budget_end=3.0,
                 burst=20.0,
                 layers=(3, 3),
-                deck=(DeckEntry(enemy="hexagon", weight=1.0),),
+                deck=(
+                    DeckEntry(enemy="hexagon", weight=1.0),
+                    DeckEntry(enemy="square", weight=1.0),
+                ),
                 formations=("ring", "line", "cluster"),
             ),
         ),

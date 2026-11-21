@@ -1,5 +1,5 @@
 """Los enemigos: polígonos regulares hechos de líneas, que se mueven por sus patrones, con
-inercia y roce (ADR 0021).
+inercia y roce (ADR 0021), y algunos giran (ADR 0027).
 
 Cada línea es una parte del enemigo: la bala quita la que golpea, y sin líneas el enemigo
 muere. Chocan por sus líneas, y el círculo envolvente es el primer descarte (ADR 0020).
@@ -17,6 +17,7 @@ from circlebh.world.polygon import (
     first_hit,
     polygon_edge,
 )
+from circlebh.world.rigid import center_of_mass, rotate, to_local, to_world
 
 
 class Enemy:
@@ -31,6 +32,17 @@ class Enemy:
         """Las aristas que le quedan, de menor a mayor (ver `polygon.py`)."""
         self.velocity = Vector2()
         """Unidades del plano por segundo. Parte quieto."""
+        self.angle = 0.0
+        """Su orientación `θ`, en radianes y antihoraria. Todos parten en 0."""
+        self.previous_angle = 0.0
+        """Su orientación antes del último `step`. La usa `hit_by`, como `previous`."""
+        self.omega = spec.spin
+        """Su velocidad angular `ω`, en rad/s. Parte en `spec.spin` y no cambia."""
+        self.offset = Vector2()
+        """Dónde queda el centro del polígono visto desde `position`, en el marco del
+        enemigo. Parte en 0. Si gira y pierde una línea, `position` pasa a su nuevo
+        centro de masa, y esto guarda cuánto se corrió (ADR 0027)."""
+        self._radius = spec.radius
         self.patterns = [make_pattern(pattern) for pattern in spec.patterns]
         """Su conducta: instancias propias de los patrones de su tipo (ADR 0021)."""
 
@@ -47,9 +59,12 @@ class Enemy:
 
     @property
     def radius(self) -> float:
-        """Radio del círculo envolvente: el del polígono completo. No es un hitbox: las
-        líneas que quedan no se mueven, así que no se achica."""
-        return self.spec.radius
+        """Radio del círculo envolvente, en torno a `position`. No es un hitbox.
+
+        Sin giro, es el del polígono completo y no se achica: las líneas que quedan no
+        se mueven. Con giro, al perder una línea, es la distancia del centro de masa
+        nuevo al extremo más lejano de las que quedan."""
+        return self._radius
 
     @property
     def alive(self) -> bool:
@@ -57,16 +72,46 @@ class Enemy:
         return bool(self.edges)
 
     def remove_edge(self, k: int) -> None:
-        """Quita la arista `k`: una bala la golpeó."""
-        self.edges.remove(k)
+        """Quita la arista `k`: una bala la golpeó.
 
-    def lines(self) -> list[tuple[Vector2, Vector2]]:
-        """Las líneas que le quedan, en coordenadas del plano."""
+        Sin giro, nada más cambia (spec de la 0.1.0, decisión 15). Con giro, el resto
+        sigue con el mismo `ω`, como un cuerpo que se rompe, y gira en torno a su nuevo
+        centro de masa `c'` (L2 del ADR 0027):
+
+        - `position` pasa a `c'`, y `previous` se corre igual, con la pose de antes.
+          Así las líneas no se mueven en el plano, ni en la pose de antes del paso.
+        - `velocity` pasa a la que tenía ese punto: `v + ω × (c' − c)`.
+        """
+        self.edges.remove(k)
+        if self.spec.spin == 0 or not self.edges:
+            return
+        # `shift` es `c' − c` en el marco del enemigo, y `moved`, en el plano.
+        shift = center_of_mass(self._local_lines())
+        moved = rotate(shift, self.angle)
+        self.offset -= shift
+        self.position += moved
+        self.previous += rotate(shift, self.previous_angle)
+        self.velocity += self.omega * Vector2(-moved.y, moved.x)
+        self._radius = max(p.length() for line in self._local_lines() for p in line)
+
+    def _local_lines(self) -> list[tuple[Vector2, Vector2]]:
+        """Las líneas que le quedan, en el marco del enemigo: desde `position`, sin
+        girar."""
         return [
-            (self.position + a, self.position + b)
+            (a + self.offset, b + self.offset)
             for a, b in (
                 polygon_edge(self.spec.radius, self.spec.sides, k) for k in self.edges
             )
+        ]
+
+    def lines(self) -> list[tuple[Vector2, Vector2]]:
+        """Las líneas que le quedan, en coordenadas del plano, giradas en `angle`."""
+        return [
+            (
+                to_world(a, self.position, self.angle),
+                to_world(b, self.position, self.angle),
+            )
+            for a, b in self._local_lines()
         ]
 
     def touches(self, center: Vector2, radius: float) -> bool:
@@ -87,14 +132,22 @@ class Enemy:
         """La primera línea que cruza el tramo de una bala en el último paso, como `(t, k)`.
 
         `start` y `end` son dónde estaba la bala antes y después del paso. El tramo se
-        mide desde el enemigo, que también se movió: de `start − previous` a
-        `end − position`. Como el enemigo solo se traslada, ese tramo relativo es exacto, y
-        un enemigo que avanza hacia la bala no la deja pasar entre dos pasos.
+        mide en el marco del enemigo, que también se movió: `start` con la pose de antes
+        y `end` con la de ahora, `R(−θ)·(p − c)`. Así un enemigo que avanza hacia la
+        bala no la deja pasar entre dos pasos.
+
+        Sin giro, ese tramo es exacto. Con giro, el camino de la bala en el marco del
+        enemigo es una curva, y el tramo recto entre sus extremos se aparta de ella a lo
+        más `(2·|ω·dt|·|Δr| + (ω·dt)²·|r|) / 8` (ADR 0027).
         """
-        relative_start = start - self.previous
-        relative_end = end - self.position
+        # Del marco del enemigo, centrado en `position`, al del polígono, donde valen
+        # los sectores (ADR 0020).
+        relative_start = (
+            to_local(start, self.previous, self.previous_angle) - self.offset
+        )
+        relative_end = to_local(end, self.position, self.angle) - self.offset
         if not segment_touches_circle(
-            relative_start, relative_end, Vector2(), self.radius + ENVELOPE_SLACK
+            relative_start, relative_end, Vector2(), self.spec.radius + ENVELOPE_SLACK
         ):
             return None
         sides = self.spec.sides
@@ -103,7 +156,9 @@ class Enemy:
             for k in edge_sectors(relative_start, relative_end, sides)
             if k in self.edges
         ]
-        return first_hit(relative_start, relative_end, self.radius, sides, candidates)
+        return first_hit(
+            relative_start, relative_end, self.spec.radius, sides, candidates
+        )
 
     def acceleration(self, context: Context) -> Vector2:
         """La suma de lo que aporta cada patrón, menos el roce: `a = Σ patrón − γ·v`."""
@@ -118,8 +173,11 @@ class Enemy:
 
         `v ← v + a·dt`, acotada a `speed`, y `p ← p + v·dt`. Es estable con roce, y el tope
         hace que nadie avance más de `speed·dt` por paso, aunque una fuerza sea enorme.
+        El giro avanza igual: `θ ← θ + ω·dt`.
         """
         self.previous = Vector2(self.position)
+        self.previous_angle = self.angle
+        self.angle += self.omega * STEP
         self.velocity = (self.velocity + acceleration * STEP).clamp_magnitude(
             self.spec.speed
         )

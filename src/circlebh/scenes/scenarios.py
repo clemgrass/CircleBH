@@ -10,7 +10,9 @@ class Scenario:
     pilot: bool
     """Si el piloto mueve al jugador. Si no, el jugador se queda quieto."""
     crowd: int = 0
-    """Hexágonos extra al empezar, en una red triangular alrededor del jugador."""
+    """Enemigos extra al empezar, en una red triangular alrededor del jugador."""
+    crowd_enemy: str = "hexagon"
+    """El tipo de esos enemigos, una clave de `enemies` en el balance."""
     lethal: bool = True
     """Si el contacto termina la partida."""
     armed: bool = True
@@ -59,6 +61,25 @@ SCENARIOS: dict[str, Scenario] = {
             crowd=40,
             lethal=False,
             armed=False,
+        ),
+        Scenario(
+            "cuadrado-gira",
+            "6 cuadrados que giran alrededor del jugador quieto, que no muere y les"
+            " dispara: cada bala quita la línea que de verdad golpea (ADR 0027).",
+            pilot=False,
+            crowd=6,
+            crowd_enemy="square",
+            lethal=False,
+        ),
+        Scenario(
+            "cuadrado-herido",
+            "Un cuadrado que gira y llega al jugador quieto, que no muere y le dispara:"
+            " con cada línea que pierde, gira en torno a su nuevo centro de masa"
+            " (ADR 0027).",
+            pilot=False,
+            crowd=1,
+            crowd_enemy="square",
+            lethal=False,
         ),
     ]
 }

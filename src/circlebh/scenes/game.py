@@ -144,9 +144,9 @@ class GameScene:
         if demo is not None and demo.crowd:
             # Más abiertos que el equilibrio (≈ 55), para ver cómo se acercan y se
             # ordenan.
-            hexagon = BALANCE.enemies["hexagon"]
+            spec = BALANCE.enemies[demo.crowd_enemy]
             self.world.enemies += [
-                Enemy(hexagon, p) for p in lattice(Vector2(), demo.crowd, 90)
+                Enemy(spec, p) for p in lattice(Vector2(), demo.crowd, 90)
             ]
         self.dead_steps = 0
         self.section = -1
