@@ -148,8 +148,8 @@ class SectionSpec:
     """Su nombre, para el registro de la demo."""
 
     kind: Literal["build", "wave"]
-    """`build` compra de a poco a lo largo de sus compases. `wave`, la oleada de un
-    drop, llega en la tarea de las oleadas."""
+    """`build` compra de a poco a lo largo de sus compases. `wave` es la oleada de un
+    drop, que hay que limpiar; por ahora se comporta como `build`."""
 
     bars: float
     """Su largo, en compases. La última sección sigue después de ellos."""
@@ -184,8 +184,8 @@ class DirectorSpec:
     """El tempo, en pulsos por minuto. Un compás son 4 pulsos. La música lo lee de aquí."""
 
     max_alive: int
-    """El tope de cuerpos vivos del modo infinito. Es provisorio: el valor medido sale
-    del #42."""
+    """El tope de cuerpos vivos del modo infinito. Es provisorio, hasta medir con
+    `poe benchmark` cuántos cuerpos caben en 16,6 ms por paso."""
 
     sections: tuple[SectionSpec, ...]
     """Las secciones, en orden."""

@@ -124,12 +124,16 @@ def test_seccion_empieza_en_su_compas() -> None:
 
 @given(seed=st.integers(0, 2**32 - 1))
 def test_secciones_en_orden(seed: int) -> None:
+    # ADR 0025: con cualquier semilla, las secciones van en orden, y cada una empieza
+    # en el primer paso que llega a su compás.
     director = Director(CORTO, ENEMIGOS, random.Random(seed))
     pasos = primer_paso(sum(s.bars for s in CORTO.sections), CORTO.bpm)
     secciones = [s for s, _ in correr(director, pasos)]
     assert [k for k, _ in itertools.groupby(secciones)] == list(
         range(len(CORTO.sections))
     )
+    empieza = [secciones.index(k) + 1 for k in range(1, len(CORTO.sections))]
+    assert empieza == [primer_paso(b, CORTO.bpm) for b in inicios(CORTO)[1:]]
 
 
 def test_la_ultima_seccion_sigue_despues_de_sus_compases() -> None:

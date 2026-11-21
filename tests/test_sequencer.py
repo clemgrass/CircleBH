@@ -7,6 +7,7 @@ cada semicorchea: la capa, las notas de los enemigos, los golpes del arma y los 
 import random
 from dataclasses import replace
 
+import pytest
 from pygame.math import Vector2
 
 from circlebh.audio import sounds
@@ -288,9 +289,8 @@ def test_reinicio_espera_el_compas_y_el_drop_cae_en_el_golpe() -> None:
     sequencer.start_game(7)
     world = World(TEMA_CORTO, random.Random(7), armed=False, lethal=False)
     entra_al_drop = golpe_decidido = None
-    golpe = (
-        1 + 4
-    ) * SIXTEENTHS  # la tonalidad entra en el compás 1; el drop, 4 después
+    # La tonalidad entra en el compás 1, y el drop, 4 compases después.
+    golpe = (1 + 4) * SIXTEENTHS
     for paso in range(800):
         if not sequencer.waiting_for_bar:
             world.update(Vector2())
@@ -300,12 +300,45 @@ def test_reinicio_espera_el_compas_y_el_drop_cae_en_el_golpe() -> None:
         if golpe_decidido is None and sequencer.decisions[-1].g >= golpe:
             golpe_decidido = paso
     assert entra_al_drop is not None and golpe_decidido is not None
-    assert abs(entra_al_drop - golpe_decidido) <= 1
+    # El director entra al drop en el mismo paso o en el siguiente, nunca antes.
+    assert 0 <= entra_al_drop - golpe_decidido <= 1
     por_g = {d.g: d for d in sequencer.decisions}
     assert "build" in por_g[1 * SIXTEENTHS].cues
     assert [g for g, d in por_g.items() if d.silent] == list(range(golpe - 4, golpe))
     assert "impact" in por_g[golpe].cues
     assert por_g[golpe].level == 3
+
+
+def test_reinicio_con_espera_es_la_misma_partida() -> None:
+    # Negativo (ADR 0026): esperar el compás solo corre la partida en el tiempo. Con
+    # los mismos pasos de mundo, queda igual a una que partió al tiro.
+    intro = replace(BALANCE.director.sections[0], budget_start=8.0, budget_end=8.0)
+    balance = replace(BALANCE, director=replace(BALANCE.director, sections=(intro,)))
+    sequencer = Sequencer(1)
+    tocar(sequencer, mundo(armed=False), 20)
+    sequencer.start_game(7)
+    congelado = World(balance, random.Random(7))
+    for _ in range(300):
+        if not sequencer.waiting_for_bar:
+            congelado.update(pilot_intent(congelado.steps))
+        sequencer.step(congelado)
+    suelto = World(balance, random.Random(7))
+    for _ in range(congelado.steps):
+        suelto.update(pilot_intent(suelto.steps))
+    assert congelado.steps < 300  # sí esperó
+    assert len(congelado.enemies) > 2
+    assert [e.position for e in congelado.enemies] == [
+        e.position for e in suelto.enemies
+    ]
+    assert congelado.rng.getstate() == suelto.rng.getstate()
+
+
+def test_mundo_con_otro_tempo_se_rechaza() -> None:
+    # Negativo: la grilla de la música y el reloj del director tienen que ir al mismo
+    # tempo, o los drops no caerían en el golpe.
+    otro = replace(BALANCE, director=replace(BALANCE.director, bpm=120.0))
+    with pytest.raises(ValueError, match="bpm"):
+        Sequencer(1).step(World(otro, random.Random(1)))
 
 
 def test_sin_reinicio_no_espera() -> None:

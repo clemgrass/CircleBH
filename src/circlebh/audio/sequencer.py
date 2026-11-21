@@ -63,9 +63,9 @@ DUCK_SECONDS = 0.2
 """El sidechain baja la música un 70 % con cada bombo, y vuelve en 200 ms."""
 DELAY_FEEDBACK = 0.38
 PAD_Q, BASS_Q = 0.7, 0.35
+"""Amortiguación de los filtros resonantes: menos, más resonancia."""
 ROLL_EVERY = (4, 2, 1, 1)
 """Cada cuántas semicorcheas suena el clap del redoble, en cada compás de la subida."""
-"""Amortiguación de los filtros resonantes: menos, más resonancia."""
 
 
 @dataclass(frozen=True)
@@ -207,6 +207,12 @@ class Sequencer:
     def step(self, world: World) -> None:
         """Avanza un paso de la escena, con `world` como quedó después de su `update`."""
         if world is not self._world:
+            if world.director.spec.bpm != self.grid.bpm:
+                # Con otro tempo, los drops del director no caerían en el golpe.
+                raise ValueError(
+                    f"director.bpm del mundo ({world.director.spec.bpm}) no calza con"
+                    f" el de la música ({self.grid.bpm})"
+                )
             if self._world is not None:
                 # Si viene una tonalidad nueva, el impacto espera para caer con ella.
                 cues = self._reset_arrangement()
