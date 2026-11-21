@@ -15,7 +15,13 @@ from typing import TYPE_CHECKING
 
 from pygame.math import Vector2
 
-from circlebh.balance import ChargesSpec, CoulombSpec, PatternSpec, SeekSpec
+from circlebh.balance import (
+    ChargesSpec,
+    CoulombSpec,
+    OrbitSpec,
+    PatternSpec,
+    SeekSpec,
+)
 from circlebh.world.charges import pair_force, player_force
 
 if TYPE_CHECKING:
@@ -82,6 +88,31 @@ class Coulomb(Pattern):
         return force / enemy.mass
 
 
+class Orbit(Pattern):
+    """Un resorte radial hacia `r = R` y un empuje tangencial, en polares desde el
+    jugador: `a = −stiffness·(r − R)·r̂ + tangential·θ̂`.
+
+    `r̂` apunta del jugador al enemigo, y `θ̂ = (−r̂y, r̂x)` es `r̂` girado 90°
+    antihorario. Sin tangencial, el enemigo se queda a distancia `R`, mirando.
+    """
+
+    def __init__(self, spec: OrbitSpec) -> None:
+        self.spec = spec
+
+    def acceleration(self, enemy: Enemy, context: Context) -> Vector2:
+        """Encima del jugador no hay dirección radial, y vale 0, como en `Seek`."""
+        offset = enemy.position - context.player_position
+        r = offset.length()
+        if r == 0:
+            return Vector2()
+        radial = offset / r
+        tangent = Vector2(-radial.y, radial.x)
+        spec = self.spec
+        return (
+            radial * (-spec.stiffness * (r - spec.radius)) + tangent * spec.tangential
+        )
+
+
 def make_pattern(spec: PatternSpec) -> Pattern:
     """La instancia del patrón que describe `spec`, nueva para cada enemigo."""
     match spec:
@@ -89,3 +120,5 @@ def make_pattern(spec: PatternSpec) -> Pattern:
             return Seek(spec)
         case CoulombSpec():
             return Coulomb()
+        case OrbitSpec():
+            return Orbit(spec)

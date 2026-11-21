@@ -34,4 +34,11 @@ class Death:
     enemy: Enemy
 
 
-type Event = Shot | Hit | Death
+@dataclass(frozen=True)
+class Telegraph:
+    """`enemy` empezó a avisar un ataque en este paso: después del aviso, ataca."""
+
+    enemy: Enemy
+
+
+type Event = Shot | Hit | Death | Telegraph

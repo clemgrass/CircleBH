@@ -5,6 +5,7 @@ import random
 from pygame.math import Vector2
 
 from circlebh.balance import Balance
+from circlebh.world.actions import step_actions
 from circlebh.world.clock import STEP
 from circlebh.world.director import Director, Purchase
 from circlebh.world.enemy import Enemy
@@ -69,21 +70,22 @@ class World:
     def update(self, intent: Vector2) -> None:
         """Avanza un paso, con la intención de movimiento del jugador (largo 0 a 1).
 
-        El jugador se mueve primero, y el enjambre da su paso con el jugador donde quedó
-        (`step_swarm`). Después las armas golpean y disparan. Los enemigos sin líneas
+        El jugador se mueve primero. Después, las acciones de los enemigos miran dónde
+        quedó, y el enjambre da su paso (`step_swarm`). Después las armas golpean y disparan. Los enemigos sin líneas
         desaparecen. Lo que compró el director entra a la cola, y de ella aparecen hasta
         `spawning.max_per_step`, que empiezan a moverse en el paso siguiente. Recién
         entonces se revisa el contacto: matar a uno en el mismo paso en que te tocaría te
         salva. Si alguno lo toca, la partida termina; desde ahí, `update` no hace nada.
 
-        `events` queda con lo que pasó en este paso: los disparos y golpes de las armas,
-        y una muerte por cada enemigo que perdió su última línea.
+        `events` queda con lo que pasó en este paso: los avisos de ataque, los disparos
+        y golpes de las armas, y una muerte por cada enemigo que perdió su última línea.
         """
         self.events = []
         if self.game_over:
             return
         self._steps += 1
         self.player.step(intent)
+        self.events += step_actions(self.enemies, self.player.position, self.rng)
         self.separations += step_swarm(
             self.enemies,
             self.player.position,

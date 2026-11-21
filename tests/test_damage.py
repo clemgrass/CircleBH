@@ -26,6 +26,7 @@ HEXAGON = EnemySpec(
     charge_per_line=0.0,
     patterns=(),
     threat=1.0,
+    actions=(),
 )
 ORIGEN = Vector2(0, 0)
 

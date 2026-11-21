@@ -1,4 +1,4 @@
-"""Tests de los patrones de movimiento: seek y coulomb (ADR 0021)."""
+"""Tests de los patrones de movimiento: seek, coulomb y orbit (ADR 0021)."""
 
 import math
 from dataclasses import replace
@@ -6,9 +6,10 @@ from dataclasses import replace
 import pytest
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, CoulombSpec, SeekSpec
+from circlebh.balance import BALANCE, CoulombSpec, OrbitSpec, SeekSpec
+from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
-from circlebh.world.patterns import Context, Coulomb, Seek, make_pattern
+from circlebh.world.patterns import Context, Coulomb, Orbit, Seek, make_pattern
 
 HEXAGON = BALANCE.enemies["hexagon"]
 SOLO_COULOMB = replace(HEXAGON, patterns=(CoulombSpec(),))
@@ -102,3 +103,48 @@ def test_hexagono_sobre_el_jugador_quieto_se_mantiene_finito() -> None:
         enemy.step(enemy.acceleration(ctx))
         assert math.isfinite(enemy.position.x) and math.isfinite(enemy.position.y)
         assert enemy.velocity.length() <= HEXAGON.speed + 1e-9
+
+
+# --- orbit ---
+
+ORBITA = OrbitSpec(radius=200.0, stiffness=4.0, tangential=0.0)
+SOLO_ORBITA = replace(HEXAGON, friction=3.0, speed=1000.0, patterns=(ORBITA,))
+
+
+def test_make_pattern_elige_orbit() -> None:
+    assert isinstance(make_pattern(ORBITA), Orbit)
+
+
+def test_orbit_fuera_del_radio_tira_hacia_el_jugador() -> None:
+    # −stiffness·(r − R)·r̂ = −4·(300 − 200)·(1, 0).
+    enemy = Enemy(HEXAGON, Vector2(300, 0))
+    assert tuple(Orbit(ORBITA).acceleration(enemy, contexto())) == pytest.approx(
+        (-400.0, 0.0)
+    )
+
+
+def test_orbit_dentro_del_radio_empuja_hacia_afuera() -> None:
+    enemy = Enemy(HEXAGON, Vector2(0, 150))
+    assert tuple(Orbit(ORBITA).acceleration(enemy, contexto())) == pytest.approx(
+        (0.0, 200.0)
+    )
+
+
+def test_orbit_en_el_radio_y_sin_tangencial_es_cero() -> None:
+    # Negativo: en `r = R` el resorte no tira, y sin tangencial no hay nada más.
+    enemy = Enemy(HEXAGON, Vector2(0, -200))
+    assert Orbit(ORBITA).acceleration(enemy, contexto()).length() == pytest.approx(0)
+
+
+def test_orbit_encima_del_jugador_no_divide_por_cero() -> None:
+    # Borde: en `r = 0` no hay dirección radial, y vale 0, como seek.
+    enemy = Enemy(HEXAGON, Vector2())
+    assert Orbit(ORBITA).acceleration(enemy, contexto()) == Vector2()
+
+
+def test_orbit_sin_tangencial_converge_al_radio() -> None:
+    # Un resorte con roce: oscila amortiguado hasta quedar en `r = R`.
+    enemy = Enemy(SOLO_ORBITA, Vector2(600, 0))
+    for _ in range(round(10 / STEP)):
+        enemy.step(enemy.acceleration(contexto()))
+    assert enemy.position.length() == pytest.approx(ORBITA.radius, abs=0.5)

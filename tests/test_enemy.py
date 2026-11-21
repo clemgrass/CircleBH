@@ -25,6 +25,7 @@ SPEC = EnemySpec(
     charge_per_line=0.0,
     patterns=(),
     threat=1.0,
+    actions=(),
 )
 
 coordenadas = st.floats(min_value=-1e4, max_value=1e4)

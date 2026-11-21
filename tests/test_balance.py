@@ -139,6 +139,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "charge_per_line": 1.0,
                 "patterns": [{"kind": "seek", "strength": 240.0}, {"kind": "coulomb"}],
                 "threat": 1.0,
+                "actions": [],
             },
             "square": {
                 "sides": 4,
@@ -149,6 +150,39 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "charge_per_line": 1.0,
                 "patterns": [{"kind": "seek", "strength": 240.0}, {"kind": "coulomb"}],
                 "threat": 1.0,
+                "actions": [],
+            },
+            "triangle": {
+                "sides": 3,
+                "radius": 14.0,
+                "speed": 150.0,
+                "friction": 3.0,
+                "spin": 0.0,
+                "charge_per_line": 1.0,
+                "patterns": [
+                    {
+                        "kind": "orbit",
+                        "radius": 280.0,
+                        "stiffness": 4.0,
+                        "tangential": 0.0,
+                    },
+                    {"kind": "coulomb"},
+                ],
+                "threat": 1.5,
+                "actions": [
+                    {
+                        "kind": "charge",
+                        "watch_distance": 320.0,
+                        "telegraph": 0.5,
+                        "recoil": 14.0,
+                        "speed": 720.0,
+                        "duration": 0.8,
+                        "cooldown": 2.0,
+                        "turn_rate": 6.0,
+                        "lead_chance": 0.1,
+                        "lead_angle": 0.3,
+                    }
+                ],
             },
         },
         "spawning": {
