@@ -5,6 +5,7 @@ contando los vivos y los que esperan en la cola, y a `spawning.distance` o más,
 de la vista. Lo comprado entra a una cola, y sale de a `max_per_step` por paso.
 """
 
+import itertools
 import math
 import random
 from collections import deque
@@ -12,7 +13,7 @@ from collections.abc import Iterable, Iterator, Sequence
 
 from pygame.math import Vector2
 
-from circlebh.balance import SpawningSpec
+from circlebh.balance import Balance, SpawningSpec
 from circlebh.world.swarm import lattice
 
 FORMATIONS = ("single", "ring", "line", "cluster")
@@ -30,8 +31,35 @@ def check_spawning(spec: SpawningSpec) -> None:
         )
     if spec.max_per_step < 1:
         raise ValueError("spawning.max_per_step: tiene que ser al menos 1")
-    if spec.formation_gap < 0:
-        raise ValueError("spawning.formation_gap: no puede ser negativo")
+    if spec.formation_gap <= 0:
+        # Con 0, los vecinos nacen justo en el borde del núcleo duro, no fuera de él.
+        raise ValueError("spawning.formation_gap: tiene que ser mayor que 0")
+    if spec.distance <= 0:
+        raise ValueError("spawning.distance: tiene que ser mayor que 0")
+
+
+def check_formations(balance: Balance) -> None:
+    """Rechaza al empezar una formación del tema que no cabe en un cuadrante.
+
+    Prueba cada tipo del mazo de cada sección con cada formación de la sección, en su
+    tamaño mayor, que es el más ancho. Así falla al crear el mundo, nombrando el
+    tamaño, y no a mitad de la partida.
+    """
+    spec = balance.spawning
+    reach = balance.charges.core_reach
+    for section in balance.director.sections:
+        for entry, kind in itertools.product(section.deck, section.formations):
+            count = 1 if kind == "single" else spec.formation_size[1]
+            radius = balance.enemies[entry.enemy].radius
+            _half_width(
+                _shape(kind, count, _spacing(radius, spec, reach), spec.distance)
+            )
+
+
+def _spacing(radius: float, spec: SpawningSpec, reach: float) -> float:
+    """La separación entre vecinos de una formación: fuera del núcleo duro, más el
+    espacio libre `formation_gap`."""
+    return reach * 2 * radius + spec.formation_gap
 
 
 def quadrant(offset: Vector2) -> int:
@@ -72,7 +100,12 @@ def _shape(kind: str, count: int, spacing: float, distance: float) -> list[Vecto
             return [Vector2(distance, 0)]
         case "ring":
             # El arco de radio `distance` cuya cuerda mide `spacing`: 2·asin(s / 2d).
-            step = 2 * math.asin(min(1.0, spacing / (2 * distance)))
+            if spacing >= 2 * distance:
+                raise ValueError(
+                    f"ring: una separación de {spacing:.0f} no cabe en un cuadrante"
+                    f" a {distance:.0f} del jugador"
+                )
+            step = 2 * math.asin(spacing / (2 * distance))
             first = -step * (count - 1) / 2
             return [
                 Vector2(distance, 0).rotate_rad(first + k * step) for k in range(count)
@@ -89,12 +122,23 @@ def _shape(kind: str, count: int, spacing: float, distance: float) -> list[Vecto
     raise ValueError(f"formación desconocida: {kind}")
 
 
+def _half_width(shape: list[Vector2]) -> float:
+    """El mayor ángulo de un miembro respecto de +x. Si pasa de 45°, la formación no
+    cabe en un cuadrante y se rechaza."""
+    half = max(abs(math.atan2(p.y, p.x)) for p in shape)
+    if half > QUARTER / 2:
+        raise ValueError(
+            f"una formación de {len(shape)} mide {math.degrees(2 * half):.0f}°:"
+            " no cabe en un cuadrante; baja spawning.formation_size"
+        )
+    return half
+
+
 def _into_quadrant(shape: list[Vector2], q: int, rng: random.Random) -> list[Vector2]:
     """Gira la formación a un ángulo al azar dentro del cuadrante `q`, sin que ningún
-    miembro se salga. Si es más ancha que el cuadrante, la centra."""
-    half = max(abs(math.atan2(p.y, p.x)) for p in shape)
-    low, high = q * QUARTER + half, (q + 1) * QUARTER - half
-    angle = rng.uniform(low, high) if low < high else (low + high) / 2
+    miembro se salga."""
+    half = _half_width(shape)
+    angle = rng.uniform(q * QUARTER + half, (q + 1) * QUARTER - half)
     return [p.rotate_rad(angle) for p in shape]
 
 
@@ -128,7 +172,7 @@ def place_formation(
     de a una separación, hasta quedar libre (decisión 27). Se corre en su propia
     dirección, así que no sale de su cuadrante ni se acerca al jugador.
     """
-    spacing = reach * 2 * radius + spec.formation_gap
+    spacing = _spacing(radius, spec, reach)
     shape = _shape(kind, count, spacing, spec.distance)
     q = rng.choice(emptiest_quadrants(o for o, _ in occupied))
     points = _into_quadrant(shape, q, rng)

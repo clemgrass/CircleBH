@@ -166,6 +166,9 @@ class Director:
             bought.append(replace(wanted, count=count))
             self._spent += count * cost
             available -= count * cost
+            # Al cerrar, la última de estas compras no se paga: `update` la reemplaza
+            # por una de la sección nueva. Gasta un sorteo, pero la partida sigue igual
+            # de repetible con la misma semilla.
             self._next = self._pick()
         return bought
 

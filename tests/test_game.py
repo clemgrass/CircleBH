@@ -309,6 +309,33 @@ def test_rafaga_reparte_los_cuadrantes() -> None:
     assert cuenta == [3, 3, 3, 3]
 
 
+def test_formacion_en_varios_pasos_se_deforma_poco() -> None:
+    # La cola guarda posiciones relativas al jugador. Si avanza mientras una fila llega
+    # de a uno, cada vecino nace corrido lo que el jugador avanzó en un paso: la fila
+    # se deforma a lo más eso, y sigue fuera del núcleo duro.
+    world = mundo_con_rafaga(6, "line", size=6, max_per_step=1)
+    for _ in range(6):
+        world.update(Vector2(1, 0))
+    fila = [e.position for e in world.enemies]
+    assert len(fila) == 6
+    hexagon = BALANCE.enemies["hexagon"]
+    nucleo = BALANCE.charges.core_reach * 2 * hexagon.radius
+    separacion = nucleo + BALANCE.spawning.formation_gap
+    avance = BALANCE.player.speed * STEP
+    for a, b in itertools.pairwise(fila):
+        assert abs(a.distance_to(b) - separacion) <= avance + 1e-9
+        assert a.distance_to(b) > nucleo
+
+
+def test_formacion_que_no_cabe_se_rechaza_al_crear_el_mundo() -> None:
+    # Negativo: con hexágonos enormes, la fila de 6 de la subida no cabe en un
+    # cuadrante. Falla al empezar, no a mitad de la partida.
+    hexagon = replace(BALANCE.enemies["hexagon"], radius=300.0)
+    balance = replace(BALANCE, enemies={"hexagon": hexagon})
+    with pytest.raises(ValueError, match="cuadrante"):
+        World(balance, random.Random(1))
+
+
 @given(seed=st.integers(0, 2**32 - 1))
 def test_aparece_fuera_de_la_vista_aunque_el_jugador_avance(seed: int) -> None:
     # Negativo: lo que espera en la cola se ubica desde donde está el jugador al salir,

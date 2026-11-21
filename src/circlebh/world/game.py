@@ -10,7 +10,7 @@ from circlebh.world.director import Director, Purchase
 from circlebh.world.enemy import Enemy
 from circlebh.world.events import Death, Event
 from circlebh.world.player import Player
-from circlebh.world.spawning import SpawnQueue, place_formation
+from circlebh.world.spawning import SpawnQueue, check_formations, place_formation
 from circlebh.world.swarm import step_swarm
 from circlebh.world.weapons import PointWeapon, Weapon
 
@@ -39,6 +39,7 @@ class World:
             balance.director, balance.enemies, balance.spawning, rng
         )
         """Decide qué aparece y cuándo, con la forma del tema (ADR 0025)."""
+        check_formations(balance)
         self.queue = SpawnQueue()
         """Lo comprado que espera aparecer, con su lugar relativo al jugador. Sale de a
         `spawning.max_per_step` por paso."""

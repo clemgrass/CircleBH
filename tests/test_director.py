@@ -23,6 +23,7 @@ from circlebh.balance import (
 from circlebh.world.clock import STEP
 from circlebh.world.director import Director, bar_at
 from circlebh.world.game import World
+from circlebh.world.spawning import FORMATIONS
 
 HEXAGONO = BALANCE.enemies["hexagon"]
 SPAWNING = BALANCE.spawning
@@ -158,11 +159,21 @@ def test_la_ultima_seccion_sigue_despues_de_sus_compases() -> None:
 # --- Las compras ---
 
 
-@given(seed=st.integers(0, 2**32 - 1))
-def test_no_gasta_mas_que_el_presupuesto(seed: int) -> None:
+CORTO_EN_FORMACION = replace(
+    CORTO,
+    sections=tuple(replace(s, formations=FORMATIONS) for s in CORTO.sections),
+)
+"""`CORTO` con todas las formaciones: compras de 1 y de 3 a 6."""
+
+
+@given(
+    seed=st.integers(0, 2**32 - 1),
+    spec=st.sampled_from([CORTO, CORTO_EN_FORMACION]),
+)
+def test_no_gasta_mas_que_el_presupuesto(seed: int, spec: DirectorSpec) -> None:
     # El presupuesto es una tasa, en amenaza por compás, que va de `budget_start` a
     # `budget_end`. Lo que gana una sección es su integral: el área de un trapecio.
-    director = Director(CORTO, ENEMIGOS, SPAWNING, random.Random(seed))
+    director = Director(spec, ENEMIGOS, SPAWNING, random.Random(seed))
     pasos = primer_paso(inicios(CORTO)[-1], CORTO.bpm)
     gastado: defaultdict[str, float] = defaultdict(float)
     for _, compras in correr(director, pasos):
@@ -171,7 +182,8 @@ def test_no_gasta_mas_que_el_presupuesto(seed: int) -> None:
     for s in CORTO.sections[:-1]:
         presupuesto = s.burst + (s.budget_start + s.budget_end) / 2 * s.bars
         assert gastado[s.name] <= presupuesto
-        # Y no deja más sin gastar de lo que cuesta la compra que está esperando.
+        # Y no deja más sin gastar de lo que cuesta uno de la compra que espera: una
+        # formación se recorta al cerrar la sección.
         assert gastado[s.name] > presupuesto - PESADO
 
 
@@ -275,6 +287,9 @@ def test_single_es_de_a_uno() -> None:
         (CORTO, replace(SPAWNING, formation_size=(4, 2)), "formation_size"),
         (CORTO, replace(SPAWNING, max_per_step=0), "max_per_step"),
         (CORTO, replace(SPAWNING, formation_gap=-1.0), "formation_gap"),
+        # Con 0, los vecinos nacen justo en el borde del núcleo duro, no fuera.
+        (CORTO, replace(SPAWNING, formation_gap=0.0), "formation_gap"),
+        (CORTO, replace(SPAWNING, distance=0.0), "distance"),
     ],
 )
 def test_aparicion_invalida_se_rechaza(

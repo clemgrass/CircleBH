@@ -187,6 +187,23 @@ def test_formacion_invalida_falla(kind: str, count: int, campo: str) -> None:
         colocar(kind, count, [], 1)
 
 
+@pytest.mark.parametrize(
+    ("kind", "radio"),
+    [
+        # El anillo de 6 mide 6 separaciones de arco: más de 90°.
+        ("ring", 300.0),
+        # Una cuerda más larga que el diámetro no existe.
+        ("ring", 700.0),
+        ("line", 300.0),
+        ("cluster", 2000.0),
+    ],
+)
+def test_formacion_que_no_cabe_en_un_cuadrante_falla(kind: str, radio: float) -> None:
+    # Negativo: una formación más ancha que su cuadrante se saldría de él.
+    with pytest.raises(ValueError, match="cuadrante"):
+        place_formation(kind, 6, radio, [], SPAWNING, REACH, random.Random(1))
+
+
 # --- La cola ---
 
 
