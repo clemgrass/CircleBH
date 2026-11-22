@@ -69,6 +69,10 @@ def todos_los_sonidos() -> list[Sequence[float]]:
         sounds.riser(1.9),
         sounds.stab((0, 3, 7, 10, 14)),
         sounds.poly_note(regular(6), (0, 2, 3), 220.0),
+        # La estrella herida: solo le quedan sus diagonales.
+        sounds.poly_note(
+            StarPolygonShape(vertices=5, steps=(1, 2)), (5, 6, 7, 8, 9), 220.0
+        ),
         sounds.blip(440.0),
     ]
 

@@ -8,6 +8,7 @@ entre `min_distance` y `max_distance` (decisiones 31 a 33 de la spec de la 0.2.0
 import math
 import random
 from collections.abc import Sequence
+from dataclasses import replace
 from itertools import groupby, pairwise
 
 import pytest
@@ -256,6 +257,23 @@ def test_herido_dispara_solo_desde_sus_vertices() -> None:
     bullets: list[EnemyBullet] = []
     rafaga(enemy).update(enemy, contexto([enemy], bullets))
     assert len(bullets) == PENTAGON.shape.vertices - 1
+    assert {(round(b.position.x, 9), round(b.position.y, 9)) for b in bullets} == (
+        vertices(enemy)
+    )
+
+
+def test_figura_no_regular_dispara_desde_los_vertices_de_sus_lineas() -> None:
+    # Con la figura de la estrella y solo la diagonal 5, que une los vértices 0 y 2,
+    # dispara desde esos dos. Con la regla vieja, "la arista k va de k a k + 1",
+    # saldría desde los vértices 5 y 6, que no existen.
+    estrella = replace(PENTAGON, shape=BALANCE.enemies["star"].shape)
+    enemy = Enemy(estrella, Vector2(DISTANCIA, 0))
+    for k in [0, 1, 2, 3, 4, 6, 7, 8, 9]:
+        enemy.remove_edge(k)
+    avanzar(enemy, AVISO)
+    bullets: list[EnemyBullet] = []
+    rafaga(enemy).update(enemy, contexto([enemy], bullets))
+    assert len(bullets) == 2
     assert {(round(b.position.x, 9), round(b.position.y, 9)) for b in bullets} == (
         vertices(enemy)
     )
