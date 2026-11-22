@@ -11,6 +11,11 @@ from pygame.math import Vector2
 
 from circlebh.balance import ChargesSpec
 
+COINCIDENT = 1e-9
+"""Bajo esta distancia, en unidades del plano, dos cuerpos están en el mismo punto. Con
+el núcleo del balance, `(d₀ / r)⁴` desborda el float recién cerca de `r = 1e-75`, así
+que el margen es amplio, y a `1e-9` ningún par se ve en pantalla."""
+
 # `math.pow` y no `**`: con exponente real, `**` puede dar un complejo y mypy lo tipa
 # como `Any`. `math.pow` siempre da un `float`.
 
@@ -29,9 +34,10 @@ def pair_force(
       depende de las cargas: siempre repele, aunque los polos se atraigan.
 
     En el mismo punto no hay dirección: da `Vector2()`, y los separa la red de seguridad.
+    Lo mismo a menos de `COINCIDENT`, donde `(d₀ / r)ⁿ` puede desbordar el float.
     """
     r = offset.length()
-    if r == 0:
+    if r < COINCIDENT:
         return Vector2()
     magnitude = 0.0
     if r < spec.cutoff:
