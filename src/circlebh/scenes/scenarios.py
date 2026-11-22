@@ -158,9 +158,10 @@ SCENARIOS: dict[str, Scenario] = {
             armed=False,
         ),
         Scenario(
-            "cuerda",
-            "El piloto da vueltas, sin armas y sin morir, con un círculo atado a él: la"
-            " espiral viaja con el jugador sin deformarse, se achica y lo alcanza.",
+            "persecucion",
+            "El piloto da vueltas, sin armas y sin morir, con un círculo que lo persigue"
+            " en espiral: mira solo dónde está el piloto, no cómo se mueve, así que"
+            " queda atrás cuando corre y se cierra cuando frena.",
             pilot=True,
             guest="circle",
             guest_at=(400.0, 0.0),

@@ -24,8 +24,8 @@ from circlebh.balance import (
     ChargeSpec,
     EnemyBulletSpec,
     EnemySpec,
+    SpiralSpec,
     StarPolygonShape,
-    TetherSpec,
     VolleySpec,
 )
 from circlebh.world.clock import STEP
@@ -367,19 +367,32 @@ class Volley(Action):
         self._left = self._durations.get(state, 0)
 
 
-class Tether(Action):
-    """La cuerda del círculo: gira atado al jugador en la espiral logarítmica
-    `r = r₀·e^(−λt)`, `θ = θ₀ + ω·t` (decisión 51).
+class SpiralState(Enum):
+    CROSSING = auto()
+    """Va derecho a cruzar el centro de la masa crítica."""
+    CIRCLING = auto()
+    """Ya lo cruzó: te persigue en espiral."""
 
-    La curva se mide desde el jugador, así que viaja con él. Corta cada radio siempre en
-    el mismo ángulo, `atan(ω/λ)`, y su rapidez es `r·√(ω² + λ²)`: lejos barre rápido, y
-    cerca del jugador anda lento. Impone su velocidad sin tope, como la embestida.
+
+class Spiral(Action):
+    """La espiral del círculo: primero cruza la masa crítica y después te persigue en
+    espiral, mirando solo dónde estás (decisiones 53 y 54).
+
+    - **Cruzar:** va a `cross_speed` hacia el centroide de los que cuentan para la masa
+      crítica, corrigiendo el rumbo. Cuando lo pasa, porque el centroide quedó detrás de
+      su avance, empieza a girar. Sin nadie que contar, gira desde el principio.
+    - **Girar:** en cada paso, el offset `d` desde el jugador gira `ω·dt` y se encoge por
+      `e^(−λ·dt)`. Con el jugador quieto es la espiral logarítmica exacta, que corta
+      cada radio en el mismo ángulo, `atan(ω/λ)`. Como solo mira las posiciones de este
+      paso, no hereda la velocidad del jugador: si corre, queda atrás y lo persigue en
+      curva.
+
+    Impone su velocidad sin tope, como la embestida.
     """
 
-    def __init__(self, spec: TetherSpec) -> None:
+    def __init__(self, spec: SpiralSpec) -> None:
         self.spec = spec
-        self._polar: tuple[float, float] | None = None
-        """`(r, θ)` desde el jugador. Se fija en el primer paso, donde nació."""
+        self.state = SpiralState.CROSSING
         self._velocity = Vector2()
 
     @property
@@ -391,32 +404,51 @@ class Tether(Action):
         return self._velocity
 
     def update(self, enemy: Enemy, context: ActionContext) -> list[Event]:
-        """Avanza `(r, θ)` un paso y fija la velocidad que deja al enemigo justo en ese
-        punto de la curva. Se mide desde `(r, θ)` y no desde donde quedó, así que si la
-        red de seguridad lo corre, el paso siguiente vuelve a la curva."""
-        if self._polar is None:
-            offset = enemy.position - context.player_position
-            self._polar = (offset.length(), math.atan2(offset.y, offset.x))
-        r, theta = self._polar
-        r *= math.exp(-self.spec.decay * STEP)
-        theta += self.spec.angular_speed * STEP
-        self._polar = (r, theta)
-        target = context.player_position + Vector2(r, 0).rotate_rad(theta)
-        self._velocity = (target - enemy.position) / STEP
+        """Fija la velocidad de este paso según la etapa."""
+        if self.state is SpiralState.CROSSING:
+            self._cross(enemy, context)
+        if self.state is SpiralState.CIRCLING:
+            self._circle(enemy, context.player_position)
         return []
+
+    def _cross(self, enemy: Enemy, context: ActionContext) -> None:
+        """Rumbo al centroide de la masa crítica, o a girar si ya lo pasó."""
+        others = [
+            e.position
+            for e in context.enemies
+            if e is not enemy and not e.spec.anchored
+        ]
+        if not others:
+            self.state = SpiralState.CIRCLING
+            return
+        ahead = sum(others, Vector2()) / len(others) - enemy.position
+        if ahead.length_squared() == 0 or self._velocity.dot(ahead) < 0:
+            self.state = SpiralState.CIRCLING
+            return
+        self._velocity = ahead.normalize() * self.spec.cross_speed
+
+    def _circle(self, enemy: Enemy, player: Vector2) -> None:
+        """La velocidad que lleva el offset `d` a `R(ω·dt)·d·e^(−λ·dt)` en un paso."""
+        offset = enemy.position - player
+        shrink = math.exp(-self.spec.decay * STEP)
+        target = player + offset.rotate_rad(self.spec.angular_speed * STEP) * shrink
+        self._velocity = (target - enemy.position) / STEP
 
 
 def check_actions(enemies: Mapping[str, EnemySpec]) -> None:
-    """Rechaza al crear el mundo una cuerda que no se acerca (`decay ≤ 0`) o que no
-    gira (`angular_speed = 0`), nombrando a su enemigo."""
+    """Rechaza al crear el mundo una espiral que no se acerca (`decay ≤ 0`), que no
+    gira (`angular_speed = 0`) o que no cruza (`cross_speed ≤ 0`), nombrando a su
+    enemigo."""
     for name, spec in enemies.items():
         for action in spec.actions:
-            if isinstance(action, TetherSpec) and (
-                action.decay <= 0 or action.angular_speed == 0
+            if isinstance(action, SpiralSpec) and (
+                action.decay <= 0
+                or action.angular_speed == 0
+                or action.cross_speed <= 0
             ):
                 raise ValueError(
-                    f"enemies.{name}.actions: una cuerda necesita decay > 0 y"
-                    f" angular_speed ≠ 0, no {action.decay} y {action.angular_speed}"
+                    f"enemies.{name}.actions: una espiral necesita decay > 0,"
+                    f" angular_speed ≠ 0 y cross_speed > 0, no {action}"
                 )
 
 
@@ -427,8 +459,8 @@ def make_action(spec: ActionSpec) -> Action:
             return Charge(spec)
         case VolleySpec():
             return Volley(spec)
-        case TetherSpec():
-            return Tether(spec)
+        case SpiralSpec():
+            return Spiral(spec)
 
 
 def step_actions(

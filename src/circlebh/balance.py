@@ -184,12 +184,13 @@ class VolleySpec:
 
 
 @dataclass(frozen=True, kw_only=True)
-class TetherSpec:
-    """Acción: la cuerda del círculo. Gira atado al jugador en la espiral logarítmica
-    `r = r₀·e^(−λt)`, `θ = θ₀ + ω·t`, medida desde el jugador: si el jugador se mueve, la
-    espiral viaja con él (`world/actions.py`, decisión 51)."""
+class SpiralSpec:
+    """Acción: la espiral del círculo. Primero cruza el centro de la masa crítica a
+    `cross_speed`, y después te persigue en la espiral logarítmica `ṙ = −λr`, `θ̇ = ω`,
+    mirando solo dónde estás, no cómo te mueves (`world/actions.py`, decisiones 53 y
+    54)."""
 
-    kind: Literal["tether"] = "tether"
+    kind: Literal["spiral"] = "spiral"
 
     angular_speed: float
     """`ω`, en rad/s, antihorario si es positiva. No puede ser 0: caería recto."""
@@ -197,6 +198,10 @@ class TetherSpec:
     decay: float
     """`λ`, en 1/s: el radio se multiplica por `e^(−λ)` cada segundo. Tiene que ser
     mayor que 0, o nunca se acercaría."""
+
+    cross_speed: float
+    """Su rapidez al cruzar la masa crítica, en unidades del plano por segundo. Más que
+    la del jugador, para que alcance al grupo aunque el jugador se mueva."""
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -238,7 +243,7 @@ type Shape = StarPolygonShape | CircleShape
 """La figura de un enemigo. En el JSON, su campo `kind` dice cuál es."""
 
 
-type ActionSpec = ChargeSpec | VolleySpec | TetherSpec
+type ActionSpec = ChargeSpec | VolleySpec | SpiralSpec
 """Una acción: lo que el enemigo hace y no es una fuerza (ADR 0021). En el JSON, su
 campo `kind` dice cuál es."""
 
@@ -642,7 +647,11 @@ BALANCE = Balance(
             mass_per_line=600.0,
             patterns=(),
             threat=0.0,
-            actions=(TetherSpec(kind="tether", angular_speed=1.2, decay=0.3),),
+            actions=(
+                SpiralSpec(
+                    kind="spiral", angular_speed=1.2, decay=0.3, cross_speed=360.0
+                ),
+            ),
         ),
     },
     spawning=SpawningSpec(

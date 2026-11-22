@@ -217,9 +217,10 @@
       "threat": 0.0,
       "actions": [
         {
-          "kind": "tether",
+          "kind": "spiral",
           "angular_speed": 1.2,
-          "decay": 0.3
+          "decay": 0.3,
+          "cross_speed": 360.0
         }
       ]
     }

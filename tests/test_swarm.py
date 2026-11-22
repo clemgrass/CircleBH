@@ -237,7 +237,7 @@ def test_lattice_empieza_por_los_mas_cercanos() -> None:
 
 def paso_real(enemies: list[Enemy]) -> None:
     """Un paso como el del mundo, con el jugador quieto en el origen y su carga real:
-    primero las acciones, como la cuerda del círculo, y después el enjambre."""
+    primero las acciones, como la espiral del círculo, y después el enjambre."""
     step_actions(enemies, Vector2(), random.Random(0), [], BALANCE.enemy_bullet)
     step_swarm(enemies, Vector2(), BALANCE.player.charge, BALANCE.charges)
 
