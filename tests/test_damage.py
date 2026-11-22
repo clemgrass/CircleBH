@@ -9,7 +9,7 @@ from dataclasses import replace
 
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, EnemySpec, PointWeaponSpec
+from circlebh.balance import BALANCE, EnemySpec, PointWeaponSpec, StarPolygonShape
 from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
 from circlebh.world.polygon import vertex
@@ -18,7 +18,7 @@ from circlebh.world.weapons import PointWeapon
 SPEC = PointWeaponSpec(cooldown=0.5, speed=600.0, range=700.0)
 # Sin patrones ni carga: aquí solo importa dónde está.
 HEXAGON = EnemySpec(
-    sides=6,
+    shape=StarPolygonShape(vertices=6, steps=(1,)),
     radius=24.0,
     speed=120.0,
     friction=0.0,
@@ -82,9 +82,11 @@ def test_tramo_que_termina_en_un_vertice_golpea() -> None:
     # Lo encontró Hypothesis: el vértice 7 de un polígono de 20 lados queda, por
     # redondeo, a 24,000000000000004 del centro, y la envolvente de radio 24 descartaba
     # un golpe que la prueba exacta sí encuentra.
-    veinte = replace(HEXAGON, sides=20, speed=0.0)
+    veinte = replace(
+        HEXAGON, shape=StarPolygonShape(vertices=20, steps=(1,)), speed=0.0
+    )
     enemy = Enemy(veinte, Vector2(0, 0))
-    v = vertex(veinte.radius, veinte.sides, 7)
+    v = vertex(veinte.radius, veinte.shape.vertices, 7)
     assert enemy.hit_by(Vector2(-29, -1), v) is not None
 
 

@@ -23,7 +23,7 @@ from circlebh.audio.voices import (
     voice_for,
     weapon_note,
 )
-from circlebh.balance import BALANCE, PointWeaponSpec
+from circlebh.balance import BALANCE, PointWeaponSpec, StarPolygonShape
 from circlebh.world.enemy import Enemy
 from circlebh.world.weapons import PointWeapon, Weapon
 
@@ -31,10 +31,15 @@ VOICING = CHORDS[0][1]
 COMPAS = 60 / 124 * 4
 
 
+def regular(n: int) -> StarPolygonShape:
+    """El polígono regular de `n` lados, `{n/1}`."""
+    return StarPolygonShape(vertices=n, steps=(1,))
+
+
 def vista(
     edges: tuple[int, ...] = (0, 1, 2, 3, 4, 5), angle: float = 0.0, sides: int = 6
 ) -> EnemyView:
-    return EnemyView(angle=angle, distance=100.0, sides=sides, edges=edges)
+    return EnemyView(angle=angle, distance=100.0, shape=regular(sides), edges=edges)
 
 
 def semicorcheas_que_suenan(view: EnemyView) -> list[int]:
@@ -65,7 +70,9 @@ def test_la_nota_del_golpe_i_es_la_nota_i_del_acorde() -> None:
     golpes = [s for s, golpe in enumerate(euclid(6, 16)) if golpe]
     lejos = [
         vista(),
-        EnemyView(angle=0.0, distance=500.0, sides=6, edges=(0, 1, 2, 3, 4, 5)),
+        EnemyView(
+            angle=0.0, distance=500.0, shape=regular(6), edges=(0, 1, 2, 3, 4, 5)
+        ),
     ]
     # El segundo más cercano no sube de octava.
     for i, s in enumerate(golpes):
@@ -75,8 +82,8 @@ def test_la_nota_del_golpe_i_es_la_nota_i_del_acorde() -> None:
 
 
 def test_el_mas_cercano_suena_mas_fuerte() -> None:
-    cerca = EnemyView(angle=0.0, distance=50.0, sides=6, edges=(0,))
-    lejos = EnemyView(angle=0.0, distance=600.0, sides=6, edges=(0,))
+    cerca = EnemyView(angle=0.0, distance=50.0, shape=regular(6), edges=(0,))
+    lejos = EnemyView(angle=0.0, distance=600.0, shape=regular(6), edges=(0,))
     [a, b] = enemy_notes([cerca, lejos], 0, VOICING)
     assert a.gain > b.gain > 0
 
@@ -125,7 +132,7 @@ def test_toda_nota_de_un_enemigo_esta_en_el_acorde(
         )
     )
     _, voicing = chord_at(bar, Variation(transpose=transpose, first_chord=0))
-    views = [EnemyView(angle, 10.0 * r, sides, edges) for r in range(3)]
+    views = [EnemyView(angle, 10.0 * r, regular(sides), edges) for r in range(3)]
     for note in enemy_notes(views, s, voicing):
         assert note.semitones in voicing or note.semitones - 12 in voicing
 

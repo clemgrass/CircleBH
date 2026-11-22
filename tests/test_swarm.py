@@ -66,7 +66,7 @@ def test_solo_entran_los_vivos() -> None:
     # Foco de revisión 1: un muerto tiene masa 0; si entrara, dividiría por cero.
     vivo = Enemy(HEXAGON, Vector2(100, 0))
     muerto = Enemy(HEXAGON, Vector2(150, 0))
-    for k in range(HEXAGON.sides):
+    for k in range(HEXAGON.shape.line_count):
         muerto.remove_edge(k)
     paso([vivo, muerto])
     assert muerto.position == Vector2(150, 0)

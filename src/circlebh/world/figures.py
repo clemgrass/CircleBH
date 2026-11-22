@@ -8,9 +8,11 @@ arista `k` del polígono regular, así que los sectores del ADR 0020 siguen vali
 Todo se mide desde el centro de la figura, sin girar.
 """
 
+from collections.abc import Mapping
+
 from pygame.math import Vector2
 
-from circlebh.balance import StarPolygonShape
+from circlebh.balance import EnemySpec, StarPolygonShape
 from circlebh.world.polygon import vertex
 
 
@@ -45,3 +47,10 @@ def check_shape(shape: StarPolygonShape, where: str) -> None:
             raise ValueError(
                 f"{where}.shape.steps: cada salto cumple 1 ≤ s < {n}/2, y {s} no"
             )
+
+
+def check_shapes(enemies: Mapping[str, EnemySpec]) -> None:
+    """Rechaza al crear el mundo la primera figura inválida del balance, nombrando a
+    su enemigo, para no fallar a mitad de la partida."""
+    for name, spec in enemies.items():
+        check_shape(spec.shape, f"enemies.{name}")

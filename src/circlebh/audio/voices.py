@@ -1,7 +1,7 @@
 """Las voces: cómo suena cada enemigo y cada arma (ADR 0022).
 
-Un enemigo de n lados es un loop E(n, 16) que suena mientras vive. Su ángulo alrededor
-del jugador rota el loop, y el golpe i es la arista i: si la arista no está, ese golpe
+Un enemigo de n líneas es un loop E(n, 16) que suena mientras vive. Su ángulo alrededor
+del jugador rota el loop, y el golpe i es la línea i: si la línea no está, ese golpe
 calla. La nota del golpe i es la nota i del acorde que suena, así que nunca desafina.
 
 Un arma es un loop E(k, 16) con k calculado desde su `spec` actual: una mejora se oye.
@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pygame.math import Vector2
 
 from circlebh.audio.rhythm import SIXTEENTHS, euclid
+from circlebh.balance import StarPolygonShape
 from circlebh.world.enemy import Enemy
 from circlebh.world.weapons import PointWeapon, Weapon
 
@@ -33,7 +34,7 @@ class EnemyView:
     angle: float
     """De 0 a 2π, antihorario desde +x (ADR 0003)."""
     distance: float
-    sides: int
+    shape: StarPolygonShape
     edges: tuple[int, ...]
 
 
@@ -43,7 +44,7 @@ class Note:
 
     semitones: int
     """Desde La3, ya dentro del voicing del acorde (o una octava arriba)."""
-    sides: int
+    shape: StarPolygonShape
     edges: tuple[int, ...]
     """La forma que le queda al enemigo: es el timbre de la nota."""
     gain: float
@@ -64,7 +65,7 @@ def nearest_views(
         offset = enemy.position - player
         angle = math.atan2(offset.y, offset.x) % math.tau
         views.append(
-            EnemyView(angle, offset.length(), enemy.spec.sides, tuple(enemy.edges))
+            EnemyView(angle, offset.length(), enemy.spec.shape, tuple(enemy.edges))
         )
     return views
 
@@ -80,9 +81,9 @@ def rotation(angle: float) -> int:
 def _loop_hit(view: EnemyView, s: int) -> int | None:
     """Qué golpe del loop cae en la semicorchea `s` del compás, o `None`.
 
-    Con más lados que semicorcheas, el loop es E(16, 16): un golpe en cada una.
+    Con más líneas que semicorcheas, el loop es E(16, 16): un golpe en cada una.
     """
-    pattern = euclid(min(view.sides, SIXTEENTHS), SIXTEENTHS)
+    pattern = euclid(min(view.shape.line_count, SIXTEENTHS), SIXTEENTHS)
     step = (s - rotation(view.angle)) % SIXTEENTHS
     if not pattern[step]:
         return None
@@ -90,14 +91,15 @@ def _loop_hit(view: EnemyView, s: int) -> int | None:
 
 
 def _still_has(view: EnemyView, j: int) -> bool:
-    """Si el golpe `j` todavía suena: su arista sigue ahí.
+    """Si el golpe `j` todavía suena: su línea sigue ahí.
 
-    Con más de 16 lados, el golpe j es un sector: suena mientras quede alguna arista
-    con `k·16 // lados == j`.
+    Con más de 16 líneas, el golpe j es un grupo: suena mientras quede alguna línea
+    con `k·16 // líneas == j`.
     """
-    if view.sides <= SIXTEENTHS:
+    lines = view.shape.line_count
+    if lines <= SIXTEENTHS:
         return j in view.edges
-    return any(edge * SIXTEENTHS // view.sides == j for edge in view.edges)
+    return any(edge * SIXTEENTHS // lines == j for edge in view.edges)
 
 
 def enemy_notes(
@@ -114,7 +116,7 @@ def enemy_notes(
             continue
         semitones = voicing[j % len(voicing)] + 12 * (rank == 0)
         gain = LOOP_GAIN * math.exp(-view.distance / GAIN_DISTANCE)
-        notes.append(Note(semitones, view.sides, view.edges, gain))
+        notes.append(Note(semitones, view.shape, view.edges, gain))
     return notes
 
 

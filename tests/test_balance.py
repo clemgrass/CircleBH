@@ -131,7 +131,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
         },
         "enemies": {
             "hexagon": {
-                "sides": 6,
+                "shape": {"kind": "star_polygon", "vertices": 6, "steps": [1]},
                 "radius": 24.0,
                 "speed": 120.0,
                 "friction": 2.0,
@@ -142,7 +142,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "actions": [],
             },
             "square": {
-                "sides": 4,
+                "shape": {"kind": "star_polygon", "vertices": 4, "steps": [1]},
                 "radius": 20.0,
                 "speed": 120.0,
                 "friction": 2.0,
@@ -153,7 +153,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "actions": [],
             },
             "triangle": {
-                "sides": 3,
+                "shape": {"kind": "star_polygon", "vertices": 3, "steps": [1]},
                 "radius": 14.0,
                 "speed": 150.0,
                 "friction": 3.0,
@@ -185,7 +185,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 ],
             },
             "pentagon": {
-                "sides": 5,
+                "shape": {"kind": "star_polygon", "vertices": 5, "steps": [1]},
                 "radius": 22.0,
                 "speed": 100.0,
                 "friction": 2.0,

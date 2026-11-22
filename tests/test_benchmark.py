@@ -10,7 +10,7 @@ from pygame.math import Vector2
 def test_el_enjambre_tiene_300_hexagonos() -> None:
     world = swarm_world()
     assert len(world.enemies) == 300
-    assert {enemy.spec.sides for enemy in world.enemies} == {6}
+    assert {enemy.spec.shape.vertices for enemy in world.enemies} == {6}
 
 
 def test_las_balas_le_pegan_al_jefe() -> None:
@@ -20,4 +20,4 @@ def test_las_balas_le_pegan_al_jefe() -> None:
     [boss] = world.enemies
     for _ in range(300):
         world.update(Vector2())
-    assert len(boss.edges) < boss.spec.sides
+    assert len(boss.edges) < boss.spec.shape.line_count

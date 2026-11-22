@@ -3,7 +3,7 @@
 import pytest
 from pygame.math import Vector2
 
-from circlebh.balance import EnemySpec, PointWeaponSpec
+from circlebh.balance import EnemySpec, PointWeaponSpec, StarPolygonShape
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
 from circlebh.world.weapons import Bullet, PointWeapon, nearest
@@ -15,7 +15,7 @@ COOLDOWN = 30
 VIDA = 70
 # Sin patrones ni carga: aquí solo importa dónde está.
 HEXAGON = EnemySpec(
-    sides=6,
+    shape=StarPolygonShape(vertices=6, steps=(1,)),
     radius=24.0,
     speed=120.0,
     friction=0.0,
@@ -123,7 +123,7 @@ def test_no_apunta_a_un_enemigo_muerto() -> None:
     # Un enemigo que perdió su última línea en este mismo paso sigue en la lista hasta
     # que `World` lo quita.
     muerto = enemigo(50, 0)
-    for k in range(HEXAGON.sides):
+    for k in range(HEXAGON.shape.line_count):
         muerto.remove_edge(k)
     weapon = PointWeapon(SPEC)
     weapon.update(Vector2(0, 0), [muerto, enemigo(0, -300)])

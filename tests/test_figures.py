@@ -4,12 +4,15 @@ La estrella chica es `{5/1}` más `{5/2}`: primero sus 5 lados y después sus 5 
 """
 
 import math
+import random
+from dataclasses import replace
 
 import pytest
 from pygame.math import Vector2
 
-from circlebh.balance import StarPolygonShape
+from circlebh.balance import BALANCE, StarPolygonShape
 from circlebh.world.figures import check_shape, line_vertices, local_lines
+from circlebh.world.game import World
 from circlebh.world.polygon import polygon_edge
 
 PHI = (1 + math.sqrt(5)) / 2
@@ -68,3 +71,12 @@ def test_rechaza_menos_de_tres_vertices() -> None:
 
 def test_acepta_la_estrella() -> None:
     check_shape(ESTRELLA, "star")
+
+
+def test_el_mundo_rechaza_una_figura_invalida_nombrando_al_enemigo() -> None:
+    malo = replace(
+        BALANCE.enemies["hexagon"], shape=StarPolygonShape(vertices=6, steps=(3,))
+    )
+    balance = replace(BALANCE, enemies={**BALANCE.enemies, "malo": malo})
+    with pytest.raises(ValueError, match=r"enemies\.malo\.shape"):
+        World(balance, random.Random(0))

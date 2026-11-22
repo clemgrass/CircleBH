@@ -212,15 +212,16 @@ campo `kind` dice cuál es."""
 
 @dataclass(frozen=True)
 class EnemySpec:
-    """Un tipo de enemigo: un polígono regular hecho de líneas, que se mueve por sus
-    patrones (ADR 0020 y 0021)."""
+    """Un tipo de enemigo: una figura hecha de líneas, que se mueve por sus patrones
+    (ADR 0020 y 0021)."""
 
-    sides: int
-    """Líneas al aparecer. Cada bala quita la que golpea y, sin líneas, muere."""
+    shape: StarPolygonShape
+    """Su figura. Aparece con todas sus líneas: cada bala quita la que golpea y, sin
+    líneas, muere."""
 
     radius: float
-    """Radio del polígono, en unidades del plano: el del círculo que pasa por sus
-    vértices. Es también su círculo envolvente, y no cambia al perder líneas."""
+    """Radio de la figura, en unidades del plano: el del círculo que pasa por sus
+    vértices. Es también su círculo envolvente."""
 
     speed: float
     """Velocidad máxima, en unidades del plano por segundo."""
@@ -401,7 +402,7 @@ BALANCE = Balance(
     ),
     enemies={
         "hexagon": EnemySpec(
-            sides=6,
+            shape=StarPolygonShape(kind="star_polygon", vertices=6, steps=(1,)),
             radius=24.0,
             speed=120.0,
             friction=2.0,
@@ -415,7 +416,7 @@ BALANCE = Balance(
             actions=(),
         ),
         "square": EnemySpec(
-            sides=4,
+            shape=StarPolygonShape(kind="star_polygon", vertices=4, steps=(1,)),
             radius=20.0,
             speed=120.0,
             friction=2.0,
@@ -429,7 +430,7 @@ BALANCE = Balance(
             actions=(),
         ),
         "triangle": EnemySpec(
-            sides=3,
+            shape=StarPolygonShape(kind="star_polygon", vertices=3, steps=(1,)),
             radius=14.0,
             speed=150.0,
             friction=3.0,
@@ -456,7 +457,7 @@ BALANCE = Balance(
             ),
         ),
         "pentagon": EnemySpec(
-            sides=5,
+            shape=StarPolygonShape(kind="star_polygon", vertices=5, steps=(1,)),
             radius=22.0,
             speed=100.0,
             friction=2.0,

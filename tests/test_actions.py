@@ -89,7 +89,9 @@ def hasta_soltarse(triangle: Enemy, enemies: Sequence[Enemy], player: Vector2) -
 
 def punta(enemy: Enemy) -> Vector2:
     """Hacia dónde apunta su primera punta, como vector unitario."""
-    tip = vertex(enemy.spec.radius, enemy.spec.sides, 0).rotate_rad(enemy.angle)
+    tip = vertex(enemy.spec.radius, enemy.spec.shape.vertices, 0).rotate_rad(
+        enemy.angle
+    )
     return tip.normalize()
 
 

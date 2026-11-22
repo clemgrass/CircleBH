@@ -47,10 +47,11 @@ def _free(_bar: int) -> Layers:
 
 
 def raw_intensity(enemies: Sequence[Enemy], player: Vector2) -> float:
-    """`Σ (líneas que quedan / lados) · e^(−d/DISTANCE)`: cuánto aprieta la partida."""
+    """`Σ (líneas que quedan / líneas de la figura) · e^(−d/DISTANCE)`: cuánto aprieta
+    la partida."""
     return sum(
         len(enemy.edges)
-        / enemy.spec.sides
+        / enemy.spec.shape.line_count
         * math.exp(-enemy.position.distance_to(player) / DISTANCE)
         for enemy in enemies
     )

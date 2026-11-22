@@ -1,4 +1,4 @@
-"""Los enemigos: polígonos regulares hechos de líneas, que se mueven por sus patrones, con
+"""Los enemigos: figuras hechas de líneas (`world/figures.py`), que se mueven por sus patrones, con
 inercia y roce (ADR 0021), y algunos giran (ADR 0027). Algunos tienen acciones, como la
 embestida, que pueden apagar sus patrones (`world/actions.py`).
 
@@ -12,13 +12,9 @@ from circlebh.balance import EnemySpec
 from circlebh.world.actions import make_action
 from circlebh.world.clock import STEP
 from circlebh.world.collisions import circles_touch, segment_touches_circle
+from circlebh.world.figures import local_lines
 from circlebh.world.patterns import Context, make_pattern
-from circlebh.world.polygon import (
-    ENVELOPE_SLACK,
-    edge_sectors,
-    first_hit,
-    polygon_edge,
-)
+from circlebh.world.polygon import ENVELOPE_SLACK, edge_sectors, first_hit
 from circlebh.world.rigid import center_of_mass, rotate, to_local, to_world
 
 
@@ -30,8 +26,11 @@ class Enemy:
         self.position = Vector2(position)
         self.previous = Vector2(position)
         """Dónde estaba antes del último `step`. Lo usa el tramo relativo de `hit_by`."""
-        self.edges = list(range(spec.sides))
-        """Las aristas que le quedan, de menor a mayor (ver `polygon.py`)."""
+        self.figure = local_lines(spec.shape, spec.radius)
+        """Las líneas de su figura entera, en el marco de la figura: desde su centro y
+        sin girar (`world/figures.py`). No cambian."""
+        self.edges = list(range(spec.shape.line_count))
+        """Los índices de las líneas que le quedan en `figure`, de menor a mayor."""
         self.velocity = Vector2()
         """Unidades del plano por segundo. Parte quieto."""
         self.angle = 0.0
@@ -103,9 +102,7 @@ class Enemy:
         girar."""
         return [
             (a + self.offset, b + self.offset)
-            for a, b in (
-                polygon_edge(self.spec.radius, self.spec.sides, k) for k in self.edges
-            )
+            for a, b in (self.figure[k] for k in self.edges)
         ]
 
     def lines(self) -> list[tuple[Vector2, Vector2]]:
@@ -154,7 +151,7 @@ class Enemy:
             relative_start, relative_end, Vector2(), self.spec.radius + ENVELOPE_SLACK
         ):
             return None
-        sides = self.spec.sides
+        sides = self.spec.shape.vertices
         candidates = [
             k
             for k in edge_sectors(relative_start, relative_end, sides)

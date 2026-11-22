@@ -277,7 +277,7 @@ class Sequencer:
         weapon_hits = self._add_weapons(s, swung, voicing)
         notes = tuple(enemy_notes(self._snapshot.views, s, voicing))
         for note in notes:
-            sample = sounds.poly_note(note.sides, note.edges, hz(note.semitones, A3))
+            sample = sounds.poly_note(note.shape, note.edges, hz(note.semitones, A3))
             self._add(swung, sample, note.gain, game=True, send=0.35)
         rims, death = self._add_accents(g, start, swung, voicing)
 

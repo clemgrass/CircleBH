@@ -14,7 +14,7 @@ from hypothesis import assume, given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, EnemySpec
+from circlebh.balance import BALANCE, EnemySpec, StarPolygonShape
 from circlebh.world.clock import STEP
 from circlebh.world.collisions import closest_point_on_segment
 from circlebh.world.enemy import Enemy
@@ -23,7 +23,7 @@ from circlebh.world.rigid import center_of_mass, rotate, to_local, to_world
 
 # Sin patrones ni carga, y rápido, para poder darle cualquier velocidad.
 CUADRADO = EnemySpec(
-    sides=4,
+    shape=StarPolygonShape(vertices=4, steps=(1,)),
     radius=24.0,
     speed=1000.0,
     friction=0.0,
@@ -33,7 +33,7 @@ CUADRADO = EnemySpec(
     threat=1.0,
     actions=(),
 )
-HEXAGONO = replace(CUADRADO, sides=6)
+HEXAGONO = replace(CUADRADO, shape=StarPolygonShape(vertices=6, steps=(1,)))
 
 SUBPASOS = 16
 """Los subpasos del cálculo de referencia."""
@@ -181,7 +181,7 @@ def golpe_en_subpasos(
         angulo = enemy.previous_angle + s * (enemy.angle - enemy.previous_angle)
         # Del marco del cuerpo, centrado en su centro de masa, al del polígono.
         camino.append(to_local(start.lerp(end, s), centro, angulo) - enemy.offset)
-    sides = enemy.spec.sides
+    sides = enemy.spec.shape.vertices
     for p, q in pairwise(camino):
         hit = first_hit(p, q, enemy.spec.radius, sides, enemy.edges)
         if hit is not None:
@@ -204,7 +204,7 @@ def ambiguo(camino: list[Vector2], enemy: Enemy, margen: float) -> bool:
     si empieza o termina a esa distancia de una línea. Ahí, un error del tamaño del
     margen puede cambiar qué línea se golpea, o si se golpea en este paso o el que
     sigue."""
-    radius, sides = enemy.spec.radius, enemy.spec.sides
+    radius, sides = enemy.spec.radius, enemy.spec.shape.vertices
     vertices = {k for edge in enemy.edges for k in (edge, (edge + 1) % sides)}
     cerca_de_un_vertice = any(
         v.distance_to(closest_point_on_segment(v, p, q)) <= margen

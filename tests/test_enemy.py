@@ -8,7 +8,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, EnemySpec
+from circlebh.balance import BALANCE, EnemySpec, StarPolygonShape
 from circlebh.settings import load_settings
 from circlebh.viewport import ASPECT_HEIGHT, ASPECT_WIDTH
 from circlebh.world.clock import STEP
@@ -17,7 +17,7 @@ from circlebh.world.patterns import Context
 from circlebh.world.polygon import polygon_edge
 
 SPEC = EnemySpec(
-    sides=6,
+    shape=StarPolygonShape(vertices=6, steps=(1,)),
     radius=24.0,
     speed=120.0,
     friction=0.0,
@@ -131,7 +131,7 @@ def test_la_envolvente_no_se_achica() -> None:
 
 def test_sin_lineas_no_esta_vivo() -> None:
     enemy = Enemy(SPEC, Vector2(0, 0))
-    for k in range(SPEC.sides):
+    for k in range(SPEC.shape.line_count):
         enemy.remove_edge(k)
     assert enemy.alive is False
 
@@ -142,7 +142,7 @@ def test_lineas_en_coordenadas_del_plano() -> None:
     lineas = enemy.lines()
     assert len(lineas) == 5
     # La arista 4, la vertical derecha, queda a la derecha del centro.
-    a, b = polygon_edge(SPEC.radius, SPEC.sides, 4)
+    a, b = polygon_edge(SPEC.radius, SPEC.shape.vertices, 4)
     assert (a + enemy.position, b + enemy.position) in lineas
 
 
