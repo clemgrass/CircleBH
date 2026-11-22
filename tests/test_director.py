@@ -259,6 +259,22 @@ def test_single_es_de_a_uno() -> None:
     assert len(compras) == 16
 
 
+@given(seed=st.integers(0, 2**32 - 1))
+def test_solitario_se_compra_siempre_single(seed: int) -> None:
+    # Decisión 45: aunque la sección sortee un anillo, una fila o un grupo, el
+    # solitario sale de a uno. El otro tipo del mazo sí forma.
+    enemigos = {**ENEMIGOS, "estrella": BALANCE.enemies["star"]}
+    mazo = (DeckEntry("estrella", 1.0), DeckEntry("hexagon", 1.0))
+    formaciones = ("ring", "line", "cluster")
+    spec = tema(seccion("unica", 8.0, 6.0, 6.0, mazo, formations=formaciones))
+    director = Director(spec, enemigos, ANILLOS_DE_5, random.Random(seed))
+    compras = [p for paso in range(1, 2000) for p in director.update(paso)]
+    estrellas = [p for p in compras if p.enemy == "estrella"]
+    assert estrellas
+    assert all((p.formation, p.count) == ("single", 1) for p in estrellas)
+    assert all(p.count == 5 for p in compras if p.enemy == "hexagon")
+
+
 @pytest.mark.parametrize(
     ("spec", "spawning", "campo"),
     [

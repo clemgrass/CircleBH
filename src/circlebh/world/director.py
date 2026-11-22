@@ -174,7 +174,10 @@ class Director:
 
     def _pick(self) -> Purchase | None:
         """La próxima compra: el tipo al azar por peso, la formación al azar entre las
-        de la sección, y su tamaño entre `spawning.formation_size`. Sin mazo, ninguna."""
+        de la sección, y su tamaño entre `spawning.formation_size`. Sin mazo, ninguna.
+
+        Un tipo `solitary` sale siempre `single` (decisión 45). Su formación se sortea
+        igual y se descarta, para que el azar que sigue no dependa de qué tipo salió."""
         section = self.section
         if not section.deck:
             return None
@@ -187,4 +190,6 @@ class Director:
             if formation == "single"
             else self.rng.randint(*self.spawning.formation_size)
         )
+        if self.enemies[enemy].solitary:
+            return Purchase(enemy, "single", 1)
         return Purchase(enemy, formation, count)
