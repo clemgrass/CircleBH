@@ -217,6 +217,18 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                     }
                 ],
             },
+            "star": {
+                "shape": {"kind": "star_polygon", "vertices": 5, "steps": [1, 2]},
+                "radius": 40.0,
+                "speed": 0.0,
+                "friction": 0.0,
+                "spin": 0.0,
+                "anchored": True,
+                "charge_per_line": 0.6,
+                "patterns": [],
+                "threat": 2.0,
+                "actions": [],
+            },
         },
         "spawning": {
             "distance": 800.0,
