@@ -15,7 +15,7 @@ from circlebh.audio.harmony import chord_at, variation_for
 from circlebh.audio.intensity import PHRASE_BARS
 from circlebh.audio.rhythm import SIXTEENTHS
 from circlebh.audio.sequencer import SAMPLES_PER_STEP, Sequencer
-from circlebh.balance import BALANCE, EnemySpec, SectionSpec
+from circlebh.balance import BALANCE, EnemySpec, SectionSpec, StarPolygonShape
 from circlebh.pilot import pilot_intent
 from circlebh.world.enemy import Enemy
 from circlebh.world.events import Death, Hit
@@ -31,11 +31,14 @@ SIN_APARICIONES = replace(
 )
 # Sin patrones ni carga: el enemigo se queda donde lo ponen.
 QUIETO = EnemySpec(
-    sides=6,
+    shape=StarPolygonShape(vertices=6, steps=(1,)),
     radius=24.0,
     speed=120.0,
     friction=0.0,
     spin=0.0,
+    anchored=False,
+    phantom=False,
+    solitary=False,
     charge_per_line=0.0,
     patterns=(),
     threat=1.0,

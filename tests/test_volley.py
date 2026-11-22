@@ -159,11 +159,11 @@ def test_rafaga_se_corta_si_el_jugador_se_acerca() -> None:
     enemy = pentagono()
     bullets: list[EnemyBullet] = []
     avanzar(enemy, AVISO + 1, bullets)
-    assert len(bullets) == PENTAGON.sides
+    assert len(bullets) == PENTAGON.shape.vertices
     cerca = enemy.position + Vector2(0, VOLLEY.min_distance - 1)
     states = avanzar(enemy, RAFAGA, bullets, player=cerca)
     assert VolleyState.FIRING not in states[INTERVALO - 1 :]
-    assert len(bullets) == PENTAGON.sides
+    assert len(bullets) == PENTAGON.shape.vertices
 
 
 # --- El giro ---
@@ -200,7 +200,7 @@ def test_dispara_una_bala_por_vertice() -> None:
     avanzar(enemy, AVISO, bullets)
     assert bullets == []
     rafaga(enemy).update(enemy, contexto([enemy], bullets))
-    assert len(bullets) == PENTAGON.sides
+    assert len(bullets) == PENTAGON.shape.vertices
     assert {(round(b.position.x, 9), round(b.position.y, 9)) for b in bullets} == (
         vertices(enemy)
     )
@@ -214,7 +214,7 @@ def test_angulos_de_las_balas() -> None:
     bullets: list[EnemyBullet] = []
     rafaga(enemy).update(enemy, contexto([enemy], bullets))
     assert enemy.angle == 0.3
-    n = PENTAGON.sides
+    n = PENTAGON.shape.vertices
     esperados = [enemy.angle + math.pi / 2 + math.tau * k / n for k in range(n)]
     for bullet, angle in zip(bullets, esperados, strict=True):
         esperado = Vector2(math.cos(angle), math.sin(angle)) * BULLET.speed
@@ -228,10 +228,10 @@ def test_rafaga_de_shots_salvas() -> None:
     contadas = []
     for _ in range(RAFAGA):
         avanzar(enemy, 1, bullets)
-        contadas.append(len(bullets) // PENTAGON.sides)
+        contadas.append(len(bullets) // PENTAGON.shape.vertices)
     # Una salva al empezar y otra cada `interval`.
     assert contadas == [1 + k // INTERVALO for k in range(RAFAGA)]
-    assert len(bullets) == VOLLEY.shots * PENTAGON.sides
+    assert len(bullets) == VOLLEY.shots * PENTAGON.shape.vertices
 
 
 def test_salvas_siguen_el_giro() -> None:
@@ -240,7 +240,7 @@ def test_salvas_siguen_el_giro() -> None:
     enemy = pentagono()
     bullets: list[EnemyBullet] = []
     avanzar(enemy, AVISO + RAFAGA, bullets)
-    n = PENTAGON.sides
+    n = PENTAGON.shape.vertices
     primeras = [bullets[k * n].velocity for k in range(VOLLEY.shots)]
     giro = PENTAGON.spin * INTERVALO * STEP
     for a, b in pairwise(primeras):
@@ -255,7 +255,7 @@ def test_herido_dispara_solo_desde_sus_vertices() -> None:
     avanzar(enemy, AVISO)
     bullets: list[EnemyBullet] = []
     rafaga(enemy).update(enemy, contexto([enemy], bullets))
-    assert len(bullets) == PENTAGON.sides - 1
+    assert len(bullets) == PENTAGON.shape.vertices - 1
     assert {(round(b.position.x, 9), round(b.position.y, 9)) for b in bullets} == (
         vertices(enemy)
     )

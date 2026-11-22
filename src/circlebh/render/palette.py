@@ -1,7 +1,7 @@
 """Los colores del juego: un fondo, un trazo y un acento para el peligro.
 
-Todo lo que se dibuja usa el trazo, salvo lo que mata sin ser un enemigo, como las balas
-enemigas, que usa el acento. Lo que tapa o desvanece la escena usa el fondo. Así,
+Todo lo que se dibuja usa el trazo, salvo lo que mata y los enemigos atraviesan, que usa
+el acento: las balas enemigas y la gran estrella roja. Lo que tapa o desvanece la escena usa el fondo. Así,
 invertir los colores es invertir el fondo y el trazo (ADR 0023).
 """
 

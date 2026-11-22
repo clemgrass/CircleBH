@@ -31,8 +31,10 @@ def step_swarm(
 
     Los vecinos de cada uno son los que están a menos de `charges.cutoff`: con radio
     `cutoff / 2` para todos, "se tocan" en la grilla justo a esa distancia.
+
+    Los fantasmas no entran: los demás los atraviesan, sin fuerzas ni red de seguridad.
     """
-    alive = [enemy for enemy in enemies if enemy.alive]
+    alive = [enemy for enemy in enemies if enemy.alive and not enemy.spec.phantom]
     half = charges.cutoff / 2
     pairs = SpatialGrid(charges.cutoff).pairs(
         [enemy.position for enemy in alive], [half] * len(alive)
@@ -57,33 +59,42 @@ def separate(enemies: Sequence[Enemy], cell_size: float) -> int:
     """La red de seguridad: aparta a los pares cuyos círculos envolventes se superponen,
     y devuelve cuántos pares corrigió.
 
-    A cada uno le toca la mitad de la superposición, en la dirección que los une, y se
-    le quita la mitad de la velocidad con que se acercan: el choque no rebota. Las
-    correcciones de todos los pares se suman y se aplican juntas (Jacobi), para que no
-    dependan del orden de la lista. Un par aislado queda tangente; en un grupo puede
-    quedar un resto, que se corrige en el paso siguiente.
+    Cada uno se lleva su parte `wᵢ / (wᵢ + wⱼ)` de la superposición, en la dirección
+    que los une, y de la velocidad con que se acercan: el choque no rebota. El peso `w`
+    es 1, o 0 si está anclado. Entre dos libres, cada uno se lleva la mitad; contra un
+    anclado, el otro se lleva todo; y dos anclados no se corrigen. Las correcciones de
+    todos los pares se suman y se aplican juntas (Jacobi), para que no dependan del
+    orden de la lista. Un par aislado queda tangente; en un grupo puede quedar un
+    resto, que se corrige en el paso siguiente.
     """
     shifts = [Vector2() for _ in enemies]
     pushes = [Vector2() for _ in enemies]
     corrected = 0
     for i, j in sorted(_close_pairs(enemies, cell_size)):
         a, b = enemies[i], enemies[j]
+        wa, wb = _weight(a), _weight(b)
         offset = b.position - a.position
         overlap = a.radius + b.radius - offset.length()
-        if overlap <= 0:
+        if overlap <= 0 or wa + wb == 0:
             continue
         corrected += 1
+        share_a, share_b = wa / (wa + wb), wb / (wa + wb)
         normal = offset.normalize() if offset.length_squared() > 0 else FIXED_DIRECTION
-        shifts[i] -= normal * (overlap / 2)
-        shifts[j] += normal * (overlap / 2)
+        shifts[i] -= normal * (overlap * share_a)
+        shifts[j] += normal * (overlap * share_b)
         approaching = (b.velocity - a.velocity).dot(normal)
         if approaching < 0:
-            pushes[i] += normal * (approaching / 2)
-            pushes[j] -= normal * (approaching / 2)
+            pushes[i] += normal * (approaching * share_a)
+            pushes[j] -= normal * (approaching * share_b)
     for enemy, shift, push in zip(enemies, shifts, pushes, strict=True):
         enemy.position = enemy.position + shift
         enemy.velocity = enemy.velocity + push
     return corrected
+
+
+def _weight(enemy: Enemy) -> float:
+    """Cuánto le toca de cada corrección: 0 si está anclado, como de masa infinita."""
+    return 0.0 if enemy.spec.anchored else 1.0
 
 
 def _close_pairs(enemies: Sequence[Enemy], cell_size: float) -> set[tuple[int, int]]:

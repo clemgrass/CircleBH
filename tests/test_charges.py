@@ -67,6 +67,13 @@ def test_mismo_punto_no_divide_por_cero() -> None:
     assert pair_force(Vector2(), 6, 6, CONTACTO, SPEC) == Vector2()
 
 
+def test_casi_en_el_mismo_punto_no_desborda() -> None:
+    # Lo encontró Hypothesis en `test_nunca_dispara_sin_avisar`: dos pentágonos a
+    # 2,3e-161, donde `(d₀ / r)ⁿ` desborda el float. Ahí, como en el mismo punto, no
+    # hay dirección confiable: los separa la red de seguridad.
+    assert pair_force(Vector2(0, 2.27625e-161), 5, 5, CONTACTO, SPEC) == Vector2()
+
+
 def test_el_jugador_atrae() -> None:
     assert player_force(Vector2(100, 0), 6, -14, SPEC).x < 0
 

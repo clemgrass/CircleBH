@@ -187,7 +187,7 @@ def test_bala_atraviesa_enemigos() -> None:
         a, b = dispara.enemies[1], callado.enemies[1]
         assert a.position == b.position
         assert a.velocity == b.velocity
-        assert a.edges == list(range(HEXAGON.sides))
+        assert a.edges == list(range(HEXAGON.shape.line_count))
     assert disparos > 0
 
 

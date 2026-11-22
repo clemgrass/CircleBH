@@ -21,7 +21,7 @@ class Shot:
 
 @dataclass(frozen=True)
 class Hit:
-    """Una bala quitó la arista `edge` a `enemy`."""
+    """Una bala quitó la línea `edge` a `enemy`."""
 
     enemy: Enemy
     edge: int

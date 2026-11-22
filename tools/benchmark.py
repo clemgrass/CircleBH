@@ -19,7 +19,7 @@ from dataclasses import replace
 
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE
+from circlebh.balance import BALANCE, StarPolygonShape
 from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
 from circlebh.world.swarm import lattice
@@ -51,7 +51,13 @@ def boss_world() -> World:
     """Un enemigo quieto de 100 líneas a 300 unidades: el único blanco del arma."""
     world = World(QUIET, random.Random(1), lethal=False)
     hexagon = QUIET.enemies["hexagon"]
-    boss = replace(hexagon, sides=100, radius=200.0, charge_per_line=0.0, patterns=())
+    boss = replace(
+        hexagon,
+        shape=StarPolygonShape(vertices=100, steps=(1,)),
+        radius=200.0,
+        charge_per_line=0.0,
+        patterns=(),
+    )
     world.enemies = [Enemy(boss, Vector2(300, 0))]
     return world
 

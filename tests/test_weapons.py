@@ -1,9 +1,11 @@
 """Tests del arma punto: una bala que se dispara sola al centro del enemigo más cercano."""
 
+from dataclasses import replace
+
 import pytest
 from pygame.math import Vector2
 
-from circlebh.balance import EnemySpec, PointWeaponSpec
+from circlebh.balance import EnemySpec, PointWeaponSpec, StarPolygonShape
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
 from circlebh.world.weapons import Bullet, PointWeapon, nearest
@@ -15,11 +17,14 @@ COOLDOWN = 30
 VIDA = 70
 # Sin patrones ni carga: aquí solo importa dónde está.
 HEXAGON = EnemySpec(
-    sides=6,
+    shape=StarPolygonShape(vertices=6, steps=(1,)),
     radius=24.0,
     speed=120.0,
     friction=0.0,
     spin=0.0,
+    anchored=False,
+    phantom=False,
+    solitary=False,
     charge_per_line=0.0,
     patterns=(),
     threat=1.0,
@@ -70,6 +75,25 @@ def test_bala_vence_al_recorrer_range() -> None:
 
 def test_nearest_sin_enemigos_es_none() -> None:
     assert nearest(Vector2(0, 0), []) is None
+
+
+def test_el_arma_no_le_apunta_al_fantasma() -> None:
+    # Decisión 44: dentro de la gran estrella, el arma sigue apuntando al enjambre,
+    # aunque el centro de la estrella esté más cerca.
+    fantasma = Enemy(replace(HEXAGON, phantom=True, radius=150.0), Vector2(10, 0))
+    hexagono = enemigo(0, -100)
+    assert nearest(Vector2(0, 0), [fantasma, hexagono]) is hexagono
+    assert nearest(Vector2(0, 0), [fantasma]) is None
+
+
+def test_la_bala_le_quita_una_linea_al_fantasma() -> None:
+    # Las balas del jugador sí lo golpean: así se rompe la trampa.
+    fantasma = Enemy(replace(HEXAGON, phantom=True), Vector2(100, 0))
+    weapon = PointWeapon(SPEC)
+    weapon.bullets.append(Bullet(Vector2(0, 0), Vector2(SPEC.speed, 0), SPEC))
+    for _ in range(20):
+        weapon.update(Vector2(0, 0), [fantasma])
+    assert len(fantasma.edges) < HEXAGON.shape.line_count
 
 
 def test_dispara_al_centro_del_mas_cercano() -> None:
@@ -123,7 +147,7 @@ def test_no_apunta_a_un_enemigo_muerto() -> None:
     # Un enemigo que perdió su última línea en este mismo paso sigue en la lista hasta
     # que `World` lo quita.
     muerto = enemigo(50, 0)
-    for k in range(HEXAGON.sides):
+    for k in range(HEXAGON.shape.line_count):
         muerto.remove_edge(k)
     weapon = PointWeapon(SPEC)
     weapon.update(Vector2(0, 0), [muerto, enemigo(0, -300)])

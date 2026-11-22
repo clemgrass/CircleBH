@@ -5,7 +5,7 @@ se calcula una sola vez: queda en caché. Los que llevan ruido usan su propia `R
 de semilla fija, así que no dependen del orden en que se generan ni tocan el azar del
 juego.
 
-El timbre de un polígono sale de su forma: un punto recorre las aristas que le quedan a
+El timbre de un enemigo sale de su figura: un punto recorre las líneas que le quedan a
 rapidez constante, y su `x` es la onda. Entero, el hexágono suena suave (armónicos en
 k = 1 ± 6m, con magnitud 1/k²); con huecos, el punto salta y suena más brillante.
 """
@@ -17,10 +17,11 @@ from functools import cache, lru_cache
 
 from circlebh.audio.harmony import A3, hz
 from circlebh.audio.rhythm import RATE
-from circlebh.world.polygon import polygon_edge
+from circlebh.balance import StarPolygonShape
+from circlebh.world.figures import local_lines
 
 TABLE = 2048
-"""Muestras de un ciclo de onda de un polígono."""
+"""Muestras de un ciclo de onda de una figura."""
 
 type Samples = array[float]
 
@@ -157,15 +158,17 @@ def blip(freq: float) -> Samples:
 
 
 @lru_cache(maxsize=64)
-def shape_table(sides: int, edges: tuple[int, ...]) -> Samples:
-    """Un ciclo de onda: la `x` de un punto que recorre `edges` a rapidez constante,
-    centrada en 0 y con pico 1. Con huecos entre aristas, el punto salta."""
+def shape_table(shape: StarPolygonShape, edges: tuple[int, ...]) -> Samples:
+    """Un ciclo de onda: la `x` de un punto que recorre las líneas `edges` de `shape` a
+    rapidez constante, centrada en 0 y con pico 1. Con huecos entre líneas, el punto
+    salta."""
     if not edges:
-        raise ValueError("un polígono sin aristas no tiene timbre")
+        raise ValueError("una figura sin líneas no tiene timbre")
+    lines = local_lines(shape, 1.0)
     xs: list[float] = []
     per_edge = TABLE / len(edges)
     for i, k in enumerate(edges):
-        a, b = polygon_edge(1.0, sides, k)
+        a, b = lines[k]
         start, end = round(i * per_edge), round((i + 1) * per_edge)
         xs.extend(a.lerp(b, (j - start) / (end - start)).x for j in range(start, end))
     mean = sum(xs) / len(xs)
@@ -174,9 +177,9 @@ def shape_table(sides: int, edges: tuple[int, ...]) -> Samples:
 
 
 @lru_cache(maxsize=256)
-def poly_note(sides: int, edges: tuple[int, ...], freq: float) -> Samples:
+def poly_note(shape: StarPolygonShape, edges: tuple[int, ...], freq: float) -> Samples:
     """La nota de un loop de enemigo: la forma que le queda es el timbre."""
-    table = shape_table(sides, edges)
+    table = shape_table(shape, edges)
     step = freq * TABLE / RATE
     out, phase = [], 0.0
     for i in range(int(0.22 * RATE)):

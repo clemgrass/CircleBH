@@ -9,18 +9,21 @@ from collections.abc import Callable
 
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, EnemySpec
+from circlebh.balance import BALANCE, EnemySpec, StarPolygonShape
 from circlebh.world.enemy import Enemy
 from circlebh.world.events import Death, Hit, Shot
 from circlebh.world.game import World
 
 # Sin patrones ni carga: el enemigo se queda donde lo ponen.
 QUIETO = EnemySpec(
-    sides=6,
+    shape=StarPolygonShape(vertices=6, steps=(1,)),
     radius=24.0,
     speed=120.0,
     friction=0.0,
     spin=0.0,
+    anchored=False,
+    phantom=False,
+    solitary=False,
     charge_per_line=0.0,
     patterns=(),
     threat=1.0,

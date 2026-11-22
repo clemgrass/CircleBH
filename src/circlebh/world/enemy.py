@@ -1,6 +1,6 @@
-"""Los enemigos: polígonos regulares hechos de líneas, que se mueven por sus patrones, con
-inercia y roce (ADR 0021), y algunos giran (ADR 0027). Algunos tienen acciones, como la
-embestida, que pueden apagar sus patrones (`world/actions.py`).
+"""Los enemigos: figuras hechas de líneas (`world/figures.py`), que se mueven por sus
+patrones, con inercia y roce (ADR 0021), y algunos giran (ADR 0027). Algunos tienen
+acciones, como la embestida, que pueden apagar sus patrones (`world/actions.py`).
 
 Cada línea es una parte del enemigo: la bala quita la que golpea, y sin líneas el enemigo
 muere. Chocan por sus líneas, y el círculo envolvente es el primer descarte (ADR 0020).
@@ -12,13 +12,9 @@ from circlebh.balance import EnemySpec
 from circlebh.world.actions import make_action
 from circlebh.world.clock import STEP
 from circlebh.world.collisions import circles_touch, segment_touches_circle
+from circlebh.world.figures import is_regular, local_lines
 from circlebh.world.patterns import Context, make_pattern
-from circlebh.world.polygon import (
-    ENVELOPE_SLACK,
-    edge_sectors,
-    first_hit,
-    polygon_edge,
-)
+from circlebh.world.polygon import ENVELOPE_SLACK, edge_sectors, first_crossing
 from circlebh.world.rigid import center_of_mass, rotate, to_local, to_world
 
 
@@ -30,8 +26,11 @@ class Enemy:
         self.position = Vector2(position)
         self.previous = Vector2(position)
         """Dónde estaba antes del último `step`. Lo usa el tramo relativo de `hit_by`."""
-        self.edges = list(range(spec.sides))
-        """Las aristas que le quedan, de menor a mayor (ver `polygon.py`)."""
+        self.figure = local_lines(spec.shape, spec.radius)
+        """Las líneas de su figura entera, en el marco de la figura: desde su centro y
+        sin girar (`world/figures.py`). No cambian."""
+        self.edges = list(range(spec.shape.line_count))
+        """Los índices de las líneas que le quedan en `figure`, de menor a mayor."""
         self.velocity = Vector2()
         """Unidades del plano por segundo. Parte quieto."""
         self.angle = 0.0
@@ -41,7 +40,7 @@ class Enemy:
         self.omega = spec.spin
         """Su velocidad angular `ω`, en rad/s. Parte en `spec.spin` y no cambia."""
         self.offset = Vector2()
-        """Dónde queda el centro del polígono visto desde `position`, en el marco del
+        """Dónde queda el centro de la figura visto desde `position`, en el marco del
         enemigo. Parte en 0. Si gira y pierde una línea, `position` pasa a su nuevo
         centro de masa, y esto guarda cuánto se corrió (ADR 0027)."""
         self._radius = spec.radius
@@ -65,7 +64,7 @@ class Enemy:
     def radius(self) -> float:
         """Radio del círculo envolvente, en torno a `position`. No es un hitbox.
 
-        Sin giro, es el del polígono completo y no se achica: las líneas que quedan no
+        Sin giro, es el de la figura completa y no se achica: las líneas que quedan no
         se mueven. Con giro, al perder una línea, es la distancia del centro de masa
         nuevo al extremo más lejano de las que quedan."""
         return self._radius
@@ -76,7 +75,7 @@ class Enemy:
         return bool(self.edges)
 
     def remove_edge(self, k: int) -> None:
-        """Quita la arista `k`: una bala la golpeó.
+        """Quita la línea `k`: una bala la golpeó.
 
         Sin giro, nada más cambia (spec de la 0.1.0, decisión 15). Con giro, el resto
         sigue con el mismo `ω`, como un cuerpo que se rompe, y gira en torno a su nuevo
@@ -87,7 +86,8 @@ class Enemy:
         - `velocity` pasa a la que tenía ese punto: `v + ω × (c' − c)`.
         """
         self.edges.remove(k)
-        if self.spec.spin == 0 or not self.edges:
+        # Un anclado no gira (ver `step`), así que tampoco se recentra.
+        if self.spec.spin == 0 or self.spec.anchored or not self.edges:
             return
         # `shift` es `c' − c` en el marco del enemigo, y `moved`, en el plano.
         shift = center_of_mass(self._local_lines())
@@ -103,9 +103,7 @@ class Enemy:
         girar."""
         return [
             (a + self.offset, b + self.offset)
-            for a, b in (
-                polygon_edge(self.spec.radius, self.spec.sides, k) for k in self.edges
-            )
+            for a, b in (self.figure[k] for k in self.edges)
         ]
 
     def lines(self) -> list[tuple[Vector2, Vector2]]:
@@ -144,8 +142,8 @@ class Enemy:
         enemigo es una curva, y el tramo recto entre sus extremos se aparta de ella a lo
         más `(2·|ω·dt|·|Δr| + (ω·dt)²·|r|) / 8` (ADR 0027).
         """
-        # Del marco del enemigo, centrado en `position`, al del polígono, donde valen
-        # los sectores (ADR 0020).
+        # Del marco del enemigo, centrado en `position`, al de la figura, donde están
+        # sus líneas.
         relative_start = (
             to_local(start, self.previous, self.previous_angle) - self.offset
         )
@@ -154,14 +152,16 @@ class Enemy:
             relative_start, relative_end, Vector2(), self.spec.radius + ENVELOPE_SLACK
         ):
             return None
-        sides = self.spec.sides
-        candidates = [
-            k
-            for k in edge_sectors(relative_start, relative_end, sides)
-            if k in self.edges
-        ]
-        return first_hit(
-            relative_start, relative_end, self.spec.radius, sides, candidates
+        # Los sectores ordenan solo las aristas de un polígono regular (ADR 0020). En
+        # otra figura, una línea cruza varios sectores: se revisan todas (F1, ADR 0027).
+        shape = self.spec.shape
+        if is_regular(shape):
+            sectors = edge_sectors(relative_start, relative_end, shape.vertices)
+            candidates = [k for k in sectors if k in self.edges]
+        else:
+            candidates = self.edges
+        return first_crossing(
+            relative_start, relative_end, {k: self.figure[k] for k in candidates}
         )
 
     def acceleration(self, context: Context) -> Vector2:
@@ -185,9 +185,14 @@ class Enemy:
 
         Si una acción fija la velocidad, como la embestida, `v` es esa, sin tope. Si fija
         el giro, como el triángulo que te mira, `ω` es ese en este paso.
+
+        Un anclado no se mueve: su pose de antes pasa a ser la de ahora, y `v` queda en 0.
         """
         self.previous = Vector2(self.position)
         self.previous_angle = self.angle
+        if self.spec.anchored:
+            self.velocity = Vector2()
+            return
         turn = next((a.omega for a in self.actions if a.omega is not None), self.omega)
         self.angle += turn * STEP
         imposed = next(

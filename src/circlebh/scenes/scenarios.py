@@ -104,5 +104,36 @@ SCENARIOS: dict[str, Scenario] = {
             lethal=False,
             armed=False,
         ),
+        Scenario(
+            "estrella",
+            "Una estrella quieta junto al jugador quieto, que no muere y le dispara:"
+            " cada bala le quita primero un lado, y después la diagonal que quedó"
+            " expuesta.",
+            pilot=False,
+            crowd=1,
+            crowd_enemy="star",
+            lethal=False,
+        ),
+        Scenario(
+            "estrella-rodeada",
+            "Una estrella quieta junto al jugador quieto, que no muere ni dispara: los"
+            " hexágonos y cuadrados que trae el tema la rodean sin encimarse, y no la"
+            " mueven.",
+            pilot=False,
+            crowd=1,
+            crowd_enemy="star",
+            lethal=False,
+            armed=False,
+        ),
+        Scenario(
+            "gran-estrella",
+            "5 estrellas alrededor del piloto, que no muere y dispara: se juntan, el aviso"
+            " titila tres pulsos encima de él, y la gran estrella roja lo encierra"
+            " mientras el enjambre la atraviesa. Al salir, se apaga.",
+            pilot=True,
+            crowd=5,
+            crowd_enemy="star",
+            lethal=False,
+        ),
     ]
 }

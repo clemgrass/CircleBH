@@ -131,33 +131,42 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
         },
         "enemies": {
             "hexagon": {
-                "sides": 6,
+                "shape": {"kind": "star_polygon", "vertices": 6, "steps": [1]},
                 "radius": 24.0,
                 "speed": 120.0,
                 "friction": 2.0,
                 "spin": 0.0,
+                "anchored": False,
+                "phantom": False,
+                "solitary": False,
                 "charge_per_line": 1.0,
                 "patterns": [{"kind": "seek", "strength": 240.0}, {"kind": "coulomb"}],
                 "threat": 1.0,
                 "actions": [],
             },
             "square": {
-                "sides": 4,
+                "shape": {"kind": "star_polygon", "vertices": 4, "steps": [1]},
                 "radius": 20.0,
                 "speed": 120.0,
                 "friction": 2.0,
                 "spin": 1.5,
+                "anchored": False,
+                "phantom": False,
+                "solitary": False,
                 "charge_per_line": 1.0,
                 "patterns": [{"kind": "seek", "strength": 240.0}, {"kind": "coulomb"}],
                 "threat": 1.0,
                 "actions": [],
             },
             "triangle": {
-                "sides": 3,
+                "shape": {"kind": "star_polygon", "vertices": 3, "steps": [1]},
                 "radius": 14.0,
                 "speed": 150.0,
                 "friction": 3.0,
                 "spin": 0.0,
+                "anchored": False,
+                "phantom": False,
+                "solitary": False,
                 "charge_per_line": 1.0,
                 "patterns": [
                     {
@@ -185,11 +194,14 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 ],
             },
             "pentagon": {
-                "sides": 5,
+                "shape": {"kind": "star_polygon", "vertices": 5, "steps": [1]},
                 "radius": 22.0,
                 "speed": 100.0,
                 "friction": 2.0,
                 "spin": 1.0,
+                "anchored": False,
+                "phantom": False,
+                "solitary": False,
                 "charge_per_line": 1.0,
                 "patterns": [
                     {
@@ -213,6 +225,34 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                     }
                 ],
             },
+            "star": {
+                "shape": {"kind": "star_polygon", "vertices": 5, "steps": [1, 2]},
+                "radius": 40.0,
+                "speed": 0.0,
+                "friction": 0.0,
+                "spin": 0.0,
+                "anchored": True,
+                "phantom": False,
+                "solitary": True,
+                "charge_per_line": 0.6,
+                "patterns": [],
+                "threat": 2.0,
+                "actions": [],
+            },
+            "red_star": {
+                "shape": {"kind": "star_polygon", "vertices": 5, "steps": [2]},
+                "radius": 150.0,
+                "speed": 0.0,
+                "friction": 0.0,
+                "spin": 0.0,
+                "anchored": True,
+                "phantom": True,
+                "solitary": True,
+                "charge_per_line": 0.0,
+                "patterns": [],
+                "threat": 0.0,
+                "actions": [],
+            },
         },
         "spawning": {
             "distance": 800.0,
@@ -222,6 +262,14 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
         },
         # El tema es largo; basta con que salga entero y en su lugar.
         "director": dump(BALANCE.director),
+        "merge": {
+            "enemy": "star",
+            "count": 5,
+            "into": "red_star",
+            "beats": 3,
+            "release": 1.5,
+            "fade_beats": 1.0,
+        },
         "point_weapon": {"cooldown": 0.6, "speed": 300.0, "range": 700.0},
         "enemy_bullet": {"speed": 330.0, "radius": 4.0},
     }
@@ -305,5 +353,8 @@ def test_el_giro_cabe_en_la_cota_del_golpe(nombre: str) -> None:
 @pytest.mark.parametrize("nombre", sorted(BALANCE.enemies))
 def test_el_nucleo_alcanza_antes_del_corte(nombre: str) -> None:
     # La grilla busca vecinos hasta `cutoff`: si el núcleo alcanzara más lejos, no lo vería.
+    # Un fantasma no entra al enjambre, así que no tiene núcleo para los demás.
+    if BALANCE.enemies[nombre].phantom:
+        return
     radius = BALANCE.enemies[nombre].radius
     assert BALANCE.charges.core_reach * 2 * radius < BALANCE.charges.cutoff

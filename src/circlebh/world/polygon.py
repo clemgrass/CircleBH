@@ -8,7 +8,7 @@ Salvo `regular_polygon`, todo se mide desde el centro del polígono.
 """
 
 import math
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 from pygame.math import Vector2
 
@@ -97,10 +97,25 @@ def first_hit(
 
     `t` es la fracción del tramo donde la cruza. Si dos empatan (ver `TIE`), gana la de
     índice menor.
+
+    `Enemy.hit_by` no la usa: cruza con `first_crossing` sobre sus líneas guardadas. Esta
+    queda como la referencia del polígono regular en los tests del ADR 0020.
+    """
+    return first_crossing(
+        start, end, {k: polygon_edge(radius, sides, k) for k in edges}
+    )
+
+
+def first_crossing(
+    start: Vector2, end: Vector2, lines: Mapping[int, tuple[Vector2, Vector2]]
+) -> tuple[float, int] | None:
+    """La primera de `lines`, por índice, que cruza el tramo `start→end`, como `(t, k)`.
+
+    Sirve para cualquier figura. Si dos empatan (ver `TIE`), gana la de índice menor.
     """
     best: tuple[float, int] | None = None
-    for k in sorted(edges):
-        a, b = polygon_edge(radius, sides, k)
+    for k in sorted(lines):
+        a, b = lines[k]
         t = crossing(start, end, a, b)
         if t is not None and (best is None or t < best[0] - TIE):
             best = (t, k)

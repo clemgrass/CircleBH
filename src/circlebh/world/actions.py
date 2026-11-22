@@ -24,6 +24,7 @@ from circlebh.world.clock import STEP
 from circlebh.world.collisions import segment_touches_circle
 from circlebh.world.enemy_bullets import EnemyBullet
 from circlebh.world.events import Event, Telegraph
+from circlebh.world.figures import line_vertices
 from circlebh.world.polygon import vertex
 from circlebh.world.rigid import rotate
 
@@ -337,14 +338,14 @@ class Volley(Action):
 
     def _fire(self, enemy: Enemy, context: ActionContext) -> None:
         """Una salva: una bala por cada vértice que le queda, desde el vértice y hacia
-        afuera del centro del polígono."""
-        sides = enemy.spec.sides
-        # El vértice `k` es el comienzo de la arista `k` y el final de la `k − 1`.
-        tips = sorted({k for e in enemy.edges for k in (e, (e + 1) % sides)})
+        afuera del centro de la figura."""
+        shape = enemy.spec.shape
+        ends = line_vertices(shape)
+        tips = sorted({k for e in enemy.edges for k in ends[e]})
         center = enemy.position + rotate(enemy.offset, enemy.angle)
         speed = context.bullet_spec.speed
         for k in tips:
-            tip = rotate(vertex(enemy.spec.radius, sides, k), enemy.angle)
+            tip = rotate(vertex(enemy.spec.radius, shape.vertices, k), enemy.angle)
             context.bullets.append(EnemyBullet(center + tip, tip.normalize() * speed))
 
     def _in_range(self, enemy: Enemy, context: ActionContext) -> bool:
@@ -376,8 +377,10 @@ def step_actions(
     Las balas que disparen quedan en `bullets`.
 
     Van en el orden de la lista, que es el de aparición: así, lo que sacan de `rng` es
-    siempre lo mismo con la misma semilla."""
-    alive = [enemy for enemy in enemies if enemy.alive]
+    siempre lo mismo con la misma semilla.
+
+    Los fantasmas no cuentan: los demás los atraviesan, así que no tapan una recta."""
+    alive = [enemy for enemy in enemies if enemy.alive and not enemy.spec.phantom]
     context = ActionContext(Vector2(player_position), alive, rng, bullets, bullet_spec)
     events: list[Event] = []
     for enemy in alive:

@@ -183,6 +183,28 @@ class VolleySpec:
     """Cuánto se recupera después de la ráfaga, en segundos, antes de volver a mirar."""
 
 
+@dataclass(frozen=True, kw_only=True)
+class StarPolygonShape:
+    """La figura de un enemigo: el polígono estrellado `{n/s}` (`world/figures.py`).
+
+    Tiene `vertices` vértices en un círculo, y cada `s` de `steps` une el vértice `k`
+    con el `k + s`. El hexágono es `{6/1}`, y la estrella, `{5/1}` más `{5/2}`: sus
+    lados y sus diagonales."""
+
+    kind: Literal["star_polygon"] = "star_polygon"
+
+    vertices: int
+    """Los vértices `n`, repartidos en el círculo del radio del enemigo."""
+
+    steps: tuple[int, ...]
+    """Los saltos `s`, cada uno con `1 ≤ s < n/2`. Con `(1,)`, es un polígono regular."""
+
+    @property
+    def line_count(self) -> int:
+        """Las líneas de la figura entera: `n` por cada salto."""
+        return self.vertices * len(self.steps)
+
+
 type ActionSpec = ChargeSpec | VolleySpec
 """Una acción: lo que el enemigo hace y no es una fuerza (ADR 0021). En el JSON, su
 campo `kind` dice cuál es."""
@@ -190,15 +212,16 @@ campo `kind` dice cuál es."""
 
 @dataclass(frozen=True)
 class EnemySpec:
-    """Un tipo de enemigo: un polígono regular hecho de líneas, que se mueve por sus
-    patrones (ADR 0020 y 0021)."""
+    """Un tipo de enemigo: una figura hecha de líneas, que se mueve por sus patrones
+    (ADR 0020 y 0021)."""
 
-    sides: int
-    """Líneas al aparecer. Cada bala quita la que golpea y, sin líneas, muere."""
+    shape: StarPolygonShape
+    """Su figura. Aparece con todas sus líneas: cada bala quita la que golpea y, sin
+    líneas, muere."""
 
     radius: float
-    """Radio del polígono, en unidades del plano: el del círculo que pasa por sus
-    vértices. Es también su círculo envolvente, y no cambia al perder líneas."""
+    """Radio de la figura, en unidades del plano: el del círculo que pasa por sus
+    vértices. Es también su círculo envolvente."""
 
     speed: float
     """Velocidad máxima, en unidades del plano por segundo."""
@@ -210,6 +233,21 @@ class EnemySpec:
     spin: float
     """Su velocidad angular al aparecer, `ω` en rad/s, antihoraria si es positiva. Con
     0 no gira. No es un patrón: los patrones son aceleraciones lineales (ADR 0027)."""
+
+    anchored: bool
+    """Si está anclado, como la estrella: nada lo mueve, ni sus patrones, ni las
+    fuerzas, ni la red de seguridad. Tampoco gira, aunque tenga `spin`. Los demás lo
+    sienten igual por Coulomb y por el núcleo duro."""
+
+    phantom: bool
+    """Si los enemigos lo atraviesan, como la gran estrella roja: no entra al paso del
+    enjambre, ni a sus fuerzas ni a la red de seguridad, y el arma no le apunta. Las
+    balas del jugador sí le quitan líneas, y sus líneas matan al jugador. Se dibuja con
+    el acento: lo rojo no choca con los enemigos."""
+
+    solitary: bool
+    """Si aparece siempre solo: el director lo compra como `single`, aunque la sección
+    sortee otra formación."""
 
     charge_per_line: float
     """Carga de cada línea. Su carga es esto por las líneas que le quedan, y su masa,
@@ -310,6 +348,31 @@ class DirectorSpec:
 
 
 @dataclass(frozen=True)
+class MergeSpec:
+    """La fusión: `count` enemigos `enemy` vivos a la vez se juntan en un `into`, que
+    aparece encima del jugador tras un aviso al pulso de la música (`world/merge.py`)."""
+
+    enemy: str
+    """El tipo que se junta, una clave de `enemies`."""
+
+    count: int
+    """Cuántos vivos a la vez disparan la fusión."""
+
+    into: str
+    """El tipo en que se juntan, una clave de `enemies`. Aparece centrado en el jugador,
+    y ninguna de sus líneas puede tocarlo."""
+
+    beats: int
+    """Los pulsos que titila el aviso. Aparece al empezar el pulso siguiente."""
+
+    release: float
+    """Se desvanece cuando el jugador queda a más de `release` radios de su centro."""
+
+    fade_beats: float
+    """Cuántos pulsos dura el desvanecerse. Mientras, ya no mata ni se golpea."""
+
+
+@dataclass(frozen=True)
 class PointWeaponSpec:
     """El arma punto: balas que salen del jugador hacia el centro del enemigo más cercano
     y avanzan en línea recta, `p(t) = p₀ + v·t`."""
@@ -358,6 +421,9 @@ class Balance:
     director: DirectorSpec
     """La forma del tema: cuándo y qué se compra."""
 
+    merge: MergeSpec
+    """La fusión de las estrellas en la gran estrella roja."""
+
     point_weapon: PointWeaponSpec
     """El arma punto."""
 
@@ -379,11 +445,14 @@ BALANCE = Balance(
     ),
     enemies={
         "hexagon": EnemySpec(
-            sides=6,
+            shape=StarPolygonShape(kind="star_polygon", vertices=6, steps=(1,)),
             radius=24.0,
             speed=120.0,
             friction=2.0,
             spin=0.0,
+            anchored=False,
+            phantom=False,
+            solitary=False,
             charge_per_line=1.0,
             patterns=(
                 SeekSpec(kind="seek", strength=240.0),
@@ -393,11 +462,14 @@ BALANCE = Balance(
             actions=(),
         ),
         "square": EnemySpec(
-            sides=4,
+            shape=StarPolygonShape(kind="star_polygon", vertices=4, steps=(1,)),
             radius=20.0,
             speed=120.0,
             friction=2.0,
             spin=1.5,
+            anchored=False,
+            phantom=False,
+            solitary=False,
             charge_per_line=1.0,
             patterns=(
                 SeekSpec(kind="seek", strength=240.0),
@@ -407,11 +479,14 @@ BALANCE = Balance(
             actions=(),
         ),
         "triangle": EnemySpec(
-            sides=3,
+            shape=StarPolygonShape(kind="star_polygon", vertices=3, steps=(1,)),
             radius=14.0,
             speed=150.0,
             friction=3.0,
             spin=0.0,
+            anchored=False,
+            phantom=False,
+            solitary=False,
             charge_per_line=1.0,
             patterns=(
                 OrbitSpec(kind="orbit", radius=280.0, stiffness=4.0, tangential=0.0),
@@ -434,11 +509,14 @@ BALANCE = Balance(
             ),
         ),
         "pentagon": EnemySpec(
-            sides=5,
+            shape=StarPolygonShape(kind="star_polygon", vertices=5, steps=(1,)),
             radius=22.0,
             speed=100.0,
             friction=2.0,
             spin=1.0,
+            anchored=False,
+            phantom=False,
+            solitary=False,
             charge_per_line=1.0,
             patterns=(
                 OrbitSpec(kind="orbit", radius=300.0, stiffness=6.0, tangential=0.0),
@@ -456,6 +534,34 @@ BALANCE = Balance(
                     cooldown=2.5,
                 ),
             ),
+        ),
+        "star": EnemySpec(
+            shape=StarPolygonShape(kind="star_polygon", vertices=5, steps=(1, 2)),
+            radius=40.0,
+            speed=0.0,
+            friction=0.0,
+            spin=0.0,
+            anchored=True,
+            phantom=False,
+            solitary=True,
+            charge_per_line=0.6,
+            patterns=(),
+            threat=2.0,
+            actions=(),
+        ),
+        "red_star": EnemySpec(
+            shape=StarPolygonShape(kind="star_polygon", vertices=5, steps=(2,)),
+            radius=150.0,
+            speed=0.0,
+            friction=0.0,
+            spin=0.0,
+            anchored=True,
+            phantom=True,
+            solitary=True,
+            charge_per_line=0.0,
+            patterns=(),
+            threat=0.0,
+            actions=(),
         ),
     },
     spawning=SpawningSpec(
@@ -476,6 +582,7 @@ BALANCE = Balance(
                 deck=(
                     DeckEntry(enemy="hexagon", weight=1.0),
                     DeckEntry(enemy="square", weight=1.0),
+                    DeckEntry(enemy="star", weight=0.25),
                 ),
                 formations=("single",),
             ),
@@ -491,6 +598,7 @@ BALANCE = Balance(
                     DeckEntry(enemy="hexagon", weight=1.0),
                     DeckEntry(enemy="square", weight=1.0),
                     DeckEntry(enemy="triangle", weight=1.0),
+                    DeckEntry(enemy="star", weight=0.35),
                 ),
                 formations=("single", "line"),
             ),
@@ -522,6 +630,7 @@ BALANCE = Balance(
                     DeckEntry(enemy="square", weight=1.0),
                     DeckEntry(enemy="triangle", weight=1.0),
                     DeckEntry(enemy="pentagon", weight=1.0),
+                    DeckEntry(enemy="star", weight=0.5),
                 ),
                 formations=("single",),
             ),
@@ -538,6 +647,7 @@ BALANCE = Balance(
                     DeckEntry(enemy="square", weight=1.0),
                     DeckEntry(enemy="triangle", weight=1.0),
                     DeckEntry(enemy="pentagon", weight=1.0),
+                    DeckEntry(enemy="star", weight=0.5),
                 ),
                 formations=("single", "line", "cluster"),
             ),
@@ -558,6 +668,9 @@ BALANCE = Balance(
                 formations=("ring", "line", "cluster"),
             ),
         ),
+    ),
+    merge=MergeSpec(
+        enemy="star", count=5, into="red_star", beats=3, release=1.5, fade_beats=1.0
     ),
     point_weapon=PointWeaponSpec(cooldown=0.6, speed=300.0, range=700.0),
     enemy_bullet=EnemyBulletSpec(speed=330.0, radius=4.0),

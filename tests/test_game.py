@@ -105,7 +105,7 @@ def mundo_con_hexagono_quieto(x: float) -> World:
     que mira al jugador es la arista 1, la vertical izquierda del hexágono.
     """
     hexagon = replace(BALANCE.enemies["hexagon"], speed=0.0)
-    balance = replace(SIN_APARICIONES, enemies={"hexagon": hexagon})
+    balance = replace(SIN_APARICIONES, enemies={**BALANCE.enemies, "hexagon": hexagon})
     return mundo_con_hexagono(Vector2(x, 0), balance)
 
 
@@ -207,7 +207,7 @@ def mundo_sin_armas(seed: int) -> World:
     Así nadie muere ni mata, y la cuenta de enemigos solo cambia por las apariciones.
     """
     hexagon = replace(BALANCE.enemies["hexagon"], speed=0.0)
-    balance = replace(RAPIDO, enemies={"hexagon": hexagon})
+    balance = replace(RAPIDO, enemies={**BALANCE.enemies, "hexagon": hexagon})
     return World(balance, random.Random(seed), armed=False)
 
 
@@ -268,7 +268,10 @@ def mundo_con_rafaga(
     )
     balance = replace(
         BALANCE,
-        enemies={"hexagon": replace(BALANCE.enemies["hexagon"], speed=0.0)},
+        enemies={
+            **BALANCE.enemies,
+            "hexagon": replace(BALANCE.enemies["hexagon"], speed=0.0),
+        },
         spawning=replace(
             BALANCE.spawning, max_per_step=max_per_step, formation_size=(size, size)
         ),

@@ -56,8 +56,8 @@ def test_simulacion_reinicia_al_morir_con_la_semilla_siguiente() -> None:
     # La partida n usa `seed + n`, como la demo: cada partida terminada dura lo mismo
     # que una suelta con esa semilla. Con las semillas 1 a 4 las duraciones difieren,
     # así que repetir la misma semilla, o sortear otra, no pasa. La intro parte vacía, y
-    # una partida dura unos 15 s: en 60 s caben más de dos.
-    durations = simulate(BALANCE, seconds=60.0, seed=1)
+    # una partida dura menos de un minuto: en 120 s caben más de dos.
+    durations = simulate(BALANCE, seconds=120.0, seed=1)
     assert len(durations) > 2
     terminadas = durations[:-1]
     assert terminadas == [hasta_morir(1 + n) for n in range(len(terminadas))]

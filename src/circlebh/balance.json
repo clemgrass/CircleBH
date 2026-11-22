@@ -15,11 +15,20 @@
   },
   "enemies": {
     "hexagon": {
-      "sides": 6,
+      "shape": {
+        "kind": "star_polygon",
+        "vertices": 6,
+        "steps": [
+          1
+        ]
+      },
       "radius": 24.0,
       "speed": 120.0,
       "friction": 2.0,
       "spin": 0.0,
+      "anchored": false,
+      "phantom": false,
+      "solitary": false,
       "charge_per_line": 1.0,
       "patterns": [
         {
@@ -34,11 +43,20 @@
       "actions": []
     },
     "square": {
-      "sides": 4,
+      "shape": {
+        "kind": "star_polygon",
+        "vertices": 4,
+        "steps": [
+          1
+        ]
+      },
       "radius": 20.0,
       "speed": 120.0,
       "friction": 2.0,
       "spin": 1.5,
+      "anchored": false,
+      "phantom": false,
+      "solitary": false,
       "charge_per_line": 1.0,
       "patterns": [
         {
@@ -53,11 +71,20 @@
       "actions": []
     },
     "triangle": {
-      "sides": 3,
+      "shape": {
+        "kind": "star_polygon",
+        "vertices": 3,
+        "steps": [
+          1
+        ]
+      },
       "radius": 14.0,
       "speed": 150.0,
       "friction": 3.0,
       "spin": 0.0,
+      "anchored": false,
+      "phantom": false,
+      "solitary": false,
       "charge_per_line": 1.0,
       "patterns": [
         {
@@ -87,11 +114,20 @@
       ]
     },
     "pentagon": {
-      "sides": 5,
+      "shape": {
+        "kind": "star_polygon",
+        "vertices": 5,
+        "steps": [
+          1
+        ]
+      },
       "radius": 22.0,
       "speed": 100.0,
       "friction": 2.0,
       "spin": 1.0,
+      "anchored": false,
+      "phantom": false,
+      "solitary": false,
       "charge_per_line": 1.0,
       "patterns": [
         {
@@ -116,6 +152,47 @@
           "cooldown": 2.5
         }
       ]
+    },
+    "star": {
+      "shape": {
+        "kind": "star_polygon",
+        "vertices": 5,
+        "steps": [
+          1,
+          2
+        ]
+      },
+      "radius": 40.0,
+      "speed": 0.0,
+      "friction": 0.0,
+      "spin": 0.0,
+      "anchored": true,
+      "phantom": false,
+      "solitary": true,
+      "charge_per_line": 0.6,
+      "patterns": [],
+      "threat": 2.0,
+      "actions": []
+    },
+    "red_star": {
+      "shape": {
+        "kind": "star_polygon",
+        "vertices": 5,
+        "steps": [
+          2
+        ]
+      },
+      "radius": 150.0,
+      "speed": 0.0,
+      "friction": 0.0,
+      "spin": 0.0,
+      "anchored": true,
+      "phantom": true,
+      "solitary": true,
+      "charge_per_line": 0.0,
+      "patterns": [],
+      "threat": 0.0,
+      "actions": []
     }
   },
   "spawning": {
@@ -150,6 +227,10 @@
           {
             "enemy": "square",
             "weight": 1.0
+          },
+          {
+            "enemy": "star",
+            "weight": 0.25
           }
         ],
         "formations": [
@@ -179,6 +260,10 @@
           {
             "enemy": "triangle",
             "weight": 1.0
+          },
+          {
+            "enemy": "star",
+            "weight": 0.35
           }
         ],
         "formations": [
@@ -244,6 +329,10 @@
           {
             "enemy": "pentagon",
             "weight": 1.0
+          },
+          {
+            "enemy": "star",
+            "weight": 0.5
           }
         ],
         "formations": [
@@ -277,6 +366,10 @@
           {
             "enemy": "pentagon",
             "weight": 1.0
+          },
+          {
+            "enemy": "star",
+            "weight": 0.5
           }
         ],
         "formations": [
@@ -321,6 +414,14 @@
         ]
       }
     ]
+  },
+  "merge": {
+    "enemy": "star",
+    "count": 5,
+    "into": "red_star",
+    "beats": 3,
+    "release": 1.5,
+    "fade_beats": 1.0
   },
   "point_weapon": {
     "cooldown": 0.6,

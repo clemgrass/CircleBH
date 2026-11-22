@@ -53,7 +53,8 @@ def test_los_heridos_no_tiemblan_en_la_multitud() -> None:
     hexagon = BALANCE.enemies["hexagon"]
     enemies = [Enemy(hexagon, p) for p in lattice(Vector2(), 300, 60)]
     for enemy in enemies:
-        for k in rng.sample(range(hexagon.sides), rng.randint(0, hexagon.sides - 1)):
+        lines = hexagon.shape.line_count
+        for k in rng.sample(range(lines), rng.randint(0, lines - 1)):
             enemy.remove_edge(k)
     separations = 0
     temblores = 0

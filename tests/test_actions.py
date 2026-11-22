@@ -89,7 +89,9 @@ def hasta_soltarse(triangle: Enemy, enemies: Sequence[Enemy], player: Vector2) -
 
 def punta(enemy: Enemy) -> Vector2:
     """Hacia dónde apunta su primera punta, como vector unitario."""
-    tip = vertex(enemy.spec.radius, enemy.spec.sides, 0).rotate_rad(enemy.angle)
+    tip = vertex(enemy.spec.radius, enemy.spec.shape.vertices, 0).rotate_rad(
+        enemy.angle
+    )
     return tip.normalize()
 
 
@@ -188,6 +190,21 @@ def test_no_embiste_sin_recta_libre() -> None:
     otro = Enemy(HEXAGON, Vector2(100, 0))
     states = estados(triangle, [triangle, otro], pasos(5))
     assert set(states) == {ChargeState.WATCHING}
+
+
+def test_el_fantasma_no_tapa_la_recta_del_triangulo() -> None:
+    # La gran estrella encierra al jugador, pero el triángulo la atraviesa: su recta
+    # sigue libre y avisa.
+    triangle = Enemy(TRIANGLE, Vector2(200, 0))
+    fantasma = Enemy(BALANCE.enemies["red_star"], Vector2(0, 0))
+    events = step_actions(
+        [triangle, fantasma],
+        Vector2(),
+        random.Random(1),
+        [],
+        BALANCE.enemy_bullet,
+    )
+    assert events == [Telegraph(triangle)]
 
 
 def test_no_avisa_desde_fuera_de_la_vista() -> None:
