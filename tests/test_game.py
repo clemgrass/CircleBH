@@ -312,6 +312,20 @@ def test_rafaga_reparte_los_cuadrantes() -> None:
     assert cuenta == [3, 3, 3, 3]
 
 
+def test_la_gran_estrella_no_cuenta_en_los_cuadrantes() -> None:
+    # Los enemigos la atraviesan (decisión 40): no ocupa un cuadrante. Si contara, su
+    # centro sobre el jugador le quitaría un hexágono al cuadrante 0.
+    world = mundo_con_rafaga(12, "single", max_per_step=12)
+    grande = Enemy(BALANCE.enemies["red_star"], world.player.position)
+    world.enemies.append(grande)
+    world.update(Vector2())
+    cuenta = [0, 0, 0, 0]
+    for enemy in world.enemies:
+        if enemy is not grande:
+            cuenta[quadrant(enemy.position - world.player.position)] += 1
+    assert cuenta == [3, 3, 3, 3]
+
+
 def test_formacion_en_varios_pasos_se_deforma_poco() -> None:
     # La cola guarda posiciones relativas al jugador. Si avanza mientras una fila llega
     # de a uno, cada vecino nace corrido lo que el jugador avanzó en un paso: la fila

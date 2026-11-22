@@ -145,7 +145,12 @@ class World:
         entre los cuadrantes."""
         here = self.player.position
         enemies = self.balance.enemies
-        occupied = [(enemy.position - here, enemy.radius) for enemy in self.enemies]
+        # Los fantasmas no ocupan lugar: los demás los atraviesan.
+        occupied = [
+            (enemy.position - here, enemy.radius)
+            for enemy in self.enemies
+            if not enemy.spec.phantom
+        ]
         occupied += [(offset, enemies[name].radius) for name, offset in self.queue]
         offsets = place_formation(
             purchase.formation,
