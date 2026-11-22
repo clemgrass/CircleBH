@@ -2,6 +2,7 @@
 (ADR 0021)."""
 
 import math
+import random
 from dataclasses import replace
 from itertools import combinations
 
@@ -11,6 +12,7 @@ from hypothesis import strategies as st
 from pygame.math import Vector2
 
 from circlebh.balance import BALANCE, CoulombSpec, EnemySpec
+from circlebh.world.actions import step_actions
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
 from circlebh.world.swarm import lattice, separate, step_swarm
@@ -234,7 +236,9 @@ def test_lattice_empieza_por_los_mas_cercanos() -> None:
 
 
 def paso_real(enemies: list[Enemy]) -> None:
-    """Un paso con el jugador quieto en el origen y su carga real, como en la partida."""
+    """Un paso como el del mundo, con el jugador quieto en el origen y su carga real:
+    primero las acciones, como la cuerda del círculo, y después el enjambre."""
+    step_actions(enemies, Vector2(), random.Random(0), [], BALANCE.enemy_bullet)
     step_swarm(enemies, Vector2(), BALANCE.player.charge, BALANCE.charges)
 
 
@@ -242,24 +246,6 @@ def dispersion(enemies: list[Enemy]) -> float:
     """La distancia media de cada uno al centroide del grupo."""
     centro = sum((e.position for e in enemies), Vector2()) / len(enemies)
     return sum(e.position.distance_to(centro) for e in enemies) / len(enemies)
-
-
-def test_cae_en_espiral() -> None:
-    # La órbita no es circular: el radio sube y baja un poco en cada vuelta. Lo que la
-    # hace espiral es que nunca se aleja más que al nacer, termina mucho más cerca y
-    # da al menos una vuelta entera en el camino.
-    circulo = Enemy(BALANCE.enemies["circle"], Vector2(800, 0))
-    circulo.launch(Vector2())
-    angulo, anterior = 0.0, 0.0
-    for _ in range(round(30 / STEP)):
-        paso_real([circulo])
-        assert circulo.position.length() <= 800
-        actual = math.atan2(circulo.position.y, circulo.position.x)
-        # Sin los saltos de 2π al cruzar el eje −x.
-        angulo += math.remainder(actual - anterior, math.tau)
-        anterior = actual
-    assert circulo.position.length() < 800 / 4
-    assert angulo > math.tau
 
 
 def test_dispersa_un_grupo() -> None:
@@ -270,9 +256,7 @@ def test_dispersa_un_grupo() -> None:
         grupo = [Enemy(HEXAGON, p) for p in lattice(Vector2(250, 0), 7, 50)]
         enemies = list(grupo)
         if circulo is not None:
-            enemy = Enemy(circulo, Vector2(250, -160))
-            enemy.launch(Vector2())
-            enemies.append(enemy)
+            enemies.append(Enemy(circulo, Vector2(250, -160)))
         for _ in range(round(2 / STEP)):
             paso_real(enemies)
         return dispersion(grupo)

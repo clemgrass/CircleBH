@@ -211,26 +211,24 @@
         "kind": "circle"
       },
       "radius": 8.0,
-      "speed": 250.0,
-      "friction": 0.12,
+      "speed": 0.0,
+      "friction": 0.0,
       "spin": 0.0,
-      "orbital_speed": 155.0,
+      "orbital_speed": 0.0,
       "anchored": false,
       "phantom": false,
       "solitary": false,
       "charge_per_line": 30.0,
       "mass_per_line": 600.0,
-      "patterns": [
-        {
-          "kind": "seek",
-          "strength": 30.0
-        },
-        {
-          "kind": "coulomb"
-        }
-      ],
+      "patterns": [],
       "threat": 0.0,
-      "actions": []
+      "actions": [
+        {
+          "kind": "tether",
+          "angular_speed": 0.8,
+          "decay": 0.19
+        }
+      ]
     }
   },
   "spawning": {

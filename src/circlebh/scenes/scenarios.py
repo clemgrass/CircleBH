@@ -158,6 +158,16 @@ SCENARIOS: dict[str, Scenario] = {
             armed=False,
         ),
         Scenario(
+            "cuerda",
+            "El piloto da vueltas, sin armas y sin morir, con un círculo atado a él: la"
+            " espiral viaja con el jugador sin deformarse, se achica y lo alcanza.",
+            pilot=True,
+            guest="circle",
+            guest_at=(400.0, 0.0),
+            lethal=False,
+            armed=False,
+        ),
+        Scenario(
             "masa-critica",
             "30 hexágonos juntos a un lado del jugador quieto, que no muere ni dispara:"
             " la masa crítica trae un círculo, que nace fuera de la vista en el"

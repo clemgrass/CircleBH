@@ -5,7 +5,7 @@ import random
 from pygame.math import Vector2
 
 from circlebh.balance import Balance
-from circlebh.world.actions import step_actions
+from circlebh.world.actions import check_actions, step_actions
 from circlebh.world.clock import STEP
 from circlebh.world.critical_mass import CriticalMass, check_critical_mass
 from circlebh.world.director import Director, Purchase
@@ -45,6 +45,7 @@ class World:
         )
         """Decide qué aparece y cuándo, con la forma del tema (ADR 0025)."""
         check_shapes(balance.enemies)
+        check_actions(balance.enemies)
         check_masses(balance.enemies)
         check_merge(balance)
         self.merge = Merge(balance.merge, balance.enemies, balance.director.bpm)

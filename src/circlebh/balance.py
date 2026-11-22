@@ -184,6 +184,22 @@ class VolleySpec:
 
 
 @dataclass(frozen=True, kw_only=True)
+class TetherSpec:
+    """Acción: la cuerda del círculo. Gira atado al jugador en la espiral logarítmica
+    `r = r₀·e^(−λt)`, `θ = θ₀ + ω·t`, medida desde el jugador: si el jugador se mueve, la
+    espiral viaja con él (`world/actions.py`, decisión 51)."""
+
+    kind: Literal["tether"] = "tether"
+
+    angular_speed: float
+    """`ω`, en rad/s, antihorario si es positiva. No puede ser 0: caería recto."""
+
+    decay: float
+    """`λ`, en 1/s: el radio se multiplica por `e^(−λ)` cada segundo. Tiene que ser
+    mayor que 0, o nunca se acercaría."""
+
+
+@dataclass(frozen=True, kw_only=True)
 class StarPolygonShape:
     """La figura de un enemigo: el polígono estrellado `{n/s}` (`world/figures.py`).
 
@@ -222,7 +238,7 @@ type Shape = StarPolygonShape | CircleShape
 """La figura de un enemigo. En el JSON, su campo `kind` dice cuál es."""
 
 
-type ActionSpec = ChargeSpec | VolleySpec
+type ActionSpec = ChargeSpec | VolleySpec | TetherSpec
 """Una acción: lo que el enemigo hace y no es una fuerza (ADR 0021). En el JSON, su
 campo `kind` dice cuál es."""
 
@@ -627,21 +643,18 @@ BALANCE = Balance(
         "circle": EnemySpec(
             shape=CircleShape(kind="circle"),
             radius=8.0,
-            speed=250.0,
-            friction=0.12,
+            speed=0.0,
+            friction=0.0,
             spin=0.0,
-            orbital_speed=155.0,
+            orbital_speed=0.0,
             anchored=False,
             phantom=False,
             solitary=False,
             charge_per_line=30.0,
             mass_per_line=600.0,
-            patterns=(
-                SeekSpec(kind="seek", strength=30.0),
-                CoulombSpec(kind="coulomb"),
-            ),
+            patterns=(),
             threat=0.0,
-            actions=(),
+            actions=(TetherSpec(kind="tether", angular_speed=0.8, decay=0.19),),
         ),
     },
     spawning=SpawningSpec(

@@ -12,7 +12,7 @@ solo para lo que sacan de la `Random`, y es siempre el de aparición.
 import math
 import random
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
@@ -23,7 +23,9 @@ from circlebh.balance import (
     ActionSpec,
     ChargeSpec,
     EnemyBulletSpec,
+    EnemySpec,
     StarPolygonShape,
+    TetherSpec,
     VolleySpec,
 )
 from circlebh.world.clock import STEP
@@ -365,6 +367,59 @@ class Volley(Action):
         self._left = self._durations.get(state, 0)
 
 
+class Tether(Action):
+    """La cuerda del círculo: gira atado al jugador en la espiral logarítmica
+    `r = r₀·e^(−λt)`, `θ = θ₀ + ω·t` (decisión 51).
+
+    La curva se mide desde el jugador, así que viaja con él. Corta cada radio siempre en
+    el mismo ángulo, `atan(ω/λ)`, y su rapidez es `r·√(ω² + λ²)`: lejos barre rápido, y
+    cerca del jugador anda lento. Impone su velocidad sin tope, como la embestida.
+    """
+
+    def __init__(self, spec: TetherSpec) -> None:
+        self.spec = spec
+        self._polar: tuple[float, float] | None = None
+        """`(r, θ)` desde el jugador. Se fija en el primer paso, donde nació."""
+        self._velocity = Vector2()
+
+    @property
+    def controls_motion(self) -> bool:
+        return True
+
+    @property
+    def velocity(self) -> Vector2:
+        return self._velocity
+
+    def update(self, enemy: Enemy, context: ActionContext) -> list[Event]:
+        """Avanza `(r, θ)` un paso y fija la velocidad que deja al enemigo justo en ese
+        punto de la curva. Se mide desde `(r, θ)` y no desde donde quedó, así que si la
+        red de seguridad lo corre, el paso siguiente vuelve a la curva."""
+        if self._polar is None:
+            offset = enemy.position - context.player_position
+            self._polar = (offset.length(), math.atan2(offset.y, offset.x))
+        r, theta = self._polar
+        r *= math.exp(-self.spec.decay * STEP)
+        theta += self.spec.angular_speed * STEP
+        self._polar = (r, theta)
+        target = context.player_position + Vector2(r, 0).rotate_rad(theta)
+        self._velocity = (target - enemy.position) / STEP
+        return []
+
+
+def check_actions(enemies: Mapping[str, EnemySpec]) -> None:
+    """Rechaza al crear el mundo una cuerda que no se acerca (`decay ≤ 0`) o que no
+    gira (`angular_speed = 0`), nombrando a su enemigo."""
+    for name, spec in enemies.items():
+        for action in spec.actions:
+            if isinstance(action, TetherSpec) and (
+                action.decay <= 0 or action.angular_speed == 0
+            ):
+                raise ValueError(
+                    f"enemies.{name}.actions: una cuerda necesita decay > 0 y"
+                    f" angular_speed ≠ 0, no {action.decay} y {action.angular_speed}"
+                )
+
+
 def make_action(spec: ActionSpec) -> Action:
     """La instancia de la acción que describe `spec`, nueva para cada enemigo."""
     match spec:
@@ -372,6 +427,8 @@ def make_action(spec: ActionSpec) -> Action:
             return Charge(spec)
         case VolleySpec():
             return Volley(spec)
+        case TetherSpec():
+            return Tether(spec)
 
 
 def step_actions(
