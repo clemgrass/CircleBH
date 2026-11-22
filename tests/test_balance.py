@@ -298,6 +298,12 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
             "release": 1.5,
             "fade_beats": 1.0,
         },
+        "critical_mass": {
+            "enemy": "circle",
+            "count": 30,
+            "imbalance": 0.5,
+            "cooldown_bars": 8.0,
+        },
         "point_weapon": {"cooldown": 0.6, "speed": 300.0, "range": 700.0},
         "enemy_bullet": {"speed": 330.0, "radius": 4.0},
     }

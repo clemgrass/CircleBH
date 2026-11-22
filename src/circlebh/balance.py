@@ -399,6 +399,26 @@ class MergeSpec:
 
 
 @dataclass(frozen=True)
+class CriticalMassSpec:
+    """La masa crítica: con `count` enemigos o más, cargados hacia un lado del jugador,
+    aparece un `enemy` que los reparte (`world/critical_mass.py`). No lo compra el
+    director, y hay a lo más uno a la vez."""
+
+    enemy: str
+    """El tipo que aparece, una clave de `enemies`: el círculo."""
+
+    count: int
+    """Cuántos enemigos tiene que haber, sin contar anclados ni fantasmas."""
+
+    imbalance: float
+    """El mínimo de `R̄ = |Σ ûᵢ| / N`, entre 0 y 1: 0 si te rodean parejo, 1 si están
+    todos del mismo lado."""
+
+    cooldown_bars: float
+    """Cuántos compases espera, después de que muere, antes de que pueda aparecer otro."""
+
+
+@dataclass(frozen=True)
 class PointWeaponSpec:
     """El arma punto: balas que salen del jugador hacia el centro del enemigo más cercano
     y avanzan en línea recta, `p(t) = p₀ + v·t`."""
@@ -449,6 +469,9 @@ class Balance:
 
     merge: MergeSpec
     """La fusión de las estrellas en la gran estrella roja."""
+
+    critical_mass: CriticalMassSpec
+    """Cuándo aparece el círculo que reparte al enjambre."""
 
     point_weapon: PointWeaponSpec
     """El arma punto."""
@@ -728,6 +751,9 @@ BALANCE = Balance(
     ),
     merge=MergeSpec(
         enemy="star", count=5, into="red_star", beats=3, release=1.5, fade_beats=1.0
+    ),
+    critical_mass=CriticalMassSpec(
+        enemy="circle", count=30, imbalance=0.5, cooldown_bars=8.0
     ),
     point_weapon=PointWeaponSpec(cooldown=0.6, speed=300.0, range=700.0),
     enemy_bullet=EnemyBulletSpec(speed=330.0, radius=4.0),

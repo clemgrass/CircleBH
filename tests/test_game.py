@@ -16,6 +16,7 @@ from circlebh.balance import (
     CircleShape,
     DeckEntry,
     DirectorSpec,
+    EnemySpec,
     SectionSpec,
 )
 from circlebh.world.clock import STEP
@@ -477,3 +478,35 @@ def test_el_mundo_rechaza_una_masa_que_no_es_positiva() -> None:
     balance = replace(BALANCE, enemies={**BALANCE.enemies, "hexagon": sin_masa})
     with pytest.raises(ValueError, match=r"enemies\.hexagon\.mass_per_line"):
         World(balance, random.Random(1))
+
+
+# --- La masa crítica trae al círculo (#59) ---
+
+
+def mundo_cargado(spec: EnemySpec) -> World:
+    """Un mundo sin apariciones ni armas, con 30 enemigos `spec` en una red a la
+    derecha del jugador: la masa crítica del balance, todos del mismo lado."""
+    world = World(SIN_APARICIONES, random.Random(1), armed=False)
+    world.enemies = [
+        Enemy(spec, Vector2(300 + 60 * (i % 6), 60 * (i // 6) - 120))
+        for i in range(BALANCE.critical_mass.count)
+    ]
+    return world
+
+
+def circulos_en_la_cola(world: World) -> int:
+    return sum(1 for name, _ in world.queue if name == "circle")
+
+
+def test_el_mundo_trae_un_circulo_con_masa_critica() -> None:
+    world = mundo_cargado(HEXAGON_REAL)
+    world.update(Vector2())
+    assert circulos_en_la_cola(world) == 1
+
+
+@pytest.mark.parametrize("campo", ["anchored", "phantom"])
+def test_los_anclados_y_los_fantasmas_no_cuentan(campo: str) -> None:
+    # Copias del hexágono, no estrellas: 30 estrellas se fusionarían.
+    world = mundo_cargado(replace(HEXAGON_REAL, **{campo: True}))
+    world.update(Vector2())
+    assert circulos_en_la_cola(world) == 0

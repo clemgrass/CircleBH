@@ -7,6 +7,7 @@ from pygame.math import Vector2
 from circlebh.balance import Balance
 from circlebh.world.actions import step_actions
 from circlebh.world.clock import STEP
+from circlebh.world.critical_mass import CriticalMass, check_critical_mass
 from circlebh.world.director import Director, Purchase
 from circlebh.world.enemy import Enemy, check_masses
 from circlebh.world.enemy_bullets import EnemyBullet, bullet_hits_player, step_bullets
@@ -48,6 +49,9 @@ class World:
         check_merge(balance)
         self.merge = Merge(balance.merge, balance.enemies, balance.director.bpm)
         """La fusión de las estrellas en la gran estrella roja."""
+        check_critical_mass(balance)
+        self.critical_mass = CriticalMass(balance.critical_mass, balance.director.bpm)
+        """Cuándo aparece el círculo que reparte al enjambre."""
         check_formations(balance)
         self.queue = SpawnQueue()
         """Lo comprado que espera aparecer, con su lugar relativo al jugador. Sale de a
@@ -133,6 +137,7 @@ class World:
         self.enemies = self.merge.update(
             self._steps, self.enemies, self.player.position
         )
+        self._check_critical_mass()
         self.game_over = self.lethal and (
             shot
             or any(
@@ -140,6 +145,25 @@ class World:
                 for enemy in self.enemies
             )
         )
+
+    def _check_critical_mass(self) -> None:
+        """Si el enjambre se cargó hacia un lado, compra un círculo que lo reparta.
+
+        Cuentan los vivos que siguen al jugador: no los anclados ni los fantasmas. El
+        círculo está presente si hay uno vivo o en la cola."""
+        name = self.balance.critical_mass.enemy
+        spec = self.balance.enemies[name]
+        present = any(enemy.spec == spec for enemy in self.enemies) or any(
+            queued == name for queued, _ in self.queue
+        )
+        here = self.player.position
+        offsets = [
+            enemy.position - here
+            for enemy in self.enemies
+            if not (enemy.spec.anchored or enemy.spec.phantom)
+        ]
+        if self.critical_mass.update(self._steps, present, offsets):
+            self._enqueue(Purchase(name, "single", 1))
 
     def _enqueue(self, purchase: Purchase) -> None:
         """Elige dónde nace cada miembro de `purchase`, relativo al jugador, y lo pone en

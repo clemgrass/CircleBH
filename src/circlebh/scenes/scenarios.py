@@ -157,5 +157,17 @@ SCENARIOS: dict[str, Scenario] = {
             lethal=False,
             armed=False,
         ),
+        Scenario(
+            "masa-critica",
+            "30 hexágonos juntos a un lado del jugador quieto, que no muere ni dispara:"
+            " la masa crítica trae un círculo, que nace fuera de la vista en el"
+            " cuadrante más vacío y gira en espiral hacia el grupo.",
+            pilot=False,
+            crowd=30,
+            crowd_center=(320.0, 0.0),
+            crowd_spacing=55.0,
+            lethal=False,
+            armed=False,
+        ),
     ]
 }
