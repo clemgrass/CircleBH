@@ -162,6 +162,17 @@ def test_dos_anclados_encimados_quedan_donde_estan() -> None:
     assert (a.position, b.position) == (Vector2(0, 0), Vector2(30, 0))
 
 
+def test_anclado_con_giro_no_se_corre_al_perder_una_linea() -> None:
+    # Un anclado no gira aunque el balance le dé `spin`, así que perder una línea no
+    # lo pasa a su nuevo centro de masa (ADR 0027, L2): nada lo mueve.
+    estrella = Enemy(replace(ANCLADO, spin=1.0), Vector2(0, 0))
+    estrella.remove_edge(0)
+    paso([estrella])
+    assert estrella.position == Vector2(0, 0)
+    assert estrella.velocity == Vector2()
+    assert estrella.angle == 0.0
+
+
 def test_anclado_no_se_mueve_con_fuerzas() -> None:
     # Con carga y patrones, sus vecinos lo empujan por Coulomb y por el núcleo duro.
     cargado = replace(SOLO_COULOMB, radius=40.0, anchored=True)

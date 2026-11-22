@@ -236,8 +236,8 @@ class EnemySpec:
 
     anchored: bool
     """Si está anclado, como la estrella: nada lo mueve, ni sus patrones, ni las
-    fuerzas, ni la red de seguridad. Los demás lo sienten igual por Coulomb y por el
-    núcleo duro."""
+    fuerzas, ni la red de seguridad. Tampoco gira, aunque tenga `spin`. Los demás lo
+    sienten igual por Coulomb y por el núcleo duro."""
 
     charge_per_line: float
     """Carga de cada línea. Su carga es esto por las líneas que le quedan, y su masa,

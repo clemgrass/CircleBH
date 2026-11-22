@@ -86,7 +86,8 @@ class Enemy:
         - `velocity` pasa a la que tenía ese punto: `v + ω × (c' − c)`.
         """
         self.edges.remove(k)
-        if self.spec.spin == 0 or not self.edges:
+        # Un anclado no gira (ver `step`), así que tampoco se recentra.
+        if self.spec.spin == 0 or self.spec.anchored or not self.edges:
             return
         # `shift` es `c' − c` en el marco del enemigo, y `moved`, en el plano.
         shift = center_of_mass(self._local_lines())
