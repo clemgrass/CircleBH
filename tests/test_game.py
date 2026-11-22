@@ -13,7 +13,6 @@ from pygame.math import Vector2
 from circlebh.balance import (
     BALANCE,
     Balance,
-    CircleShape,
     DeckEntry,
     DirectorSpec,
     EnemySpec,
@@ -457,20 +456,7 @@ def test_cuenta_las_separaciones() -> None:
     assert world.separations == 1
 
 
-# --- La masa y la órbita (#59) ---
-
-
-def test_el_mundo_lanza_a_lo_que_nace() -> None:
-    # Nace después del paso del enjambre: su velocidad es la del lanzamiento.
-    circulo = replace(HEXAGON_REAL, shape=CircleShape(), radius=8.0, orbital_speed=50.0)
-    balance = replace(
-        SIN_APARICIONES, enemies={**SIN_APARICIONES.enemies, "circulo": circulo}
-    )
-    world = World(balance, random.Random(1))
-    world.queue.push([("circulo", Vector2(800, 0))])
-    world.update(Vector2())
-    (enemy,) = world.enemies
-    assert enemy.velocity == Vector2(0, 50)
+# --- La masa (#59, ADR 0027) ---
 
 
 def test_el_mundo_rechaza_una_masa_que_no_es_positiva() -> None:

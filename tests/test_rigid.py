@@ -28,7 +28,6 @@ CUADRADO = EnemySpec(
     speed=1000.0,
     friction=0.0,
     spin=0.0,
-    orbital_speed=0.0,
     anchored=False,
     phantom=False,
     solitary=False,

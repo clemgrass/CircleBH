@@ -77,18 +77,6 @@ class Enemy:
         de sus líneas, un herido empuja menos, y a él lo empujan igual."""
         return self.spec.charge_per_line * len(self.edges)
 
-    def launch(self, player_position: Vector2) -> None:
-        """Le da su velocidad al nacer: `orbital_speed` por `θ̂`, la dirección desde el
-        jugador girada 90° antihorario. Así el círculo parte orbitando.
-
-        Encima del jugador no hay dirección, y queda quieto."""
-        offset = self.position - player_position
-        if offset.length_squared() == 0:
-            self.velocity = Vector2()
-            return
-        radial = offset.normalize()
-        self.velocity = Vector2(-radial.y, radial.x) * self.spec.orbital_speed
-
     @property
     def radius(self) -> float:
         """Radio del círculo envolvente, en torno a `position`. No es un hitbox.

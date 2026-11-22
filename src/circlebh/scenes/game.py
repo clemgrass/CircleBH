@@ -149,7 +149,6 @@ class GameScene:
             ]
         if demo is not None and demo.guest is not None:
             guest = Enemy(BALANCE.enemies[demo.guest], Vector2(demo.guest_at))
-            guest.launch(self.world.player.position)
             self.world.enemies.append(guest)
         self.dead_steps = 0
         self.section = -1

@@ -22,7 +22,6 @@ HEXAGON = EnemySpec(
     speed=120.0,
     friction=0.0,
     spin=0.0,
-    orbital_speed=0.0,
     anchored=False,
     phantom=False,
     solitary=False,

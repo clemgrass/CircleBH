@@ -18,7 +18,7 @@ class Scenario:
     crowd_spacing: float = 90.0
     """La separación de esa red. 90 es más abierta que el equilibrio (≈ 55)."""
     guest: str | None = None
-    """Un enemigo más al empezar, lanzado como si naciera (`Enemy.launch`)."""
+    """Un enemigo más al empezar, como el círculo atado al jugador."""
     guest_at: tuple[float, float] = (0.0, 0.0)
     """Dónde nace el invitado, relativo al jugador."""
     lethal: bool = True

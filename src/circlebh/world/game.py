@@ -132,9 +132,8 @@ class World:
         for name, offset in self.queue.pop(self.balance.spawning.max_per_step):
             if not self.merge.allows(name):
                 continue
-            enemy = Enemy(self.balance.enemies[name], self.player.position + offset)
-            enemy.launch(self.player.position)
-            self.enemies.append(enemy)
+            position = self.player.position + offset
+            self.enemies.append(Enemy(self.balance.enemies[name], position))
         self.enemies = self.merge.update(
             self._steps, self.enemies, self.player.position
         )
