@@ -78,6 +78,10 @@ class Enemy:
 
         Una acción puede escalarla, como el círculo, que atrae mientras se lleva a la
         masa crítica (decisión 57)."""
+        if not self.actions:
+            # El caso de casi todo el enjambre: sin el generador de abajo, que `Coulomb`
+            # pide por cada vecino.
+            return self.spec.charge_per_line * len(self.edges)
         scale = next(
             (a.charge_scale for a in self.actions if a.charge_scale is not None), 1.0
         )
@@ -179,6 +183,9 @@ class Enemy:
         shape = self.spec.shape
         if isinstance(shape, CircleShape):
             # Su única línea es el borde: el golpe es donde el tramo entra al círculo.
+            # Sin ella, ya murió en este paso: una segunda bala no lo golpea.
+            if not self.edges:
+                return None
             t = segment_circle_entry(
                 relative_start, relative_end, Vector2(), self.spec.radius
             )

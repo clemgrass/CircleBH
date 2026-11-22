@@ -159,7 +159,9 @@ class World:
         donde está cargado, para cruzarlo desde afuera (decisión 56)."""
         name = self.balance.critical_mass.enemy
         spec = self.balance.enemies[name]
-        present = any(enemy.spec == spec for enemy in self.enemies) or any(
+        # `is` y no `==`: comparar la dataclass campo por campo, contra cada enemigo y en
+        # cada paso, hacía notar el costo en el benchmark del enjambre.
+        present = any(enemy.spec is spec for enemy in self.enemies) or any(
             queued == name for queued, _ in self.queue
         )
         here = self.player.position

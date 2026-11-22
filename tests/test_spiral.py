@@ -18,6 +18,7 @@ from circlebh.world.actions import (
     step_actions,
 )
 from circlebh.world.clock import STEP
+from circlebh.world.critical_mass import heavy_direction
 from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
 from circlebh.world.swarm import lattice, step_swarm
@@ -156,6 +157,23 @@ def test_la_media_vuelta_suma_pi_y_no_se_acerca_al_jugador() -> None:
     # Del primer offset cargando al primero girando hay media vuelta, más un paso.
     giro = abs(cargando[0].angle_to(primero_girando))
     assert giro == pytest.approx(180, abs=2)
+
+
+def test_el_cruce_nunca_entra_a_carry_radius() -> None:
+    # Un grupo cerca del jugador y unos rezagados lejos al otro lado: el centroide de
+    # las posiciones cae cerca del jugador, aunque Σû apunte al grupo. El círculo nace
+    # detrás del grupo, como en el mundo, y nunca se acerca a menos de `carry_radius`.
+    grupo = [Enemy(QUIETO, p) for p in lattice(Vector2(350, 0), 23, 55)]
+    rezagados = [Enemy(QUIETO, Vector2(-1100, 60 * k - 180)) for k in range(7)]
+    otros = [*grupo, *rezagados]
+    direccion = heavy_direction([e.position for e in otros])
+    assert direccion is not None
+    circulo = Enemy(CIRCULO, direccion * BALANCE.spawning.distance)
+    enemies = [*otros, circulo]
+    for _ in range(pasos(10)):
+        paso(enemies, Vector2())
+        if espiral_de(circulo).state is not SpiralState.CIRCLING:
+            assert circulo.position.length() >= 250 - 360 * STEP
 
 
 def test_se_lleva_parte_del_grupo_al_otro_lado() -> None:

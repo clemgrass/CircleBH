@@ -199,6 +199,14 @@ def test_circulo_que_avanza_hacia_la_bala_la_golpea() -> None:
     assert enemy.hit_by(Vector2(9, 0), Vector2(9, 0)) == (pytest.approx(0.5), 0)
 
 
+def test_circulo_muerto_no_se_golpea_otra_vez() -> None:
+    # Dos balas en el mismo paso: la primera lo mata y el mundo todavía no lo saca.
+    # La segunda no puede quitarle una línea que ya no tiene.
+    enemy = Enemy(CIRCULO, Vector2())
+    enemy.remove_edge(0)
+    assert enemy.hit_by(Vector2(-20, 0), Vector2(20, 0)) is None
+
+
 def test_el_circulo_no_tiene_segmentos() -> None:
     assert Enemy(CIRCULO, Vector2()).lines() == []
 

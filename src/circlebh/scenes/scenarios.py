@@ -18,7 +18,7 @@ class Scenario:
     crowd_spacing: float = 90.0
     """La separación de esa red. 90 es más abierta que el equilibrio (≈ 55)."""
     guest: str | None = None
-    """Un enemigo más al empezar, como el círculo atado al jugador."""
+    """Un enemigo más al empezar, como el círculo que persigue al jugador."""
     guest_at: tuple[float, float] = (0.0, 0.0)
     """Dónde nace el invitado, relativo al jugador."""
     lethal: bool = True
@@ -146,8 +146,8 @@ SCENARIOS: dict[str, Scenario] = {
         Scenario(
             "circulo-dispersa",
             "7 hexágonos juntos a un lado del jugador quieto, que no muere ni dispara,"
-            " y un círculo que nace bajo ellos girando hacia arriba: su carga los abre"
-            " al pasar, y sigue cayendo en espiral.",
+            " y un círculo que nace bajo ellos: los atrae al cruzarlos, se los lleva en"
+            " media vuelta alrededor del jugador, los suelta y sigue en espiral.",
             pilot=False,
             crowd=7,
             crowd_center=(250.0, 0.0),
@@ -171,8 +171,8 @@ SCENARIOS: dict[str, Scenario] = {
         Scenario(
             "masa-critica",
             "30 hexágonos juntos a un lado del jugador quieto, que no muere ni dispara:"
-            " la masa crítica trae un círculo, que nace fuera de la vista en el"
-            " cuadrante más vacío y gira en espiral hacia el grupo.",
+            " la masa crítica trae un círculo, que nace fuera de la vista detrás del"
+            " grupo, lo cruza, se lleva a parte al otro lado y los suelta.",
             pilot=False,
             crowd=30,
             crowd_center=(320.0, 0.0),

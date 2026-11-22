@@ -185,10 +185,11 @@ class VolleySpec:
 
 @dataclass(frozen=True, kw_only=True)
 class SpiralSpec:
-    """Acción: la espiral del círculo. Primero cruza el centro de la masa crítica a
-    `cross_speed`, y después te persigue en la espiral logarítmica `ṙ = −λr`, `θ̇ = ω`,
-    mirando solo dónde estás, no cómo te mueves (`world/actions.py`, decisiones 53 y
-    54)."""
+    """Acción: la espiral del círculo. Cruza el centro de la masa crítica a
+    `cross_speed`, atrayendo; da media vuelta alrededor del jugador a `carry_speed` y a
+    `carry_radius`, llevándose a los que atrapó, y los suelta; y después te persigue en
+    la espiral logarítmica `ṙ = −λr`, `θ̇ = ω`, mirando solo dónde estás, no cómo te
+    mueves (`world/actions.py`, decisiones 53, 54 y 57)."""
 
     kind: Literal["spiral"] = "spiral"
 
@@ -300,8 +301,9 @@ class EnemySpec:
 
     mass_per_line: float
     """Masa de cada línea. Su masa es esto por las líneas que le quedan (ADR 0027). Vale
-    1 en todos menos el círculo, que pesa más de lo que indican sus líneas para no
-    salir disparado por un vecino."""
+    1 en todos menos el círculo. Al círculo hoy no le cambia nada, porque su espiral
+    impone su velocidad y no siente fuerzas; el campo queda porque lo decide el ADR
+    0027."""
 
     patterns: tuple[PatternSpec, ...]
     """Su conducta: los patrones de movimiento, cuyas aceleraciones se suman."""

@@ -434,7 +434,11 @@ class Spiral(Action):
         return []
 
     def _cross(self, enemy: Enemy, context: ActionContext) -> None:
-        """Rumbo al centroide de la masa crítica, o a cargar si ya lo pasó."""
+        """Rumbo al centroide de la masa crítica, o a cargar si ya lo pasó.
+
+        También empieza a cargar al llegar a `carry_radius` del jugador: el centroide de
+        las posiciones puede caer cerca de él, o al otro lado, aunque `Σû` apunte al
+        grupo, y el cruce nunca pasa por encima del jugador (decisión 56)."""
         others = [
             e.position
             for e in context.enemies
@@ -444,7 +448,10 @@ class Spiral(Action):
             self.state = SpiralState.CIRCLING
             return
         ahead = sum(others, Vector2()) / len(others) - enemy.position
-        if ahead.length_squared() == 0 or self._velocity.dot(ahead) < 0:
+        near = enemy.position.distance_to(context.player_position) <= (
+            self.spec.carry_radius
+        )
+        if ahead.length_squared() == 0 or self._velocity.dot(ahead) < 0 or near:
             self.state = SpiralState.CARRYING
             return
         self._velocity = ahead.normalize() * self.spec.cross_speed

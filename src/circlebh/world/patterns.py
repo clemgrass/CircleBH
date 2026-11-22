@@ -69,9 +69,11 @@ class Coulomb(Pattern):
     """
 
     def acceleration(self, enemy: Enemy, context: Context) -> Vector2:
+        # La carga propia se lee una vez: puede depender de sus acciones (decisión 57).
+        charge = enemy.charge
         force = player_force(
             enemy.position - context.player_position,
-            enemy.charge,
+            charge,
             context.player_charge,
             context.charges,
         )
@@ -80,7 +82,7 @@ class Coulomb(Pattern):
                 continue
             force += pair_force(
                 enemy.position - other.position,
-                enemy.charge,
+                charge,
                 other.charge,
                 enemy.radius + other.radius,
                 context.charges,
