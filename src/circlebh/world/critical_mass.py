@@ -28,6 +28,19 @@ def mean_resultant_length(offsets: Sequence[Vector2]) -> float:
     return total.length() / len(offsets)
 
 
+def heavy_direction(offsets: Sequence[Vector2]) -> Vector2 | None:
+    """Hacia dónde está cargado el enjambre: `Σ ûᵢ` normalizado. Si te rodean tan
+    parejo que la suma da 0, no hay dirección y da `None`. El círculo nace por ahí,
+    detrás del grupo (decisión 56)."""
+    total = sum(
+        (offset.normalize() for offset in offsets if offset.length_squared() > 0),
+        Vector2(),
+    )
+    if total.length_squared() == 0:
+        return None
+    return total.normalize()
+
+
 def check_critical_mass(balance: Balance) -> None:
     """Rechaza al crear el mundo una masa crítica sin sentido, nombrando el campo."""
     spec = balance.critical_mass

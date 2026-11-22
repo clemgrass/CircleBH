@@ -490,6 +490,17 @@ def test_el_mundo_trae_un_circulo_con_masa_critica() -> None:
     assert circulos_en_la_cola(world) == 1
 
 
+def test_el_circulo_nace_detras_del_grupo() -> None:
+    # El grupo está a la derecha del jugador: el círculo nace más allá, a la derecha,
+    # para cruzarlo desde afuera sin pasar por encima del jugador (decisión 56).
+    world = mundo_cargado(HEXAGON_REAL)
+    centro = sum((e.position for e in world.enemies), Vector2()) / len(world.enemies)
+    world.update(Vector2())
+    (offset,) = [o for name, o in world.queue if name == "circle"]
+    assert offset.length() >= BALANCE.spawning.distance - 1e-9
+    assert abs(offset.angle_to(centro - world.player.position)) < 30
+
+
 @pytest.mark.parametrize("campo", ["anchored", "phantom"])
 def test_los_anclados_y_los_fantasmas_no_cuentan(campo: str) -> None:
     # Copias del hexágono, no estrellas: 30 estrellas se fusionarían.

@@ -14,6 +14,7 @@ from circlebh.balance import BALANCE, CriticalMassSpec
 from circlebh.world.critical_mass import (
     CriticalMass,
     check_critical_mass,
+    heavy_direction,
     mean_resultant_length,
 )
 from circlebh.world.game import World
@@ -41,6 +42,19 @@ def test_repartidos_parejo_da_cero(n: int) -> None:
 
 def test_sin_enemigos_da_cero() -> None:
     assert mean_resultant_length([]) == 0.0
+
+
+def test_la_direccion_cargada_apunta_al_grupo() -> None:
+    direccion = heavy_direction(DE_UN_LADO)
+    assert direccion is not None
+    assert direccion.length() == pytest.approx(1.0)
+    # Todos están a la derecha, cerca del eje x.
+    assert direccion.x > 0.95
+
+
+def test_repartidos_parejo_no_tienen_direccion() -> None:
+    assert heavy_direction(PAREJO) is None
+    assert heavy_direction([]) is None
 
 
 def test_uno_encima_del_jugador_cuenta_sin_direccion() -> None:
