@@ -278,6 +278,8 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                         "angular_speed": 1.2,
                         "decay": 0.3,
                         "cross_speed": 360.0,
+                        "carry_speed": 100.0,
+                        "carry_radius": 250.0,
                     }
                 ],
             },

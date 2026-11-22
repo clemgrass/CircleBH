@@ -1,5 +1,6 @@
-"""Tests de la espiral del círculo: primero cruza la masa crítica y después te persigue en
-espiral, mirando solo tu posición (spec de la 0.2.0, decisiones 53 y 54)."""
+"""Tests de la espiral del círculo: primero cruza la masa crítica, se lleva a parte del
+grupo al otro lado del jugador, y después lo persigue en espiral, mirando solo su
+posición (spec de la 0.2.0, decisiones 53, 54 y 57)."""
 
 import math
 import random
@@ -8,7 +9,7 @@ from dataclasses import replace
 import pytest
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, CircleShape, SpiralSpec
+from circlebh.balance import BALANCE, CircleShape, CoulombSpec, SpiralSpec
 from circlebh.world.actions import (
     ActionContext,
     Spiral,
@@ -21,19 +22,28 @@ from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
 from circlebh.world.swarm import lattice, step_swarm
 
-ESPIRAL = SpiralSpec(angular_speed=0.8, decay=0.19, cross_speed=360.0)
+ESPIRAL = SpiralSpec(
+    angular_speed=0.8,
+    decay=0.19,
+    cross_speed=360.0,
+    carry_speed=100.0,
+    carry_radius=250.0,
+)
 CIRCULO = replace(
     BALANCE.enemies["hexagon"],
     shape=CircleShape(),
     radius=8.0,
     speed=0.0,
     friction=0.0,
+    charge_per_line=60.0,
     patterns=(),
     actions=(ESPIRAL,),
 )
 """Un círculo con números propios, para que afinar el balance no cambie estos tests."""
 QUIETO = replace(BALANCE.enemies["hexagon"], speed=0.0, patterns=())
 """Un hexágono que no se mueve por sí mismo: el grupo que hay que cruzar."""
+SOLO_CARGAS = replace(BALANCE.enemies["hexagon"], patterns=(CoulombSpec(),))
+"""Un hexágono que solo siente la ley de cargas: el círculo se lo puede llevar."""
 
 
 def pasos(seconds: float) -> int:
@@ -87,7 +97,24 @@ def test_la_velocidad_no_depende_de_la_del_jugador() -> None:
     assert corriendo.velocity == quieto.velocity
 
 
-def test_primero_cruza_el_centroide_del_grupo() -> None:
+def etapas_con_grupo(
+    segundos: float,
+) -> tuple[Enemy, list[Enemy], list[tuple[SpiralState, Vector2, float]]]:
+    """Un círculo bajo un grupo quieto de 7 hexágonos en `(300, 0)`, con el jugador quieto
+    en el origen. Devuelve, por paso, la etapa, el offset desde el jugador y su carga."""
+    grupo = [Enemy(QUIETO, p) for p in lattice(Vector2(300, 0), 7, 50)]
+    circulo = Enemy(CIRCULO, Vector2(300, -700))
+    enemies = [*grupo, circulo]
+    registro = []
+    for _ in range(pasos(segundos)):
+        paso(enemies, Vector2())
+        registro.append(
+            (espiral_de(circulo).state, Vector2(circulo.position), circulo.charge)
+        )
+    return circulo, grupo, registro
+
+
+def test_al_pasar_el_centroide_empieza_a_cargar() -> None:
     grupo = [Enemy(QUIETO, p) for p in lattice(Vector2(300, 0), 7, 50)]
     circulo = Enemy(CIRCULO, Vector2(300, -700))
     enemies = [*grupo, circulo]
@@ -100,11 +127,51 @@ def test_primero_cruza_el_centroide_del_grupo() -> None:
         if etapa is SpiralState.CROSSING:
             # La que impone; la red de seguridad la corrige si choca con un hexágono.
             assert espiral_de(circulo).velocity.length() == pytest.approx(360)
-        elif etapas.count(SpiralState.CIRCLING) == 1:
-            # Empieza a girar recién cuando ya pasó el centro del grupo.
+        elif etapas.count(SpiralState.CARRYING) == 1:
+            # Empieza a cargar recién cuando ya pasó el centro del grupo.
             assert circulo.position.y >= centro.y - 360 * STEP
     assert etapas[0] is SpiralState.CROSSING
-    assert SpiralState.CIRCLING in etapas
+    assert SpiralState.CARRYING in etapas
+
+
+def test_atrae_al_cruzar_y_al_cargar_y_repele_al_girar() -> None:
+    _, _, registro = etapas_con_grupo(15)
+    signos = {etapa: carga > 0 for etapa, _, carga in registro}
+    assert signos == {
+        SpiralState.CROSSING: False,
+        SpiralState.CARRYING: False,
+        SpiralState.CIRCLING: True,
+    }
+
+
+def test_la_media_vuelta_suma_pi_y_no_se_acerca_al_jugador() -> None:
+    _, _, registro = etapas_con_grupo(15)
+    cargando = [
+        offset for etapa, offset, _ in registro if etapa is SpiralState.CARRYING
+    ]
+    primero_girando = next(
+        offset for etapa, offset, _ in registro if etapa is SpiralState.CIRCLING
+    )
+    assert min(o.length() for o in cargando) >= 250 - 100 * STEP
+    # Del primer offset cargando al primero girando hay media vuelta, más un paso.
+    giro = abs(cargando[0].angle_to(primero_girando))
+    assert giro == pytest.approx(180, abs=2)
+
+
+def test_se_lleva_parte_del_grupo_al_otro_lado() -> None:
+    # 14 hexágonos a la derecha del jugador quieto, y el círculo detrás de ellos. Al
+    # terminar la media vuelta, una parte quedó a la izquierda del jugador.
+    grupo = [Enemy(SOLO_CARGAS, p) for p in lattice(Vector2(300, 0), 14, 55)]
+    circulo = Enemy(CIRCULO, Vector2(1100, 0))
+    enemies = [*grupo, circulo]
+    assert all(e.position.x > 0 for e in grupo)
+    for _ in range(pasos(20)):
+        paso(enemies, Vector2())
+        if espiral_de(circulo).state is SpiralState.CIRCLING:
+            break
+    assert espiral_de(circulo).state is SpiralState.CIRCLING
+    al_otro_lado = [e for e in grupo if e.position.x < 0]
+    assert len(al_otro_lado) >= len(grupo) / 3
 
 
 def test_sin_nadie_que_cruzar_gira_al_tiro() -> None:
@@ -129,13 +196,18 @@ def test_encima_del_jugador_se_queda_quieto() -> None:
 
 
 @pytest.mark.parametrize(
-    ("angular_speed", "decay", "cross_speed"),
-    [(1.2, 0.0, 360.0), (1.2, -0.1, 360.0), (0.0, 0.3, 360.0), (1.2, 0.3, 0.0)],
+    ("campo", "valor"),
+    [
+        ("decay", 0.0),
+        ("decay", -0.1),
+        ("angular_speed", 0.0),
+        ("cross_speed", 0.0),
+        ("carry_speed", 0.0),
+        ("carry_radius", 0.0),
+    ],
 )
-def test_rechaza_una_espiral_sin_sentido(
-    angular_speed: float, decay: float, cross_speed: float
-) -> None:
-    mala = SpiralSpec(angular_speed=angular_speed, decay=decay, cross_speed=cross_speed)
+def test_rechaza_una_espiral_sin_sentido(campo: str, valor: float) -> None:
+    mala = replace(ESPIRAL, **{campo: valor})
     circulo = replace(BALANCE.enemies["circle"], actions=(mala,))
     balance = replace(BALANCE, enemies={**BALANCE.enemies, "circle": circulo})
     with pytest.raises(ValueError, match=r"enemies\.circle\.actions"):

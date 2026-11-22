@@ -74,8 +74,14 @@ class Enemy:
     @property
     def charge(self) -> float:
         """`charge_per_line` por las líneas que le quedan. Como la masa también depende
-        de sus líneas, un herido empuja menos, y a él lo empujan igual."""
-        return self.spec.charge_per_line * len(self.edges)
+        de sus líneas, un herido empuja menos, y a él lo empujan igual.
+
+        Una acción puede escalarla, como el círculo, que atrae mientras se lleva a la
+        masa crítica (decisión 57)."""
+        scale = next(
+            (a.charge_scale for a in self.actions if a.charge_scale is not None), 1.0
+        )
+        return scale * self.spec.charge_per_line * len(self.edges)
 
     @property
     def radius(self) -> float:

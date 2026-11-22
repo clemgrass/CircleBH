@@ -12,7 +12,7 @@ from hypothesis import strategies as st
 from pygame.math import Vector2
 
 from circlebh.balance import BALANCE, CoulombSpec, EnemySpec
-from circlebh.world.actions import step_actions
+from circlebh.world.actions import Spiral, SpiralState, step_actions
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
 from circlebh.world.swarm import lattice, separate, step_swarm
@@ -249,19 +249,33 @@ def dispersion(enemies: list[Enemy]) -> float:
 
 
 def test_dispersa_un_grupo() -> None:
-    # La misma simulación sin círculo, con uno sin carga y con el real, que nace bajo
-    # el grupo y gira hacia él. El choque solo ya los corre un poco: lo que los abre es
-    # la carga.
-    def simular(circulo: EnemySpec | None) -> float:
+    # El círculo nace bajo el grupo. Al cruzarlo y llevárselo, lo atrae y lo junta
+    # (decisión 57); al soltarlo, lo repele. Por eso se mide 2 s después de que empieza
+    # a girar, y se compara contra el mismo tiempo sin círculo y con uno sin carga. El
+    # choque solo ya los corre un poco: lo que los abre es la carga.
+    real = BALANCE.enemies["circle"]
+
+    def simular(circulo: EnemySpec | None, pasos: int) -> float:
         grupo = [Enemy(HEXAGON, p) for p in lattice(Vector2(250, 0), 7, 50)]
         enemies = list(grupo)
         if circulo is not None:
             enemies.append(Enemy(circulo, Vector2(250, -160)))
-        for _ in range(round(2 / STEP)):
+        for _ in range(pasos):
             paso_real(enemies)
         return dispersion(grupo)
 
-    real = BALANCE.enemies["circle"]
-    con_carga = simular(real)
-    assert con_carga > simular(None)
-    assert con_carga > simular(replace(real, charge_per_line=0.0))
+    def hasta_soltarlos() -> int:
+        grupo = [Enemy(HEXAGON, p) for p in lattice(Vector2(250, 0), 7, 50)]
+        circulo = Enemy(real, Vector2(250, -160))
+        (espiral,) = circulo.actions
+        assert isinstance(espiral, Spiral)
+        for n in range(round(30 / STEP)):
+            if espiral.state is SpiralState.CIRCLING:
+                return n
+            paso_real([*grupo, circulo])
+        raise AssertionError("el círculo nunca los soltó")
+
+    pasos = hasta_soltarlos() + round(2 / STEP)
+    con_carga = simular(real, pasos)
+    assert con_carga > simular(None, pasos)
+    assert con_carga > simular(replace(real, charge_per_line=0.0), pasos)

@@ -203,6 +203,14 @@ class SpiralSpec:
     """Su rapidez al cruzar la masa crítica, en unidades del plano por segundo. Más que
     la del jugador, para que alcance al grupo aunque el jugador se mueva."""
 
+    carry_speed: float
+    """Su rapidez en la media vuelta en que se lleva a los que atrapó al otro lado del
+    jugador (decisión 57). Menos que la de ellos, para que alcancen a seguirlo."""
+
+    carry_radius: float
+    """A qué distancia del jugador da la media vuelta. Tiene que dejar a la bola de
+    atrapados lejos de él."""
+
 
 @dataclass(frozen=True, kw_only=True)
 class StarPolygonShape:
@@ -649,7 +657,12 @@ BALANCE = Balance(
             threat=0.0,
             actions=(
                 SpiralSpec(
-                    kind="spiral", angular_speed=1.2, decay=0.3, cross_speed=360.0
+                    kind="spiral",
+                    angular_speed=1.2,
+                    decay=0.3,
+                    cross_speed=360.0,
+                    carry_speed=100.0,
+                    carry_radius=250.0,
                 ),
             ),
         ),
