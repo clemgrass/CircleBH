@@ -49,6 +49,7 @@ class Merge:
         self, spec: MergeSpec, enemies: Mapping[str, EnemySpec], bpm: float
     ) -> None:
         self.spec = spec
+        self.enemies = enemies
         self.member = enemies[spec.enemy]
         """El tipo que se junta."""
         self.into = enemies[spec.into]
@@ -65,8 +66,10 @@ class Merge:
         """El pulso en que empezó a apagarse."""
 
     def allows(self, name: str) -> bool:
-        """Si el tipo `name` puede nacer: fuera de la calma, no nacen estrellas."""
-        return name != self.spec.enemy or self.state is MergeState.CALM
+        """Si el tipo `name` puede nacer: fuera de la calma, no nacen estrellas.
+
+        Reconoce a la estrella por su spec, como `update`, y no por su nombre."""
+        return self.enemies[name] != self.member or self.state is MergeState.CALM
 
     def update(self, steps: int, enemies: list[Enemy], player: Vector2) -> list[Enemy]:
         """Avanza la fusión al paso `steps` y devuelve la lista nueva de enemigos.

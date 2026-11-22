@@ -141,6 +141,44 @@ def test_rota_entera_vuelve_la_calma() -> None:
     assert not grandes(world)
 
 
+def test_con_mas_de_cinco_se_quitan_todas() -> None:
+    # Borde: si hay 6, no queda una suelta mientras las estrellas están prohibidas.
+    world = mundo_con_estrellas(6)
+    world.update(QUIETO)
+    assert world.merge.state is MergeState.WARNING
+    assert not [e for e in world.enemies if e.spec == STAR]
+
+
+def test_rota_en_el_mismo_paso_en_que_sale_no_se_desvanece() -> None:
+    # Borde: el mundo quita a los muertos antes del paso de la fusión, así que gana la
+    # muerte. Vuelve la calma sin pasar por el desvanecerse.
+    world = mundo_con_estrellas(5, lethal=False)
+    hasta_que_aparezca(world)
+    [grande] = grandes(world)
+    afuera = MERGE.release * RED_STAR.radius + 1
+    world.player.position = grande.position + Vector2(afuera, 0)
+    for k in list(grande.edges):
+        grande.remove_edge(k)
+    world.update(QUIETO)
+    assert world.merge.state is MergeState.CALM
+    assert world.merge.fading is None
+
+
+def test_una_estrella_con_otro_nombre_tampoco_nace() -> None:
+    # La fusión reconoce a sus estrellas por su spec, también al prohibir: un tipo con
+    # otro nombre y el mismo spec es una estrella.
+    gemela = replace(
+        SIN_APARICIONES,
+        enemies={**SIN_APARICIONES.enemies, "gemela": STAR},
+    )
+    world = World(gemela, random.Random(1), armed=False)
+    world.enemies += [Enemy(STAR, Vector2(300, 0).rotate(72 * k)) for k in range(5)]
+    world.update(QUIETO)
+    assert world.merge.state is MergeState.WARNING
+    assert not world.merge.allows("gemela")
+    assert world.merge.allows("hexagon")
+
+
 def test_fuera_de_la_calma_no_nacen_estrellas() -> None:
     world = mundo_con_estrellas(5)
     world.update(QUIETO)

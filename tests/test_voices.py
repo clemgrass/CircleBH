@@ -107,6 +107,17 @@ def test_enemigo_sobre_el_jugador_tiene_angulo_cero() -> None:
     assert view.distance == 0
 
 
+def test_estrella_suena_en_e_10_16_y_calla_los_golpes_de_sus_lados() -> None:
+    # 10 líneas: el loop es E(10, 16). El golpe j es la línea j, así que sin sus 5
+    # lados solo suenan los golpes de las diagonales, del 5 al 9.
+    estrella = BALANCE.enemies["star"].shape
+    golpes = [s for s, golpe in enumerate(euclid(10, 16)) if golpe]
+    entera = EnemyView(0.0, 100.0, estrella, tuple(range(10)))
+    assert semicorcheas_que_suenan(entera) == golpes
+    diagonales = EnemyView(0.0, 100.0, estrella, tuple(range(5, 10)))
+    assert semicorcheas_que_suenan(diagonales) == golpes[5:]
+
+
 def test_enemigo_de_100_lados_suena_sin_error() -> None:
     entero = vista(edges=tuple(range(100)), sides=100)
     assert semicorcheas_que_suenan(entero) == list(range(16))
