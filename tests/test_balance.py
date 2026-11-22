@@ -268,11 +268,11 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "anchored": False,
                 "phantom": False,
                 "solitary": False,
-                "charge_per_line": 30.0,
+                "charge_per_line": 60.0,
                 "mass_per_line": 600.0,
                 "patterns": [],
                 "threat": 0.0,
-                "actions": [{"kind": "tether", "angular_speed": 0.8, "decay": 0.19}],
+                "actions": [{"kind": "tether", "angular_speed": 1.2, "decay": 0.3}],
             },
         },
         "spawning": {
