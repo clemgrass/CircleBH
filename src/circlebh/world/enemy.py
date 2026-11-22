@@ -6,6 +6,8 @@ Cada línea es una parte del enemigo: la bala quita la que golpea, y sin líneas
 muere. Chocan por sus líneas, y el círculo envolvente es el primer descarte (ADR 0020).
 """
 
+from collections.abc import Mapping
+
 from pygame.math import Vector2
 
 from circlebh.balance import CircleShape, EnemySpec
@@ -20,6 +22,17 @@ from circlebh.world.figures import is_regular, local_lines
 from circlebh.world.patterns import Context, make_pattern
 from circlebh.world.polygon import ENVELOPE_SLACK, edge_sectors, first_crossing
 from circlebh.world.rigid import center_of_mass, rotate, to_local, to_world
+
+
+def check_masses(enemies: Mapping[str, EnemySpec]) -> None:
+    """Rechaza al crear el mundo una masa por línea que no sea positiva, nombrando a su
+    enemigo: con masa 0, `Coulomb` dividiría por cero."""
+    for name, spec in enemies.items():
+        if spec.mass_per_line <= 0:
+            raise ValueError(
+                f"enemies.{name}.mass_per_line: tiene que ser mayor que 0, no"
+                f" {spec.mass_per_line}"
+            )
 
 
 class Enemy:
@@ -55,14 +68,26 @@ class Enemy:
 
     @property
     def mass(self) -> float:
-        """Las líneas que le quedan (ADR 0021)."""
-        return float(len(self.edges))
+        """`mass_per_line` por las líneas que le quedan (ADR 0021 y 0027)."""
+        return self.spec.mass_per_line * len(self.edges)
 
     @property
     def charge(self) -> float:
-        """`charge_per_line` por las líneas que le quedan. Como la masa también son sus
-        líneas, un herido empuja menos, y a él lo empujan igual."""
+        """`charge_per_line` por las líneas que le quedan. Como la masa también depende
+        de sus líneas, un herido empuja menos, y a él lo empujan igual."""
         return self.spec.charge_per_line * len(self.edges)
+
+    def launch(self, player_position: Vector2) -> None:
+        """Le da su velocidad al nacer: `orbital_speed` por `θ̂`, la dirección desde el
+        jugador girada 90° antihorario. Así el círculo parte orbitando.
+
+        Encima del jugador no hay dirección, y queda quieto."""
+        offset = self.position - player_position
+        if offset.length_squared() == 0:
+            self.velocity = Vector2()
+            return
+        radial = offset.normalize()
+        self.velocity = Vector2(-radial.y, radial.x) * self.spec.orbital_speed
 
     @property
     def radius(self) -> float:

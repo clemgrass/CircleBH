@@ -8,7 +8,7 @@ from circlebh.balance import Balance
 from circlebh.world.actions import step_actions
 from circlebh.world.clock import STEP
 from circlebh.world.director import Director, Purchase
-from circlebh.world.enemy import Enemy
+from circlebh.world.enemy import Enemy, check_masses
 from circlebh.world.enemy_bullets import EnemyBullet, bullet_hits_player, step_bullets
 from circlebh.world.events import Death, Event
 from circlebh.world.figures import check_shapes
@@ -44,6 +44,7 @@ class World:
         )
         """Decide qué aparece y cuándo, con la forma del tema (ADR 0025)."""
         check_shapes(balance.enemies)
+        check_masses(balance.enemies)
         check_merge(balance)
         self.merge = Merge(balance.merge, balance.enemies, balance.director.bpm)
         """La fusión de las estrellas en la gran estrella roja."""
@@ -126,8 +127,9 @@ class World:
         for name, offset in self.queue.pop(self.balance.spawning.max_per_step):
             if not self.merge.allows(name):
                 continue
-            position = self.player.position + offset
-            self.enemies.append(Enemy(self.balance.enemies[name], position))
+            enemy = Enemy(self.balance.enemies[name], self.player.position + offset)
+            enemy.launch(self.player.position)
+            self.enemies.append(enemy)
         self.enemies = self.merge.update(
             self._steps, self.enemies, self.player.position
         )

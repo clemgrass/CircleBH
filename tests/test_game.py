@@ -10,7 +10,14 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, Balance, DeckEntry, DirectorSpec, SectionSpec
+from circlebh.balance import (
+    BALANCE,
+    Balance,
+    CircleShape,
+    DeckEntry,
+    DirectorSpec,
+    SectionSpec,
+)
 from circlebh.world.clock import STEP
 from circlebh.world.director import bar_at
 from circlebh.world.enemy import Enemy
@@ -29,6 +36,7 @@ SIN_APARICIONES = replace(
 )
 """El balance real con un director sin mazo, que no compra: los tests ponen a mano a
 los enemigos."""
+HEXAGON_REAL = BALANCE.enemies["hexagon"]
 
 
 def mundo_con_hexagono(
@@ -446,3 +454,26 @@ def test_cuenta_las_separaciones() -> None:
     world.enemies = [Enemy(hexagon, Vector2(300, 0)), Enemy(hexagon, Vector2(320, 0))]
     world.update(Vector2())
     assert world.separations == 1
+
+
+# --- La masa y la órbita (#59) ---
+
+
+def test_el_mundo_lanza_a_lo_que_nace() -> None:
+    # Nace después del paso del enjambre: su velocidad es la del lanzamiento.
+    circulo = replace(HEXAGON_REAL, shape=CircleShape(), radius=8.0, orbital_speed=50.0)
+    balance = replace(
+        SIN_APARICIONES, enemies={**SIN_APARICIONES.enemies, "circulo": circulo}
+    )
+    world = World(balance, random.Random(1))
+    world.queue.push([("circulo", Vector2(800, 0))])
+    world.update(Vector2())
+    (enemy,) = world.enemies
+    assert enemy.velocity == Vector2(0, 50)
+
+
+def test_el_mundo_rechaza_una_masa_que_no_es_positiva() -> None:
+    sin_masa = replace(HEXAGON_REAL, mass_per_line=0.0)
+    balance = replace(BALANCE, enemies={**BALANCE.enemies, "hexagon": sin_masa})
+    with pytest.raises(ValueError, match=r"enemies\.hexagon\.mass_per_line"):
+        World(balance, random.Random(1))

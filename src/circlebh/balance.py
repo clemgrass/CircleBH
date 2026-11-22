@@ -251,6 +251,11 @@ class EnemySpec:
     """Su velocidad angular al aparecer, `ω` en rad/s, antihoraria si es positiva. Con
     0 no gira. No es un patrón: los patrones son aceleraciones lineales (ADR 0027)."""
 
+    orbital_speed: float
+    """Su rapidez al nacer, en unidades del plano por segundo, perpendicular a la
+    dirección al jugador y en sentido antihorario. Con 0 nace quieto. El círculo la usa
+    para caer en espiral (spec de la 0.2.0, "El círculo")."""
+
     anchored: bool
     """Si está anclado, como la estrella: nada lo mueve, ni sus patrones, ni las
     fuerzas, ni la red de seguridad. Tampoco gira, aunque tenga `spin`. Los demás lo
@@ -267,8 +272,12 @@ class EnemySpec:
     sortee otra formación."""
 
     charge_per_line: float
-    """Carga de cada línea. Su carga es esto por las líneas que le quedan, y su masa,
-    las líneas que le quedan."""
+    """Carga de cada línea. Su carga es esto por las líneas que le quedan."""
+
+    mass_per_line: float
+    """Masa de cada línea. Su masa es esto por las líneas que le quedan (ADR 0027). Vale
+    1 en todos menos el círculo, que pesa más de lo que indican sus líneas para no
+    salir disparado por un vecino."""
 
     patterns: tuple[PatternSpec, ...]
     """Su conducta: los patrones de movimiento, cuyas aceleraciones se suman."""
@@ -467,10 +476,12 @@ BALANCE = Balance(
             speed=120.0,
             friction=2.0,
             spin=0.0,
+            orbital_speed=0.0,
             anchored=False,
             phantom=False,
             solitary=False,
             charge_per_line=1.0,
+            mass_per_line=1.0,
             patterns=(
                 SeekSpec(kind="seek", strength=240.0),
                 CoulombSpec(kind="coulomb"),
@@ -484,10 +495,12 @@ BALANCE = Balance(
             speed=120.0,
             friction=2.0,
             spin=1.5,
+            orbital_speed=0.0,
             anchored=False,
             phantom=False,
             solitary=False,
             charge_per_line=1.0,
+            mass_per_line=1.0,
             patterns=(
                 SeekSpec(kind="seek", strength=240.0),
                 CoulombSpec(kind="coulomb"),
@@ -501,10 +514,12 @@ BALANCE = Balance(
             speed=150.0,
             friction=3.0,
             spin=0.0,
+            orbital_speed=0.0,
             anchored=False,
             phantom=False,
             solitary=False,
             charge_per_line=1.0,
+            mass_per_line=1.0,
             patterns=(
                 OrbitSpec(kind="orbit", radius=280.0, stiffness=4.0, tangential=0.0),
                 CoulombSpec(kind="coulomb"),
@@ -531,10 +546,12 @@ BALANCE = Balance(
             speed=100.0,
             friction=2.0,
             spin=1.0,
+            orbital_speed=0.0,
             anchored=False,
             phantom=False,
             solitary=False,
             charge_per_line=1.0,
+            mass_per_line=1.0,
             patterns=(
                 OrbitSpec(kind="orbit", radius=300.0, stiffness=6.0, tangential=0.0),
                 CoulombSpec(kind="coulomb"),
@@ -558,10 +575,12 @@ BALANCE = Balance(
             speed=0.0,
             friction=0.0,
             spin=0.0,
+            orbital_speed=0.0,
             anchored=True,
             phantom=False,
             solitary=True,
             charge_per_line=0.6,
+            mass_per_line=1.0,
             patterns=(),
             threat=2.0,
             actions=(),
@@ -572,10 +591,12 @@ BALANCE = Balance(
             speed=0.0,
             friction=0.0,
             spin=0.0,
+            orbital_speed=0.0,
             anchored=True,
             phantom=True,
             solitary=True,
             charge_per_line=0.0,
+            mass_per_line=1.0,
             patterns=(),
             threat=0.0,
             actions=(),

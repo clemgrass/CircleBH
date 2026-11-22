@@ -22,10 +22,12 @@ SPEC = EnemySpec(
     speed=120.0,
     friction=0.0,
     spin=0.0,
+    orbital_speed=0.0,
     anchored=False,
     phantom=False,
     solitary=False,
     charge_per_line=0.0,
+    mass_per_line=1.0,
     patterns=(),
     threat=1.0,
     actions=(),
@@ -200,6 +202,39 @@ def test_circulo_que_avanza_hacia_la_bala_la_golpea() -> None:
 
 def test_el_circulo_no_tiene_segmentos() -> None:
     assert Enemy(CIRCULO, Vector2()).lines() == []
+
+
+# --- La masa y la órbita (#59) ---
+
+
+def test_la_masa_es_mass_per_line_por_las_lineas() -> None:
+    enemy = Enemy(replace(SPEC, mass_per_line=2.5), Vector2())
+    assert enemy.mass == 15.0
+    enemy.remove_edge(0)
+    assert enemy.mass == 12.5
+
+
+def test_nace_con_velocidad_tangencial() -> None:
+    # θ̂ es la dirección desde el jugador girada 90° antihorario.
+    spec = replace(CIRCULO, orbital_speed=50.0)
+    derecha = Enemy(spec, Vector2(100, 0))
+    derecha.launch(Vector2())
+    assert derecha.velocity == Vector2(0, 50)
+    arriba = Enemy(spec, Vector2(10, 110))
+    arriba.launch(Vector2(10, 10))
+    assert tuple(arriba.velocity) == pytest.approx((-50, 0))
+
+
+def test_launch_encima_del_jugador_queda_quieto() -> None:
+    enemy = Enemy(replace(CIRCULO, orbital_speed=50.0), Vector2(3, 4))
+    enemy.launch(Vector2(3, 4))
+    assert enemy.velocity == Vector2()
+
+
+def test_sin_orbital_speed_nace_quieto() -> None:
+    enemy = Enemy(SPEC, Vector2(100, 0))
+    enemy.launch(Vector2())
+    assert enemy.velocity == Vector2()
 
 
 # --- Aparecer (dónde, en `test_spawning.py`) ---

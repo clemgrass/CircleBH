@@ -6,7 +6,7 @@ from dataclasses import replace
 import pytest
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, CoulombSpec, OrbitSpec, SeekSpec
+from circlebh.balance import BALANCE, CoulombSpec, EnemySpec, OrbitSpec, SeekSpec
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
 from circlebh.world.patterns import Context, Coulomb, Orbit, Seek, make_pattern
@@ -103,6 +103,19 @@ def test_hexagono_sobre_el_jugador_quieto_se_mantiene_finito() -> None:
         enemy.step(enemy.acceleration(ctx))
         assert math.isfinite(enemy.position.x) and math.isfinite(enemy.position.y)
         assert enemy.velocity.length() <= HEXAGON.speed + 1e-9
+
+
+def test_mas_masa_acelera_menos_con_la_misma_carga() -> None:
+    # La misma fuerza del mismo vecino, dividida por una masa 10 veces mayor.
+    def empuje(spec: EnemySpec) -> Vector2:
+        enemy = Enemy(spec, Vector2())
+        vecino = Enemy(HEXAGON, Vector2(30, 0))
+        return Coulomb().acceleration(enemy, contexto([vecino]))
+
+    liviano = empuje(SOLO_COULOMB)
+    pesado = empuje(replace(SOLO_COULOMB, mass_per_line=10.0))
+    assert liviano.x < 0
+    assert tuple(pesado) == pytest.approx((liviano.x / 10, 0.0))
 
 
 # --- orbit ---
