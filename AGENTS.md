@@ -89,7 +89,7 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 - Los enemigos se mueven por los patrones de su tipo en el balance. Sus aceleraciones se suman, con inercia y roce, y entre ellos actúa una sola ley de cargas (ADR 0021).
 - Algunos enemigos giran como cuerpos rígidos, según el `spin` del balance. El golpe de una bala se mide en el marco del enemigo, y al perder una línea, el enemigo conserva su `ω` y gira en torno a su nuevo centro de masa (ADR 0027).
 - La configuración del juego (cámara, controles, audio, accesibilidad y depuración) vive solo en `settings.json`, dentro del paquete, y se valida al arrancar contra una dataclass (ADR 0018). Si describe a una entidad, va al balance; si describe cómo se juega o se ve, a la configuración.
-- El fondo es negro y el trazo, blanco. `accessibility.invert_colors` los invierte (ADR 0023). Los colores viven solo en `render/palette.py`, y las funciones de dibujo reciben la paleta como parámetro.
+- El fondo es negro y el trazo, blanco. `accessibility.invert_colors` los invierte (ADR 0023). El acento rojo `#ff3b30` es solo para el peligro, como las balas enemigas, y no se invierte. Los colores viven solo en `render/palette.py`, y las funciones de dibujo reciben la paleta como parámetro.
 - La lógica avanza en pasos fijos de 1/60 s con acumulador. El azar sale solo de la `random.Random(seed)` inyectada.
 - La partida sigue la forma de un tema. Un director en `world/` cuenta compases con el tempo fijo del balance (`director.bpm`) y compra enemigos por secciones con presupuesto (ADR 0025). Cada sección acota las capas de la música, y una partida nueva espera el compás (ADR 0026).
 - En las colisiones, el jugador es un círculo y cada enemigo choca por sus líneas, con su círculo envolvente como primer descarte (ADR 0020). Se usa una grilla espacial y funciones propias en `world/`.
@@ -123,5 +123,4 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 
 ## Preguntas abiertas
 - El nombre del juego. `circlebh` es provisorio.
-- El color de acento: se decide cuando existan balas enemigas.
 - Los números de equilibrio y qué parámetro mejora cada tarjeta.

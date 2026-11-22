@@ -153,7 +153,37 @@ class ChargeSpec:
     adivina hacia dónde vas a escapar."""
 
 
-type ActionSpec = ChargeSpec
+@dataclass(frozen=True, kw_only=True)
+class VolleySpec:
+    """Acción: la ráfaga. Si te ve a distancia, avisa congelando su giro, y dispara
+    `shots` salvas, una bala por vértice, mientras gira. Cada punta deja un brazo de la
+    espiral de Arquímedes `r = (v/ω)·θ`. Después se recupera (`world/actions.py`)."""
+
+    kind: Literal["volley"] = "volley"
+
+    min_distance: float
+    """No dispara con el jugador más cerca que esto: una bala que nace encima no se
+    puede esquivar."""
+
+    max_distance: float
+    """Solo dispara con el jugador a esta distancia o menos. Tiene que caber en la
+    vista, para que nadie dispare desde fuera de la pantalla."""
+
+    telegraph: float
+    """Cuánto dura el aviso, en segundos. Mientras avisa no gira: sus puntas muestran
+    hacia dónde van a salir las balas."""
+
+    shots: int
+    """Cuántas salvas dispara en una ráfaga."""
+
+    interval: float
+    """Los segundos entre una salva y la siguiente."""
+
+    cooldown: float
+    """Cuánto se recupera después de la ráfaga, en segundos, antes de volver a mirar."""
+
+
+type ActionSpec = ChargeSpec | VolleySpec
 """Una acción: lo que el enemigo hace y no es una fuerza (ADR 0021). En el JSON, su
 campo `kind` dice cuál es."""
 
@@ -295,6 +325,21 @@ class PointWeaponSpec:
 
 
 @dataclass(frozen=True)
+class EnemyBulletSpec:
+    """Las balas enemigas: puntos que van en línea recta, `p(t) = p₀ + v·t`. Atraviesan
+    a los enemigos sin tocarlos, matan al jugador y se borran al pasar
+    `spawning.distance` de él (`world/enemy_bullets.py`)."""
+
+    speed: float
+    """Su rapidez, en unidades del plano por segundo. Más que la del jugador: no se las
+    deja atrás corriendo, hay que esquivarlas."""
+
+    radius: float
+    """Su radio, en unidades del plano. Tocan al jugador a `player.radius + radius` de
+    su centro, y se dibujan de este tamaño."""
+
+
+@dataclass(frozen=True)
 class Balance:
     """Todas las entidades del juego."""
 
@@ -315,6 +360,9 @@ class Balance:
 
     point_weapon: PointWeaponSpec
     """El arma punto."""
+
+    enemy_bullet: EnemyBulletSpec
+    """Las balas que disparan los enemigos."""
 
 
 # >>> datos (lo genera poe balance-importar)
@@ -385,6 +433,30 @@ BALANCE = Balance(
                 ),
             ),
         ),
+        "pentagon": EnemySpec(
+            sides=5,
+            radius=22.0,
+            speed=100.0,
+            friction=2.0,
+            spin=1.0,
+            charge_per_line=1.0,
+            patterns=(
+                OrbitSpec(kind="orbit", radius=300.0, stiffness=6.0, tangential=0.0),
+                CoulombSpec(kind="coulomb"),
+            ),
+            threat=2.0,
+            actions=(
+                VolleySpec(
+                    kind="volley",
+                    min_distance=120.0,
+                    max_distance=320.0,
+                    telegraph=0.6,
+                    shots=4,
+                    interval=0.15,
+                    cooldown=2.5,
+                ),
+            ),
+        ),
     },
     spawning=SpawningSpec(
         distance=800.0, max_per_step=4, formation_gap=20.0, formation_size=(3, 6)
@@ -449,6 +521,7 @@ BALANCE = Balance(
                     DeckEntry(enemy="hexagon", weight=1.0),
                     DeckEntry(enemy="square", weight=1.0),
                     DeckEntry(enemy="triangle", weight=1.0),
+                    DeckEntry(enemy="pentagon", weight=1.0),
                 ),
                 formations=("single",),
             ),
@@ -464,6 +537,7 @@ BALANCE = Balance(
                     DeckEntry(enemy="hexagon", weight=1.0),
                     DeckEntry(enemy="square", weight=1.0),
                     DeckEntry(enemy="triangle", weight=1.0),
+                    DeckEntry(enemy="pentagon", weight=1.0),
                 ),
                 formations=("single", "line", "cluster"),
             ),
@@ -479,11 +553,13 @@ BALANCE = Balance(
                     DeckEntry(enemy="hexagon", weight=1.0),
                     DeckEntry(enemy="square", weight=1.0),
                     DeckEntry(enemy="triangle", weight=1.0),
+                    DeckEntry(enemy="pentagon", weight=1.0),
                 ),
                 formations=("ring", "line", "cluster"),
             ),
         ),
     ),
     point_weapon=PointWeaponSpec(cooldown=0.6, speed=300.0, range=700.0),
+    enemy_bullet=EnemyBulletSpec(speed=330.0, radius=4.0),
 )
 # <<< datos

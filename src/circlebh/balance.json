@@ -85,6 +85,37 @@
           "lead_angle": 0.3
         }
       ]
+    },
+    "pentagon": {
+      "sides": 5,
+      "radius": 22.0,
+      "speed": 100.0,
+      "friction": 2.0,
+      "spin": 1.0,
+      "charge_per_line": 1.0,
+      "patterns": [
+        {
+          "kind": "orbit",
+          "radius": 300.0,
+          "stiffness": 6.0,
+          "tangential": 0.0
+        },
+        {
+          "kind": "coulomb"
+        }
+      ],
+      "threat": 2.0,
+      "actions": [
+        {
+          "kind": "volley",
+          "min_distance": 120.0,
+          "max_distance": 320.0,
+          "telegraph": 0.6,
+          "shots": 4,
+          "interval": 0.15,
+          "cooldown": 2.5
+        }
+      ]
     }
   },
   "spawning": {
@@ -209,6 +240,10 @@
           {
             "enemy": "triangle",
             "weight": 1.0
+          },
+          {
+            "enemy": "pentagon",
+            "weight": 1.0
           }
         ],
         "formations": [
@@ -237,6 +272,10 @@
           },
           {
             "enemy": "triangle",
+            "weight": 1.0
+          },
+          {
+            "enemy": "pentagon",
             "weight": 1.0
           }
         ],
@@ -269,6 +308,10 @@
           {
             "enemy": "triangle",
             "weight": 1.0
+          },
+          {
+            "enemy": "pentagon",
+            "weight": 1.0
           }
         ],
         "formations": [
@@ -283,5 +326,9 @@
     "cooldown": 0.6,
     "speed": 300.0,
     "range": 700.0
+  },
+  "enemy_bullet": {
+    "speed": 330.0,
+    "radius": 4.0
   }
 }

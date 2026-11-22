@@ -26,7 +26,8 @@ def draw_world(
     show_hitboxes: bool,
 ) -> None:
     """Dibuja al jugador como un círculo relleno, a cada enemigo con las líneas que le
-    quedan, sin relleno, y las balas del jugador debajo, como puntos.
+    quedan, sin relleno, las balas del jugador debajo, como puntos, y las balas enemigas
+    encima, con el acento.
 
     Con `show_hitboxes`, encima va el círculo de cada cuerpo.
     """
@@ -57,6 +58,16 @@ def draw_world(
                 viewport.to_screen(b),
                 line_width,
             )
+
+    # Las balas enemigas van encima de todo, con el acento: lo que mata se ve siempre.
+    radius = world.balance.enemy_bullet.radius * viewport.scale
+    for enemy_bullet in world.enemy_bullets:
+        pygame.draw.circle(
+            screen,
+            palette.accent,
+            viewport.to_screen(enemy_bullet.position),
+            radius,
+        )
 
     if show_hitboxes:
         # El jugador choca como círculo. Del enemigo se dibuja la envolvente, el primer

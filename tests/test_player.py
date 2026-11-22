@@ -16,6 +16,17 @@ def test_jugador_nace_en_el_origen() -> None:
     assert player.radius == SPEC.radius
 
 
+def test_previous_es_donde_estaba_antes_del_paso() -> None:
+    # Lo usa el tramo de una bala enemiga, en el marco del jugador.
+    player = Player(SPEC)
+    assert player.previous == Vector2(0, 0)
+    player.step(Vector2(1, 0))
+    before = Vector2(player.position)
+    player.step(Vector2(0, 1))
+    assert player.previous == before
+    assert player.previous is not player.position
+
+
 def test_jugador_avanza_speed_por_paso() -> None:
     player = Player(SPEC)
     player.step(Vector2(1, 0))

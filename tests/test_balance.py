@@ -184,6 +184,35 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                     }
                 ],
             },
+            "pentagon": {
+                "sides": 5,
+                "radius": 22.0,
+                "speed": 100.0,
+                "friction": 2.0,
+                "spin": 1.0,
+                "charge_per_line": 1.0,
+                "patterns": [
+                    {
+                        "kind": "orbit",
+                        "radius": 300.0,
+                        "stiffness": 6.0,
+                        "tangential": 0.0,
+                    },
+                    {"kind": "coulomb"},
+                ],
+                "threat": 2.0,
+                "actions": [
+                    {
+                        "kind": "volley",
+                        "min_distance": 120.0,
+                        "max_distance": 320.0,
+                        "telegraph": 0.6,
+                        "shots": 4,
+                        "interval": 0.15,
+                        "cooldown": 2.5,
+                    }
+                ],
+            },
         },
         "spawning": {
             "distance": 800.0,
@@ -194,6 +223,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
         # El tema es largo; basta con que salga entero y en su lugar.
         "director": dump(BALANCE.director),
         "point_weapon": {"cooldown": 0.6, "speed": 300.0, "range": 700.0},
+        "enemy_bullet": {"speed": 330.0, "radius": 4.0},
     }
 
 
