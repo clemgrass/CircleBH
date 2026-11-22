@@ -31,8 +31,10 @@ def step_swarm(
 
     Los vecinos de cada uno son los que están a menos de `charges.cutoff`: con radio
     `cutoff / 2` para todos, "se tocan" en la grilla justo a esa distancia.
+
+    Los fantasmas no entran: los demás los atraviesan, sin fuerzas ni red de seguridad.
     """
-    alive = [enemy for enemy in enemies if enemy.alive]
+    alive = [enemy for enemy in enemies if enemy.alive and not enemy.spec.phantom]
     half = charges.cutoff / 2
     pairs = SpatialGrid(charges.cutoff).pairs(
         [enemy.position for enemy in alive], [half] * len(alive)

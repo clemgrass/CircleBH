@@ -377,8 +377,10 @@ def step_actions(
     Las balas que disparen quedan en `bullets`.
 
     Van en el orden de la lista, que es el de aparición: así, lo que sacan de `rng` es
-    siempre lo mismo con la misma semilla."""
-    alive = [enemy for enemy in enemies if enemy.alive]
+    siempre lo mismo con la misma semilla.
+
+    Los fantasmas no cuentan: los demás los atraviesan, así que no tapan una recta."""
+    alive = [enemy for enemy in enemies if enemy.alive and not enemy.spec.phantom]
     context = ActionContext(Vector2(player_position), alive, rng, bullets, bullet_spec)
     events: list[Event] = []
     for enemy in alive:

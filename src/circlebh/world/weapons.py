@@ -75,12 +75,17 @@ def nearest(origin: Vector2, enemies: list[Enemy]) -> Enemy | None:
     dirección. Un enemigo abierto puede quedar estacionado sobre el jugador quieto; así
     no calla el arma contra los demás, y para pegarle hay que moverse (decisión 18).
 
+    Tampoco apunta a los fantasmas, como la gran estrella roja: el arma sigue apuntando
+    al enjambre, y sus balas rompen las líneas rojas que hay en el camino (decisión 44).
+
     Se compara la distancia al cuadrado con 0 y no `position != origin`, porque la
     igualdad de `Vector2` tiene una tolerancia de 1e-6. La distancia al cuadrado es el
     largo al cuadrado de la dirección del disparo: si no es 0, se puede normalizar.
     """
     targets = [
-        e for e in enemies if e.alive and e.position.distance_squared_to(origin) > 0
+        e
+        for e in enemies
+        if e.alive and not e.spec.phantom and e.position.distance_squared_to(origin) > 0
     ]
     # `min` devuelve el primero de los empatados.
     return min(

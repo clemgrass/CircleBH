@@ -11,6 +11,7 @@ from hypothesis import strategies as st
 from pygame.math import Vector2
 
 from circlebh.balance import BALANCE, CoulombSpec
+from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
 from circlebh.world.swarm import lattice, separate, step_swarm
 
@@ -182,6 +183,32 @@ def test_anclado_no_se_mueve_con_fuerzas() -> None:
         paso([estrella, *vecinos], player_charge=-14.0)
     assert estrella.position == Vector2(0, 0)
     assert estrella.velocity == Vector2()
+
+
+# --- El fantasma ---
+
+FANTASMA = BALANCE.enemies["red_star"]
+"""La gran estrella roja: los enemigos la atraviesan (decisión 40)."""
+
+
+def test_fantasma_no_mueve_ni_frena_al_enjambre() -> None:
+    # El hexágono está dentro de su envolvente: sin ser fantasma, la red de seguridad
+    # lo sacaría a 174 y el núcleo duro lo empujaría. Va sin roce, para que su
+    # velocidad solo pueda cambiar por la estrella.
+    estrella = Enemy(FANTASMA, Vector2(0, 0))
+    hexagono = Enemy(replace(SOLO_COULOMB, friction=0.0), Vector2(50, 0))
+    hexagono.velocity = Vector2(-60, 0)
+    assert paso([estrella, hexagono]) == 0
+    assert hexagono.velocity == Vector2(-60, 0)
+    assert hexagono.position == Vector2(50 - 60 * STEP, 0)
+
+
+def test_el_fantasma_no_se_mueve() -> None:
+    estrella = Enemy(FANTASMA, Vector2(0, 0))
+    vecinos = [Enemy(SOLO_COULOMB, p) for p in lattice(Vector2(), 12, 55)]
+    for _ in range(30):
+        paso([estrella, *vecinos], player_charge=-14.0)
+    assert estrella.position == Vector2(0, 0)
 
 
 # --- La red triangular ---

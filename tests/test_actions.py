@@ -192,6 +192,21 @@ def test_no_embiste_sin_recta_libre() -> None:
     assert set(states) == {ChargeState.WATCHING}
 
 
+def test_el_fantasma_no_tapa_la_recta_del_triangulo() -> None:
+    # La gran estrella encierra al jugador, pero el triángulo la atraviesa: su recta
+    # sigue libre y avisa.
+    triangle = Enemy(TRIANGLE, Vector2(200, 0))
+    fantasma = Enemy(BALANCE.enemies["red_star"], Vector2(0, 0))
+    events = step_actions(
+        [triangle, fantasma],
+        Vector2(),
+        random.Random(1),
+        [],
+        BALANCE.enemy_bullet,
+    )
+    assert events == [Telegraph(triangle)]
+
+
 def test_no_avisa_desde_fuera_de_la_vista() -> None:
     # Foco 2: más allá de `watch_distance` sigue observando.
     triangle = Enemy(TRIANGLE, Vector2(CHARGE.watch_distance + 1, 0))
