@@ -183,6 +183,28 @@ class VolleySpec:
     """Cuánto se recupera después de la ráfaga, en segundos, antes de volver a mirar."""
 
 
+@dataclass(frozen=True, kw_only=True)
+class StarPolygonShape:
+    """La figura de un enemigo: el polígono estrellado `{n/s}` (`world/figures.py`).
+
+    Tiene `vertices` vértices en un círculo, y cada `s` de `steps` une el vértice `k`
+    con el `k + s`. El hexágono es `{6/1}`, y la estrella, `{5/1}` más `{5/2}`: sus
+    lados y sus diagonales."""
+
+    kind: Literal["star_polygon"] = "star_polygon"
+
+    vertices: int
+    """Los vértices `n`, repartidos en el círculo del radio del enemigo."""
+
+    steps: tuple[int, ...]
+    """Los saltos `s`, cada uno con `1 ≤ s < n/2`. Con `(1,)`, es un polígono regular."""
+
+    @property
+    def line_count(self) -> int:
+        """Las líneas de la figura entera: `n` por cada salto."""
+        return self.vertices * len(self.steps)
+
+
 type ActionSpec = ChargeSpec | VolleySpec
 """Una acción: lo que el enemigo hace y no es una fuerza (ADR 0021). En el JSON, su
 campo `kind` dice cuál es."""
