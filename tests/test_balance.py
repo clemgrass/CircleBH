@@ -350,11 +350,12 @@ def test_el_giro_cabe_en_la_cota_del_golpe(nombre: str) -> None:
     assert abs(BALANCE.enemies[nombre].spin * STEP) <= 0.1
 
 
-@pytest.mark.parametrize("nombre", sorted(BALANCE.enemies))
+@pytest.mark.parametrize(
+    # Un fantasma no entra al enjambre, así que no tiene núcleo para los demás.
+    "nombre",
+    sorted(n for n, spec in BALANCE.enemies.items() if not spec.phantom),
+)
 def test_el_nucleo_alcanza_antes_del_corte(nombre: str) -> None:
     # La grilla busca vecinos hasta `cutoff`: si el núcleo alcanzara más lejos, no lo vería.
-    # Un fantasma no entra al enjambre, así que no tiene núcleo para los demás.
-    if BALANCE.enemies[nombre].phantom:
-        return
     radius = BALANCE.enemies[nombre].radius
     assert BALANCE.charges.core_reach * 2 * radius < BALANCE.charges.cutoff
