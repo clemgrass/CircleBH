@@ -27,6 +27,8 @@
       "friction": 2.0,
       "spin": 0.0,
       "anchored": false,
+      "phantom": false,
+      "solitary": false,
       "charge_per_line": 1.0,
       "patterns": [
         {
@@ -53,6 +55,8 @@
       "friction": 2.0,
       "spin": 1.5,
       "anchored": false,
+      "phantom": false,
+      "solitary": false,
       "charge_per_line": 1.0,
       "patterns": [
         {
@@ -79,6 +83,8 @@
       "friction": 3.0,
       "spin": 0.0,
       "anchored": false,
+      "phantom": false,
+      "solitary": false,
       "charge_per_line": 1.0,
       "patterns": [
         {
@@ -120,6 +126,8 @@
       "friction": 2.0,
       "spin": 1.0,
       "anchored": false,
+      "phantom": false,
+      "solitary": false,
       "charge_per_line": 1.0,
       "patterns": [
         {
@@ -159,9 +167,31 @@
       "friction": 0.0,
       "spin": 0.0,
       "anchored": true,
+      "phantom": false,
+      "solitary": true,
       "charge_per_line": 0.6,
       "patterns": [],
       "threat": 2.0,
+      "actions": []
+    },
+    "red_star": {
+      "shape": {
+        "kind": "star_polygon",
+        "vertices": 5,
+        "steps": [
+          2
+        ]
+      },
+      "radius": 150.0,
+      "speed": 0.0,
+      "friction": 0.0,
+      "spin": 0.0,
+      "anchored": true,
+      "phantom": true,
+      "solitary": true,
+      "charge_per_line": 0.0,
+      "patterns": [],
+      "threat": 0.0,
       "actions": []
     }
   },
@@ -197,6 +227,10 @@
           {
             "enemy": "square",
             "weight": 1.0
+          },
+          {
+            "enemy": "star",
+            "weight": 0.25
           }
         ],
         "formations": [
@@ -226,6 +260,10 @@
           {
             "enemy": "triangle",
             "weight": 1.0
+          },
+          {
+            "enemy": "star",
+            "weight": 0.35
           }
         ],
         "formations": [
@@ -376,6 +414,14 @@
         ]
       }
     ]
+  },
+  "merge": {
+    "enemy": "star",
+    "count": 5,
+    "into": "red_star",
+    "beats": 3,
+    "release": 1.5,
+    "fade_beats": 1.0
   },
   "point_weapon": {
     "cooldown": 0.6,
