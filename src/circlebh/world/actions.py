@@ -19,7 +19,13 @@ from typing import TYPE_CHECKING
 
 from pygame.math import Vector2
 
-from circlebh.balance import ActionSpec, ChargeSpec, EnemyBulletSpec, VolleySpec
+from circlebh.balance import (
+    ActionSpec,
+    ChargeSpec,
+    EnemyBulletSpec,
+    StarPolygonShape,
+    VolleySpec,
+)
 from circlebh.world.clock import STEP
 from circlebh.world.collisions import segment_touches_circle
 from circlebh.world.enemy_bullets import EnemyBullet
@@ -340,6 +346,8 @@ class Volley(Action):
         """Una salva: una bala por cada vértice que le queda, desde el vértice y hacia
         afuera del centro de la figura."""
         shape = enemy.spec.shape
+        # Un círculo con volley se rechaza al crear el mundo (`check_shapes`).
+        assert isinstance(shape, StarPolygonShape)
         ends = line_vertices(shape)
         tips = sorted({k for e in enemy.edges for k in ends[e]})
         center = enemy.position + rotate(enemy.offset, enemy.angle)

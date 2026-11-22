@@ -1,5 +1,7 @@
 """Colisiones: círculos (ADR 0006) y segmentos (ADR 0020)."""
 
+import math
+
 from pygame.math import Vector2
 
 
@@ -54,3 +56,26 @@ def segment_touches_circle(
 ) -> bool:
     """Si el segmento `ab` toca al círculo. Tangente cuenta como tocarlo."""
     return center.distance_to(closest_point_on_segment(center, a, b)) <= radius
+
+
+def segment_circle_entry(
+    start: Vector2, end: Vector2, center: Vector2, radius: float
+) -> float | None:
+    """Dónde entra el tramo `start→end` al círculo, como fracción `t ∈ [0, 1]` del tramo.
+
+    Con `d = end − start` y `f = start − center`, el punto `start + t·d` está en el
+    borde cuando `|f + t·d|² = radius²`, o sea `(d·d)·t² + 2(f·d)·t + (f·f − radius²) = 0`.
+    La entrada es la raíz menor. Si `start` ya está adentro, da 0, y si el tramo no
+    toca el círculo, `None`. Tangente cuenta como tocarlo.
+    """
+    f = start - center
+    c = f.length_squared() - radius * radius
+    if c <= 0:
+        return 0.0
+    a = end.distance_squared_to(start)
+    b = f.dot(end - start)
+    discriminant = b * b - a * c
+    if a == 0 or discriminant < 0:
+        return None
+    t = (-b - math.sqrt(discriminant)) / a
+    return t if 0 <= t <= 1 else None

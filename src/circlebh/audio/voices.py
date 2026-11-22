@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pygame.math import Vector2
 
 from circlebh.audio.rhythm import SIXTEENTHS, euclid
-from circlebh.balance import StarPolygonShape
+from circlebh.balance import Shape
 from circlebh.world.enemy import Enemy
 from circlebh.world.weapons import PointWeapon, Weapon
 
@@ -34,7 +34,7 @@ class EnemyView:
     angle: float
     """De 0 a 2π, antihorario desde +x (ADR 0003)."""
     distance: float
-    shape: StarPolygonShape
+    shape: Shape
     edges: tuple[int, ...]
 
 
@@ -44,7 +44,7 @@ class Note:
 
     semitones: int
     """Desde La3, ya dentro del voicing del acorde (o una octava arriba)."""
-    shape: StarPolygonShape
+    shape: Shape
     edges: tuple[int, ...]
     """La forma que le queda al enemigo: es el timbre de la nota."""
     gain: float

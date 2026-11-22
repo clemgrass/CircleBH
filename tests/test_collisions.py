@@ -7,6 +7,7 @@ from circlebh.world.collisions import (
     circles_touch,
     closest_point_on_segment,
     crossing,
+    segment_circle_entry,
     segment_touches_circle,
 )
 
@@ -104,3 +105,28 @@ def test_circulo_a_una_unidad_del_extremo_no_lo_toca() -> None:
     assert not segment_touches_circle(
         Vector2(0, 0), Vector2(10, 0), Vector2(14, 0), 3.0
     )
+
+
+# --- Dónde entra un tramo a un círculo (el círculo, #59) ---
+
+
+def test_entrada_al_circulo_desde_afuera() -> None:
+    # De x = −10 a x = 10 entra en x = −2: recorrió 8 de 20.
+    t = segment_circle_entry(Vector2(-10, 0), Vector2(10, 0), Vector2(), 2.0)
+    assert t == pytest.approx(0.4)
+
+
+def test_tramo_que_empieza_adentro_entra_en_cero() -> None:
+    assert segment_circle_entry(Vector2(1, 0), Vector2(10, 0), Vector2(), 2.0) == 0
+
+
+def test_tramo_que_pasa_afuera_no_entra() -> None:
+    assert (
+        segment_circle_entry(Vector2(-10, 2.01), Vector2(10, 2.01), Vector2(), 2.0)
+        is None
+    )
+
+
+def test_tramo_que_no_alcanza_el_circulo_no_entra() -> None:
+    # Va hacia el círculo, pero termina antes: el borde está en x = −2.
+    assert segment_circle_entry(Vector2(-10, 0), Vector2(-3, 0), Vector2(), 2.0) is None

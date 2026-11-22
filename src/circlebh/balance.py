@@ -205,6 +205,23 @@ class StarPolygonShape:
         return self.vertices * len(self.steps)
 
 
+@dataclass(frozen=True, kw_only=True)
+class CircleShape:
+    """La figura del círculo: una sola línea curva, el círculo del radio del enemigo.
+    Choca como círculo, no por segmentos (spec de la 0.2.0, "El círculo")."""
+
+    kind: Literal["circle"] = "circle"
+
+    @property
+    def line_count(self) -> int:
+        """Una sola línea: muere de un golpe."""
+        return 1
+
+
+type Shape = StarPolygonShape | CircleShape
+"""La figura de un enemigo. En el JSON, su campo `kind` dice cuál es."""
+
+
 type ActionSpec = ChargeSpec | VolleySpec
 """Una acción: lo que el enemigo hace y no es una fuerza (ADR 0021). En el JSON, su
 campo `kind` dice cuál es."""
@@ -215,7 +232,7 @@ class EnemySpec:
     """Un tipo de enemigo: una figura hecha de líneas, que se mueve por sus patrones
     (ADR 0020 y 0021)."""
 
-    shape: StarPolygonShape
+    shape: Shape
     """Su figura. Aparece con todas sus líneas: cada bala quita la que golpea y, sin
     líneas, muere."""
 

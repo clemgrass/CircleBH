@@ -12,7 +12,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, StarPolygonShape
+from circlebh.balance import BALANCE, CircleShape, StarPolygonShape
 from circlebh.world.collisions import crossing
 from circlebh.world.enemy import Enemy
 from circlebh.world.figures import check_shape, line_vertices, local_lines
@@ -139,3 +139,25 @@ def test_el_mundo_rechaza_una_figura_invalida_nombrando_al_enemigo() -> None:
     balance = replace(BALANCE, enemies={**BALANCE.enemies, "malo": malo})
     with pytest.raises(ValueError, match=r"enemies\.malo\.shape"):
         World(balance, random.Random(0))
+
+
+# --- El círculo (#59) ---
+
+
+def test_circulo_tiene_una_linea_y_ningun_segmento() -> None:
+    assert CircleShape().line_count == 1
+    assert local_lines(CircleShape(), 8.0) == []
+
+
+def test_rechaza_un_circulo_con_volley() -> None:
+    # La salva sale de los vértices, y el círculo no tiene.
+    malo = replace(BALANCE.enemies["pentagon"], shape=CircleShape())
+    balance = replace(BALANCE, enemies={**BALANCE.enemies, "malo": malo})
+    with pytest.raises(ValueError, match=r"enemies\.malo\.actions"):
+        World(balance, random.Random(0))
+
+
+def test_acepta_el_circulo() -> None:
+    circulo = replace(BALANCE.enemies["hexagon"], shape=CircleShape(), radius=8.0)
+    balance = replace(BALANCE, enemies={**BALANCE.enemies, "circulo": circulo})
+    World(balance, random.Random(0))

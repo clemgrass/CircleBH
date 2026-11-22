@@ -8,10 +8,14 @@ muere. Chocan por sus líneas, y el círculo envolvente es el primer descarte (A
 
 from pygame.math import Vector2
 
-from circlebh.balance import EnemySpec
+from circlebh.balance import CircleShape, EnemySpec
 from circlebh.world.actions import make_action
 from circlebh.world.clock import STEP
-from circlebh.world.collisions import circles_touch, segment_touches_circle
+from circlebh.world.collisions import (
+    circles_touch,
+    segment_circle_entry,
+    segment_touches_circle,
+)
 from circlebh.world.figures import is_regular, local_lines
 from circlebh.world.patterns import Context, make_pattern
 from circlebh.world.polygon import ENVELOPE_SLACK, edge_sectors, first_crossing
@@ -100,7 +104,9 @@ class Enemy:
 
     def _local_lines(self) -> list[tuple[Vector2, Vector2]]:
         """Las líneas que le quedan, en el marco del enemigo: desde `position`, sin
-        girar."""
+        girar. El círculo no tiene segmentos: su única línea es curva."""
+        if isinstance(self.spec.shape, CircleShape):
+            return []
         return [
             (a + self.offset, b + self.offset)
             for a, b in (self.figure[k] for k in self.edges)
@@ -120,8 +126,11 @@ class Enemy:
         """Si alguna de sus líneas toca al círculo de `center` y `radius`.
 
         Primero descarta con el círculo envolvente; solo si lo toca, prueba cada línea.
-        Un círculo dentro del enemigo que no toca ninguna línea no lo toca.
+        Un círculo dentro del enemigo que no toca ninguna línea no lo toca. El enemigo
+        círculo choca como círculo: su línea es el envolvente.
         """
+        if isinstance(self.spec.shape, CircleShape):
+            return circles_touch(center, radius, self.position, self.radius)
         if not circles_touch(
             center, radius, self.position, self.radius + ENVELOPE_SLACK
         ):
@@ -148,13 +157,19 @@ class Enemy:
             to_local(start, self.previous, self.previous_angle) - self.offset
         )
         relative_end = to_local(end, self.position, self.angle) - self.offset
+        shape = self.spec.shape
+        if isinstance(shape, CircleShape):
+            # Su única línea es el borde: el golpe es donde el tramo entra al círculo.
+            t = segment_circle_entry(
+                relative_start, relative_end, Vector2(), self.spec.radius
+            )
+            return None if t is None else (t, 0)
         if not segment_touches_circle(
             relative_start, relative_end, Vector2(), self.spec.radius + ENVELOPE_SLACK
         ):
             return None
         # Los sectores ordenan solo las aristas de un polígono regular (ADR 0020). En
         # otra figura, una línea cruza varios sectores: se revisan todas (F1, ADR 0027).
-        shape = self.spec.shape
         if is_regular(shape):
             sectors = edge_sectors(relative_start, relative_end, shape.vertices)
             candidates = [k for k in sectors if k in self.edges]

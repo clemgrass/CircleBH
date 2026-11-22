@@ -12,7 +12,7 @@ from collections.abc import Sequence
 import pytest
 
 from circlebh.audio import sounds
-from circlebh.balance import StarPolygonShape
+from circlebh.balance import CircleShape, StarPolygonShape
 
 
 def regular(n: int) -> StarPolygonShape:
@@ -51,6 +51,14 @@ def test_una_sola_arista_es_diente_de_sierra() -> None:
     h = armonicos(sounds.shape_table(regular(6), (0,)), 3)
     assert h[1] > 0.1
     assert h[2] > 0.05
+
+
+def test_el_timbre_del_circulo_es_un_seno() -> None:
+    # Un punto que recorre el círculo a rapidez constante tiene `x = cos θ`.
+    tabla = sounds.shape_table(CircleShape(), (0,))
+    assert len(tabla) == sounds.TABLE
+    for i in range(0, sounds.TABLE, 64):
+        assert tabla[i] == pytest.approx(math.cos(2 * math.pi * i / sounds.TABLE))
 
 
 def test_tabla_sin_aristas_da_error() -> None:
