@@ -97,6 +97,9 @@ def first_hit(
 
     `t` es la fracción del tramo donde la cruza. Si dos empatan (ver `TIE`), gana la de
     índice menor.
+
+    `Enemy.hit_by` no la usa: cruza con `first_crossing` sobre sus líneas guardadas. Esta
+    queda como la referencia del polígono regular en los tests del ADR 0020.
     """
     return first_crossing(
         start, end, {k: polygon_edge(radius, sides, k) for k in edges}

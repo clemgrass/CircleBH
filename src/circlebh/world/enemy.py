@@ -1,6 +1,6 @@
-"""Los enemigos: figuras hechas de líneas (`world/figures.py`), que se mueven por sus patrones, con
-inercia y roce (ADR 0021), y algunos giran (ADR 0027). Algunos tienen acciones, como la
-embestida, que pueden apagar sus patrones (`world/actions.py`).
+"""Los enemigos: figuras hechas de líneas (`world/figures.py`), que se mueven por sus
+patrones, con inercia y roce (ADR 0021), y algunos giran (ADR 0027). Algunos tienen
+acciones, como la embestida, que pueden apagar sus patrones (`world/actions.py`).
 
 Cada línea es una parte del enemigo: la bala quita la que golpea, y sin líneas el enemigo
 muere. Chocan por sus líneas, y el círculo envolvente es el primer descarte (ADR 0020).
@@ -40,7 +40,7 @@ class Enemy:
         self.omega = spec.spin
         """Su velocidad angular `ω`, en rad/s. Parte en `spec.spin` y no cambia."""
         self.offset = Vector2()
-        """Dónde queda el centro del polígono visto desde `position`, en el marco del
+        """Dónde queda el centro de la figura visto desde `position`, en el marco del
         enemigo. Parte en 0. Si gira y pierde una línea, `position` pasa a su nuevo
         centro de masa, y esto guarda cuánto se corrió (ADR 0027)."""
         self._radius = spec.radius
@@ -64,7 +64,7 @@ class Enemy:
     def radius(self) -> float:
         """Radio del círculo envolvente, en torno a `position`. No es un hitbox.
 
-        Sin giro, es el del polígono completo y no se achica: las líneas que quedan no
+        Sin giro, es el de la figura completa y no se achica: las líneas que quedan no
         se mueven. Con giro, al perder una línea, es la distancia del centro de masa
         nuevo al extremo más lejano de las que quedan."""
         return self._radius
@@ -75,7 +75,7 @@ class Enemy:
         return bool(self.edges)
 
     def remove_edge(self, k: int) -> None:
-        """Quita la arista `k`: una bala la golpeó.
+        """Quita la línea `k`: una bala la golpeó.
 
         Sin giro, nada más cambia (spec de la 0.1.0, decisión 15). Con giro, el resto
         sigue con el mismo `ω`, como un cuerpo que se rompe, y gira en torno a su nuevo
@@ -142,8 +142,8 @@ class Enemy:
         enemigo es una curva, y el tramo recto entre sus extremos se aparta de ella a lo
         más `(2·|ω·dt|·|Δr| + (ω·dt)²·|r|) / 8` (ADR 0027).
         """
-        # Del marco del enemigo, centrado en `position`, al del polígono, donde valen
-        # los sectores (ADR 0020).
+        # Del marco del enemigo, centrado en `position`, al de la figura, donde están
+        # sus líneas.
         relative_start = (
             to_local(start, self.previous, self.previous_angle) - self.offset
         )

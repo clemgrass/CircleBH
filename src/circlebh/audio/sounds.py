@@ -5,7 +5,7 @@ se calcula una sola vez: queda en caché. Los que llevan ruido usan su propia `R
 de semilla fija, así que no dependen del orden en que se generan ni tocan el azar del
 juego.
 
-El timbre de un polígono sale de su forma: un punto recorre las aristas que le quedan a
+El timbre de un enemigo sale de su figura: un punto recorre las líneas que le quedan a
 rapidez constante, y su `x` es la onda. Entero, el hexágono suena suave (armónicos en
 k = 1 ± 6m, con magnitud 1/k²); con huecos, el punto salta y suena más brillante.
 """
@@ -21,7 +21,7 @@ from circlebh.balance import StarPolygonShape
 from circlebh.world.figures import local_lines
 
 TABLE = 2048
-"""Muestras de un ciclo de onda de un polígono."""
+"""Muestras de un ciclo de onda de una figura."""
 
 type Samples = array[float]
 
