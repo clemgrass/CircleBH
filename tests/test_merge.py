@@ -175,5 +175,26 @@ def test_el_mundo_rechaza_un_merge_de_un_enemigo_que_no_existe() -> None:
         World(balance, random.Random(0))
 
 
+@pytest.mark.parametrize(
+    ("campo", "valor"),
+    [
+        ("count", 0),
+        ("beats", 0),
+        ("fade_beats", 0.0),
+        ("fade_beats", -1.0),
+        ("release", 1.0),
+    ],
+)
+def test_el_mundo_rechaza_numeros_de_merge_sin_sentido(
+    campo: str, valor: float
+) -> None:
+    # Sin pulsos de aviso, la trampa se cierra sin avisar (anti-meta). Con
+    # `release ≤ 1`, el jugador saldría sin romper ninguna línea. Con `fade_beats ≤ 0`,
+    # apagarse no tiene duración. Con `count < 1`, toda partida empieza encerrada.
+    balance = replace(BALANCE, merge=replace(BALANCE.merge, **{campo: valor}))
+    with pytest.raises(ValueError, match=rf"merge\.{campo}"):
+        World(balance, random.Random(0))
+
+
 def test_el_balance_real_cumple_el_merge() -> None:
     World(BALANCE, random.Random(0))

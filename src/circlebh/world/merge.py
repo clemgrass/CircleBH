@@ -125,9 +125,19 @@ class Merge:
 
 
 def check_merge(balance: Balance) -> None:
-    """Rechaza al crear el mundo una fusión con tipos que no existen, o cuya figura
-    tocaría al jugador al aparecer centrada en él."""
+    """Rechaza al crear el mundo una fusión con tipos que no existen, con números sin
+    sentido, o cuya figura tocaría al jugador al aparecer centrada en él."""
     spec, enemies = balance.merge, balance.enemies
+    if spec.count < 1:
+        raise ValueError("merge.count: tiene que ser al menos 1")
+    if spec.beats < 1:
+        # Sin pulsos, la trampa se cierra sin avisar.
+        raise ValueError("merge.beats: el aviso necesita al menos 1 pulso")
+    if spec.fade_beats <= 0:
+        raise ValueError("merge.fade_beats: tiene que ser mayor que 0")
+    if spec.release <= 1:
+        # Dentro de su radio, el jugador todavía puede estar encerrado.
+        raise ValueError("merge.release: tiene que ser mayor que 1, fuera de la figura")
     for field, name in (("enemy", spec.enemy), ("into", spec.into)):
         if name not in enemies:
             raise ValueError(f"merge.{field}: no existe el enemigo {name}")
