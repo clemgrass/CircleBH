@@ -125,5 +125,15 @@ SCENARIOS: dict[str, Scenario] = {
             lethal=False,
             armed=False,
         ),
+        Scenario(
+            "gran-estrella",
+            "5 estrellas alrededor del piloto, que no muere y dispara: se juntan, el aviso"
+            " titila tres pulsos encima de él, y la gran estrella roja lo encierra"
+            " mientras el enjambre la atraviesa. Al salir, se apaga.",
+            pilot=True,
+            crowd=5,
+            crowd_enemy="star",
+            lethal=False,
+        ),
     ]
 }
