@@ -234,6 +234,11 @@ class EnemySpec:
     """Su velocidad angular al aparecer, `ω` en rad/s, antihoraria si es positiva. Con
     0 no gira. No es un patrón: los patrones son aceleraciones lineales (ADR 0027)."""
 
+    anchored: bool
+    """Si está anclado, como la estrella: nada lo mueve, ni sus patrones, ni las
+    fuerzas, ni la red de seguridad. Los demás lo sienten igual por Coulomb y por el
+    núcleo duro."""
+
     charge_per_line: float
     """Carga de cada línea. Su carga es esto por las líneas que le quedan, y su masa,
     las líneas que le quedan."""
@@ -407,6 +412,7 @@ BALANCE = Balance(
             speed=120.0,
             friction=2.0,
             spin=0.0,
+            anchored=False,
             charge_per_line=1.0,
             patterns=(
                 SeekSpec(kind="seek", strength=240.0),
@@ -421,6 +427,7 @@ BALANCE = Balance(
             speed=120.0,
             friction=2.0,
             spin=1.5,
+            anchored=False,
             charge_per_line=1.0,
             patterns=(
                 SeekSpec(kind="seek", strength=240.0),
@@ -435,6 +442,7 @@ BALANCE = Balance(
             speed=150.0,
             friction=3.0,
             spin=0.0,
+            anchored=False,
             charge_per_line=1.0,
             patterns=(
                 OrbitSpec(kind="orbit", radius=280.0, stiffness=4.0, tangential=0.0),
@@ -462,6 +470,7 @@ BALANCE = Balance(
             speed=100.0,
             friction=2.0,
             spin=1.0,
+            anchored=False,
             charge_per_line=1.0,
             patterns=(
                 OrbitSpec(kind="orbit", radius=300.0, stiffness=6.0, tangential=0.0),

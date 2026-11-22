@@ -136,6 +136,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "speed": 120.0,
                 "friction": 2.0,
                 "spin": 0.0,
+                "anchored": False,
                 "charge_per_line": 1.0,
                 "patterns": [{"kind": "seek", "strength": 240.0}, {"kind": "coulomb"}],
                 "threat": 1.0,
@@ -147,6 +148,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "speed": 120.0,
                 "friction": 2.0,
                 "spin": 1.5,
+                "anchored": False,
                 "charge_per_line": 1.0,
                 "patterns": [{"kind": "seek", "strength": 240.0}, {"kind": "coulomb"}],
                 "threat": 1.0,
@@ -158,6 +160,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "speed": 150.0,
                 "friction": 3.0,
                 "spin": 0.0,
+                "anchored": False,
                 "charge_per_line": 1.0,
                 "patterns": [
                     {
@@ -190,6 +193,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "speed": 100.0,
                 "friction": 2.0,
                 "spin": 1.0,
+                "anchored": False,
                 "charge_per_line": 1.0,
                 "patterns": [
                     {

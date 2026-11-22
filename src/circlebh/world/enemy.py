@@ -184,9 +184,14 @@ class Enemy:
 
         Si una acción fija la velocidad, como la embestida, `v` es esa, sin tope. Si fija
         el giro, como el triángulo que te mira, `ω` es ese en este paso.
+
+        Un anclado no se mueve: su pose de antes pasa a ser la de ahora, y `v` queda en 0.
         """
         self.previous = Vector2(self.position)
         self.previous_angle = self.angle
+        if self.spec.anchored:
+            self.velocity = Vector2()
+            return
         turn = next((a.omega for a in self.actions if a.omega is not None), self.omega)
         self.angle += turn * STEP
         imposed = next(

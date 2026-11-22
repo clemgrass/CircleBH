@@ -132,6 +132,47 @@ def test_la_bala_golpea_al_que_movio_el_empujon() -> None:
     assert a.hit_by(Vector2(88, 0), Vector2(89, 0)) is not None
 
 
+# --- El anclado ---
+
+ANCLADO = replace(QUIETO, radius=40.0, anchored=True)
+"""Como la estrella: nada lo mueve, ni las fuerzas ni la red de seguridad."""
+
+
+def test_red_de_seguridad_no_mueve_al_anclado() -> None:
+    estrella = Enemy(ANCLADO, Vector2(0, 0))
+    hexagono = Enemy(QUIETO, Vector2(50, 0))
+    assert separate([estrella, hexagono], CELDA) == 1
+    assert estrella.position == Vector2(0, 0)
+    assert hexagono.position.x == pytest.approx(ANCLADO.radius + HEXAGON.radius)
+
+
+def test_choque_contra_anclado_le_quita_toda_la_velocidad_de_acercamiento() -> None:
+    estrella = Enemy(ANCLADO, Vector2(0, 0))
+    hexagono = Enemy(QUIETO, Vector2(50, 0))
+    hexagono.velocity = Vector2(-30, 12)
+    separate([estrella, hexagono], CELDA)
+    assert hexagono.velocity.x == pytest.approx(0)
+    assert hexagono.velocity.y == pytest.approx(12)
+    assert estrella.velocity == Vector2()
+
+
+def test_dos_anclados_encimados_quedan_donde_estan() -> None:
+    a, b = Enemy(ANCLADO, Vector2(0, 0)), Enemy(ANCLADO, Vector2(30, 0))
+    assert separate([a, b], CELDA) == 0
+    assert (a.position, b.position) == (Vector2(0, 0), Vector2(30, 0))
+
+
+def test_anclado_no_se_mueve_con_fuerzas() -> None:
+    # Con carga y patrones, sus vecinos lo empujan por Coulomb y por el núcleo duro.
+    cargado = replace(SOLO_COULOMB, radius=40.0, anchored=True)
+    estrella = Enemy(cargado, Vector2(0, 0))
+    vecinos = [Enemy(SOLO_COULOMB, p) for p in lattice(Vector2(20, 0), 6, 55)]
+    for _ in range(60):
+        paso([estrella, *vecinos], player_charge=-14.0)
+    assert estrella.position == Vector2(0, 0)
+    assert estrella.velocity == Vector2()
+
+
 # --- La red triangular ---
 
 

@@ -21,6 +21,7 @@ QUIETO = EnemySpec(
     speed=120.0,
     friction=0.0,
     spin=0.0,
+    anchored=False,
     charge_per_line=0.0,
     patterns=(),
     threat=1.0,
