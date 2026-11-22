@@ -601,6 +601,25 @@ BALANCE = Balance(
             threat=0.0,
             actions=(),
         ),
+        "circle": EnemySpec(
+            shape=CircleShape(kind="circle"),
+            radius=8.0,
+            speed=250.0,
+            friction=0.12,
+            spin=0.0,
+            orbital_speed=155.0,
+            anchored=False,
+            phantom=False,
+            solitary=False,
+            charge_per_line=30.0,
+            mass_per_line=600.0,
+            patterns=(
+                SeekSpec(kind="seek", strength=30.0),
+                CoulombSpec(kind="coulomb"),
+            ),
+            threat=0.0,
+            actions=(),
+        ),
     },
     spawning=SpawningSpec(
         distance=800.0, max_per_step=4, formation_gap=20.0, formation_size=(3, 6)

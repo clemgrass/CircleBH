@@ -3,6 +3,7 @@
 import pygame
 from pygame.math import Vector2
 
+from circlebh.balance import CircleShape
 from circlebh.render.palette import Palette
 from circlebh.viewport import Viewport
 from circlebh.world.figures import local_lines
@@ -54,7 +55,17 @@ def draw_world(
     for enemy in world.enemies:
         # Lo rojo no choca con los enemigos: los fantasmas van con el acento.
         color = palette.accent if enemy.spec.phantom else palette.foreground
-        draw_lines(screen, viewport, enemy.lines(), color, line_width)
+        if isinstance(enemy.spec.shape, CircleShape):
+            # Su única línea es curva: un círculo sin relleno, con el mismo trazo.
+            pygame.draw.circle(
+                screen,
+                color,
+                viewport.to_screen(enemy.position),
+                enemy.radius * viewport.scale,
+                line_width,
+            )
+        else:
+            draw_lines(screen, viewport, enemy.lines(), color, line_width)
 
     merge = world.merge
     if merge.blink(world.steps):

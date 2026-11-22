@@ -10,7 +10,7 @@ from hypothesis import assume, given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, CoulombSpec
+from circlebh.balance import BALANCE, CoulombSpec, EnemySpec
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
 from circlebh.world.swarm import lattice, separate, step_swarm
@@ -228,3 +228,56 @@ def test_lattice_empieza_por_los_mas_cercanos() -> None:
         [60] * 6
     )
     assert puntos[6].distance_to(Vector2(10, 10)) > 60
+
+
+# --- El círculo (#59): cae en espiral y reparte al enjambre ---
+
+
+def paso_real(enemies: list[Enemy]) -> None:
+    """Un paso con el jugador quieto en el origen y su carga real, como en la partida."""
+    step_swarm(enemies, Vector2(), BALANCE.player.charge, BALANCE.charges)
+
+
+def dispersion(enemies: list[Enemy]) -> float:
+    """La distancia media de cada uno al centroide del grupo."""
+    centro = sum((e.position for e in enemies), Vector2()) / len(enemies)
+    return sum(e.position.distance_to(centro) for e in enemies) / len(enemies)
+
+
+def test_cae_en_espiral() -> None:
+    # La órbita no es circular: el radio sube y baja un poco en cada vuelta. Lo que la
+    # hace espiral es que nunca se aleja más que al nacer, termina mucho más cerca y
+    # da al menos una vuelta entera en el camino.
+    circulo = Enemy(BALANCE.enemies["circle"], Vector2(800, 0))
+    circulo.launch(Vector2())
+    angulo, anterior = 0.0, 0.0
+    for _ in range(round(30 / STEP)):
+        paso_real([circulo])
+        assert circulo.position.length() <= 800
+        actual = math.atan2(circulo.position.y, circulo.position.x)
+        # Sin los saltos de 2π al cruzar el eje −x.
+        angulo += math.remainder(actual - anterior, math.tau)
+        anterior = actual
+    assert circulo.position.length() < 800 / 4
+    assert angulo > math.tau
+
+
+def test_dispersa_un_grupo() -> None:
+    # La misma simulación sin círculo, con uno sin carga y con el real, que nace bajo
+    # el grupo y gira hacia él. El choque solo ya los corre un poco: lo que los abre es
+    # la carga.
+    def simular(circulo: EnemySpec | None) -> float:
+        grupo = [Enemy(HEXAGON, p) for p in lattice(Vector2(250, 0), 7, 50)]
+        enemies = list(grupo)
+        if circulo is not None:
+            enemy = Enemy(circulo, Vector2(250, -160))
+            enemy.launch(Vector2())
+            enemies.append(enemy)
+        for _ in range(round(2 / STEP)):
+            paso_real(enemies)
+        return dispersion(grupo)
+
+    real = BALANCE.enemies["circle"]
+    con_carga = simular(real)
+    assert con_carga > simular(None)
+    assert con_carga > simular(replace(real, charge_per_line=0.0))
