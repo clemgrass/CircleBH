@@ -10,7 +10,14 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, Balance, DeckEntry, DirectorSpec, SectionSpec
+from circlebh.balance import (
+    BALANCE,
+    Balance,
+    DeckEntry,
+    DirectorSpec,
+    EnemySpec,
+    SectionSpec,
+)
 from circlebh.world.clock import STEP
 from circlebh.world.director import bar_at
 from circlebh.world.enemy import Enemy
@@ -29,6 +36,7 @@ SIN_APARICIONES = replace(
 )
 """El balance real con un director sin mazo, que no compra: los tests ponen a mano a
 los enemigos."""
+HEXAGON_REAL = BALANCE.enemies["hexagon"]
 
 
 def mundo_con_hexagono(
@@ -446,3 +454,56 @@ def test_cuenta_las_separaciones() -> None:
     world.enemies = [Enemy(hexagon, Vector2(300, 0)), Enemy(hexagon, Vector2(320, 0))]
     world.update(Vector2())
     assert world.separations == 1
+
+
+# --- La masa (#59, ADR 0027) ---
+
+
+def test_el_mundo_rechaza_una_masa_que_no_es_positiva() -> None:
+    sin_masa = replace(HEXAGON_REAL, mass_per_line=0.0)
+    balance = replace(BALANCE, enemies={**BALANCE.enemies, "hexagon": sin_masa})
+    with pytest.raises(ValueError, match=r"enemies\.hexagon\.mass_per_line"):
+        World(balance, random.Random(1))
+
+
+# --- La masa crítica trae al círculo (#59) ---
+
+
+def mundo_cargado(spec: EnemySpec) -> World:
+    """Un mundo sin apariciones ni armas, con 30 enemigos `spec` en una red a la
+    derecha del jugador: la masa crítica del balance, todos del mismo lado."""
+    world = World(SIN_APARICIONES, random.Random(1), armed=False)
+    world.enemies = [
+        Enemy(spec, Vector2(300 + 60 * (i % 6), 60 * (i // 6) - 120))
+        for i in range(BALANCE.critical_mass.count)
+    ]
+    return world
+
+
+def circulos_en_la_cola(world: World) -> int:
+    return sum(1 for name, _ in world.queue if name == "circle")
+
+
+def test_el_mundo_trae_un_circulo_con_masa_critica() -> None:
+    world = mundo_cargado(HEXAGON_REAL)
+    world.update(Vector2())
+    assert circulos_en_la_cola(world) == 1
+
+
+def test_el_circulo_nace_detras_del_grupo() -> None:
+    # El grupo está a la derecha del jugador: el círculo nace más allá, a la derecha,
+    # para cruzarlo desde afuera sin pasar por encima del jugador (decisión 56).
+    world = mundo_cargado(HEXAGON_REAL)
+    centro = sum((e.position for e in world.enemies), Vector2()) / len(world.enemies)
+    world.update(Vector2())
+    (offset,) = [o for name, o in world.queue if name == "circle"]
+    assert offset.length() >= BALANCE.spawning.distance - 1e-9
+    assert abs(offset.angle_to(centro - world.player.position)) < 30
+
+
+@pytest.mark.parametrize("campo", ["anchored", "phantom"])
+def test_los_anclados_y_los_fantasmas_no_cuentan(campo: str) -> None:
+    # Copias del hexágono, no estrellas: 30 estrellas se fusionarían.
+    world = mundo_cargado(replace(HEXAGON_REAL, **{campo: True}))
+    world.update(Vector2())
+    assert circulos_en_la_cola(world) == 0

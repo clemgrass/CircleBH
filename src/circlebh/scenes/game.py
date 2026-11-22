@@ -142,12 +142,14 @@ class GameScene:
             armed=demo is None or demo.armed,
         )
         if demo is not None and demo.crowd:
-            # Más abiertos que el equilibrio (≈ 55), para ver cómo se acercan y se
-            # ordenan.
             spec = BALANCE.enemies[demo.crowd_enemy]
+            center = Vector2(demo.crowd_center)
             self.world.enemies += [
-                Enemy(spec, p) for p in lattice(Vector2(), demo.crowd, 90)
+                Enemy(spec, p) for p in lattice(center, demo.crowd, demo.crowd_spacing)
             ]
+        if demo is not None and demo.guest is not None:
+            guest = Enemy(BALANCE.enemies[demo.guest], Vector2(demo.guest_at))
+            self.world.enemies.append(guest)
         self.dead_steps = 0
         self.section = -1
         """La última sección anotada en la consola."""

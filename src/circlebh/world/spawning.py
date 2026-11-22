@@ -162,6 +162,7 @@ def place_formation(
     spec: SpawningSpec,
     reach: float,
     rng: random.Random,
+    angle: float | None = None,
 ) -> list[Vector2]:
     """Dónde nace una formación de `count` enemigos de `radius`, relativo al jugador.
 
@@ -171,11 +172,18 @@ def place_formation(
     cae dentro del núcleo de otro enemigo, la formación entera se corre hacia afuera
     de a una separación, hasta quedar libre (decisión 27). Se corre en su propia
     dirección, así que no sale de su cuadrante ni se acerca al jugador.
+
+    Con `angle`, la formación mira hacia ese ángulo, en radianes, en vez de sortear un
+    cuadrante, y no saca números de `rng`. Así nace el círculo, detrás del grupo que lo
+    trajo (decisión 56).
     """
     spacing = _spacing(radius, spec, reach)
     shape = _shape(kind, count, spacing, spec.distance)
-    q = rng.choice(emptiest_quadrants(o for o, _ in occupied))
-    points = _into_quadrant(shape, q, rng)
+    if angle is None:
+        q = rng.choice(emptiest_quadrants(o for o, _ in occupied))
+        points = _into_quadrant(shape, q, rng)
+    else:
+        points = [p.rotate_rad(angle) for p in shape]
     outward = sum(points, Vector2()).normalize()
     while _crowded(points, radius, occupied, reach):
         points = [p + outward * spacing for p in points]

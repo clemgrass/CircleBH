@@ -12,14 +12,22 @@ solo para lo que sacan de la `Random`, y es siempre el de aparición.
 import math
 import random
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
 from pygame.math import Vector2
 
-from circlebh.balance import ActionSpec, ChargeSpec, EnemyBulletSpec, VolleySpec
+from circlebh.balance import (
+    ActionSpec,
+    ChargeSpec,
+    EnemyBulletSpec,
+    EnemySpec,
+    SpiralSpec,
+    StarPolygonShape,
+    VolleySpec,
+)
 from circlebh.world.clock import STEP
 from circlebh.world.collisions import segment_touches_circle
 from circlebh.world.enemy_bullets import EnemyBullet
@@ -68,6 +76,13 @@ class Action(ABC):
     def omega(self) -> float | None:
         """La velocidad angular que la acción le fija al enemigo, o `None`: entonces
         gira con su `spin`."""
+        return None
+
+    @property
+    def charge_scale(self) -> float | None:
+        """Por cuánto multiplica la acción la carga del enemigo, o `None`: entonces la
+        carga es la de siempre. Con −1, el enemigo atrae en vez de repeler, con la misma
+        ley de cargas (decisión 57)."""
         return None
 
 
@@ -340,6 +355,8 @@ class Volley(Action):
         """Una salva: una bala por cada vértice que le queda, desde el vértice y hacia
         afuera del centro de la figura."""
         shape = enemy.spec.shape
+        # Un círculo con volley se rechaza al crear el mundo (`check_shapes`).
+        assert isinstance(shape, StarPolygonShape)
         ends = line_vertices(shape)
         tips = sorted({k for e in enemy.edges for k in ends[e]})
         center = enemy.position + rotate(enemy.offset, enemy.angle)
@@ -357,6 +374,134 @@ class Volley(Action):
         self._left = self._durations.get(state, 0)
 
 
+class SpiralState(Enum):
+    CROSSING = auto()
+    """Va derecho a cruzar el centro de la masa crítica, atrayendo."""
+    CARRYING = auto()
+    """Lo cruzó: da media vuelta alrededor del jugador, llevándose a los que atrapó."""
+    CIRCLING = auto()
+    """Los soltó: te persigue en espiral, repeliendo."""
+
+
+class Spiral(Action):
+    """La espiral del círculo: cruza la masa crítica, se lleva a parte de ella al otro
+    lado del jugador y después lo persigue en espiral, mirando solo dónde está
+    (decisiones 53, 54 y 57).
+
+    - **Cruzar:** va a `cross_speed` hacia el centroide de los que cuentan para la masa
+      crítica, corrigiendo el rumbo. Cuando lo pasa, porque el centroide quedó detrás de
+      su avance, empieza a cargar. Sin nadie que contar, gira desde el principio.
+    - **Cargar:** da media vuelta alrededor del jugador a `carry_speed`, acercándose o
+      alejándose hasta `carry_radius`. Mientras cruza y carga, su carga atrae: los que
+      atrapa lo siguen. Al sumar `π` de giro, los suelta y empieza a girar.
+    - **Girar:** en cada paso, el offset `d` desde el jugador gira `ω·dt` y se encoge por
+      `e^(−λ·dt)`. Con el jugador quieto es la espiral logarítmica exacta, que corta
+      cada radio en el mismo ángulo, `atan(ω/λ)`. Como solo mira las posiciones de este
+      paso, no hereda la velocidad del jugador: si corre, queda atrás y lo persigue en
+      curva. Su carga vuelve a repeler.
+
+    Impone su velocidad sin tope, como la embestida.
+    """
+
+    def __init__(self, spec: SpiralSpec) -> None:
+        self.spec = spec
+        self.state = SpiralState.CROSSING
+        self._velocity = Vector2()
+        self._turned = 0.0
+        """Cuánto giró alrededor del jugador al cargar, en radianes."""
+
+    @property
+    def controls_motion(self) -> bool:
+        return True
+
+    @property
+    def velocity(self) -> Vector2:
+        return self._velocity
+
+    @property
+    def charge_scale(self) -> float | None:
+        """Atrae mientras cruza y carga; al girar, su carga es la de siempre."""
+        return None if self.state is SpiralState.CIRCLING else -1.0
+
+    def update(self, enemy: Enemy, context: ActionContext) -> list[Event]:
+        """Fija la velocidad de este paso según la etapa."""
+        if self.state is SpiralState.CROSSING:
+            self._cross(enemy, context)
+        if self.state is SpiralState.CARRYING:
+            self._carry(enemy, context.player_position)
+        elif self.state is SpiralState.CIRCLING:
+            self._circle(enemy, context.player_position)
+        return []
+
+    def _cross(self, enemy: Enemy, context: ActionContext) -> None:
+        """Rumbo al centroide de la masa crítica, o a cargar si ya lo pasó.
+
+        También empieza a cargar al llegar a `carry_radius` del jugador: el centroide de
+        las posiciones puede caer cerca de él, o al otro lado, aunque `Σû` apunte al
+        grupo, y el cruce nunca pasa por encima del jugador (decisión 56)."""
+        others = [
+            e.position
+            for e in context.enemies
+            if e is not enemy and not e.spec.anchored
+        ]
+        if not others:
+            self.state = SpiralState.CIRCLING
+            return
+        ahead = sum(others, Vector2()) / len(others) - enemy.position
+        near = enemy.position.distance_to(context.player_position) <= (
+            self.spec.carry_radius
+        )
+        if ahead.length_squared() == 0 or self._velocity.dot(ahead) < 0 or near:
+            self.state = SpiralState.CARRYING
+            return
+        self._velocity = ahead.normalize() * self.spec.cross_speed
+
+    def _carry(self, enemy: Enemy, player: Vector2) -> None:
+        """Un paso de la media vuelta: el offset gira `carry_speed·dt / r` en el sentido
+        de `ω`, y su largo se acerca a `carry_radius` a lo más `carry_speed·dt`."""
+        offset = enemy.position - player
+        r = offset.length()
+        if r == 0:
+            self.state = SpiralState.CIRCLING
+            self._velocity = Vector2()
+            return
+        reach = self.spec.carry_speed * STEP
+        turn = math.copysign(reach / r, self.spec.angular_speed)
+        radius = r + max(-reach, min(reach, self.spec.carry_radius - r))
+        target = player + offset.rotate_rad(turn) * (radius / r)
+        self._velocity = (target - enemy.position) / STEP
+        self._turned += abs(turn)
+        if self._turned >= math.pi:
+            self.state = SpiralState.CIRCLING
+
+    def _circle(self, enemy: Enemy, player: Vector2) -> None:
+        """La velocidad que lleva el offset `d` a `R(ω·dt)·d·e^(−λ·dt)` en un paso."""
+        offset = enemy.position - player
+        shrink = math.exp(-self.spec.decay * STEP)
+        target = player + offset.rotate_rad(self.spec.angular_speed * STEP) * shrink
+        self._velocity = (target - enemy.position) / STEP
+
+
+def check_actions(enemies: Mapping[str, EnemySpec]) -> None:
+    """Rechaza al crear el mundo una espiral que no se acerca (`decay ≤ 0`), que no
+    gira (`angular_speed = 0`), que no cruza (`cross_speed ≤ 0`) o que no carga
+    (`carry_speed ≤ 0` o `carry_radius ≤ 0`), nombrando a su enemigo."""
+    for name, spec in enemies.items():
+        for action in spec.actions:
+            if isinstance(action, SpiralSpec) and (
+                action.decay <= 0
+                or action.angular_speed == 0
+                or action.cross_speed <= 0
+                or action.carry_speed <= 0
+                or action.carry_radius <= 0
+            ):
+                raise ValueError(
+                    f"enemies.{name}.actions: una espiral necesita decay > 0,"
+                    " angular_speed ≠ 0, y cross_speed, carry_speed y carry_radius"
+                    f" > 0, no {action}"
+                )
+
+
 def make_action(spec: ActionSpec) -> Action:
     """La instancia de la acción que describe `spec`, nueva para cada enemigo."""
     match spec:
@@ -364,6 +509,8 @@ def make_action(spec: ActionSpec) -> Action:
             return Charge(spec)
         case VolleySpec():
             return Volley(spec)
+        case SpiralSpec():
+            return Spiral(spec)
 
 
 def step_actions(

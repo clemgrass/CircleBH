@@ -5,6 +5,8 @@ Los `n` vértices son los del polígono regular (`polygon.py`): el vértice `k` 
 `j·n + k` es la de `k` con el salto `steps[j]`. Con `steps = (1,)`, la línea `k` es la
 arista `k` del polígono regular, así que los sectores del ADR 0020 siguen valiendo.
 
+El círculo es la excepción: una sola línea curva, sin segmentos, que choca como círculo.
+
 Todo se mide desde el centro de la figura, sin girar.
 """
 
@@ -12,7 +14,7 @@ from collections.abc import Mapping
 
 from pygame.math import Vector2
 
-from circlebh.balance import EnemySpec, StarPolygonShape
+from circlebh.balance import CircleShape, EnemySpec, Shape, StarPolygonShape, VolleySpec
 from circlebh.world.polygon import vertex
 
 
@@ -22,10 +24,11 @@ def line_vertices(shape: StarPolygonShape) -> list[tuple[int, int]]:
     return [(k, (k + s) % n) for s in shape.steps for k in range(n)]
 
 
-def local_lines(
-    shape: StarPolygonShape, radius: float
-) -> list[tuple[Vector2, Vector2]]:
-    """Las líneas de la figura entera, en el círculo de `radius`."""
+def local_lines(shape: Shape, radius: float) -> list[tuple[Vector2, Vector2]]:
+    """Las líneas rectas de la figura entera, en el círculo de `radius`. El círculo no
+    tiene ninguna."""
+    if isinstance(shape, CircleShape):
+        return []
     n = shape.vertices
     return [
         (vertex(radius, n, a), vertex(radius, n, b)) for a, b in line_vertices(shape)
@@ -56,6 +59,17 @@ def check_shape(shape: StarPolygonShape, where: str) -> None:
 
 def check_shapes(enemies: Mapping[str, EnemySpec]) -> None:
     """Rechaza al crear el mundo la primera figura inválida del balance, nombrando a
-    su enemigo, para no fallar a mitad de la partida."""
+    su enemigo, para no fallar a mitad de la partida.
+
+    Un círculo no puede tener una `volley`: la salva sale de los vértices."""
     for name, spec in enemies.items():
-        check_shape(spec.shape, f"enemies.{name}")
+        where = f"enemies.{name}"
+        match spec.shape:
+            case StarPolygonShape():
+                check_shape(spec.shape, where)
+            case CircleShape():
+                if any(isinstance(action, VolleySpec) for action in spec.actions):
+                    raise ValueError(
+                        f"{where}.actions: un círculo no tiene vértices desde donde"
+                        " disparar una volley"
+                    )

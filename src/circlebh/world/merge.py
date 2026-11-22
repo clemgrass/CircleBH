@@ -14,7 +14,7 @@ from enum import Enum, auto
 
 from pygame.math import Vector2
 
-from circlebh.balance import Balance, EnemySpec, MergeSpec
+from circlebh.balance import Balance, EnemySpec, MergeSpec, StarPolygonShape
 from circlebh.world.director import bar_at
 from circlebh.world.enemy import Enemy
 
@@ -145,7 +145,11 @@ def check_merge(balance: Balance) -> None:
         if name not in enemies:
             raise ValueError(f"merge.{field}: no existe el enemigo {name}")
     into = enemies[spec.into]
-    shape = into.shape
+    match into.shape:
+        case StarPolygonShape() as shape:
+            pass
+        case _:
+            raise ValueError("merge.into: tiene que ser un polígono estrellado")
     nearest = into.radius * math.cos(math.pi * max(shape.steps) / shape.vertices)
     if nearest <= balance.player.radius:
         raise ValueError(

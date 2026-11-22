@@ -8,7 +8,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, EnemySpec, StarPolygonShape
+from circlebh.balance import BALANCE, CircleShape, EnemySpec, StarPolygonShape
 from circlebh.settings import load_settings
 from circlebh.viewport import ASPECT_HEIGHT, ASPECT_WIDTH
 from circlebh.world.clock import STEP
@@ -26,6 +26,7 @@ SPEC = EnemySpec(
     phantom=False,
     solitary=False,
     charge_per_line=0.0,
+    mass_per_line=1.0,
     patterns=(),
     threat=1.0,
     actions=(),
@@ -156,6 +157,68 @@ def test_previous_es_la_posicion_antes_del_paso() -> None:
     enemy.step(Vector2())
     assert enemy.previous == Vector2(300, 0)
     assert enemy.position.x == pytest.approx(300 - SPEC.speed * STEP)
+
+
+# --- El círculo (#59): una sola línea curva, que choca como círculo ---
+
+CIRCULO = replace(SPEC, shape=CircleShape(), radius=8.0)
+
+
+def test_circulo_muere_de_un_golpe() -> None:
+    enemy = Enemy(CIRCULO, Vector2())
+    # De x = −20 a x = 20 entra en x = −8: recorrió 12 de 40.
+    hit = enemy.hit_by(Vector2(-20, 0), Vector2(20, 0))
+    assert hit == (pytest.approx(0.3), 0)
+    enemy.remove_edge(0)
+    assert enemy.alive is False
+
+
+def test_tramo_tangente_golpea_al_circulo() -> None:
+    enemy = Enemy(CIRCULO, Vector2())
+    assert enemy.hit_by(Vector2(-20, 8), Vector2(20, 8)) is not None
+
+
+def test_tramo_justo_afuera_no_golpea_al_circulo() -> None:
+    enemy = Enemy(CIRCULO, Vector2())
+    assert enemy.hit_by(Vector2(-20, 8.01), Vector2(20, 8.01)) is None
+
+
+def test_circulo_toca_por_su_radio() -> None:
+    enemy = Enemy(CIRCULO, Vector2())
+    # Radios 8 y 12: se tocan con los centros a 20 o menos.
+    assert enemy.touches(Vector2(20, 0), 12.0)
+    assert not enemy.touches(Vector2(20.01, 0), 12.0)
+
+
+def test_circulo_que_avanza_hacia_la_bala_la_golpea() -> None:
+    # La bala queda quieta en x = 9, fuera del círculo. El círculo avanza 2 y la
+    # cubre: en su marco, la bala va de 9 a 7 y entra en x = 8, a la mitad.
+    enemy = Enemy(CIRCULO, Vector2())
+    enemy.velocity = Vector2(120, 0)
+    enemy.step(Vector2())
+    assert enemy.hit_by(Vector2(9, 0), Vector2(9, 0)) == (pytest.approx(0.5), 0)
+
+
+def test_circulo_muerto_no_se_golpea_otra_vez() -> None:
+    # Dos balas en el mismo paso: la primera lo mata y el mundo todavía no lo saca.
+    # La segunda no puede quitarle una línea que ya no tiene.
+    enemy = Enemy(CIRCULO, Vector2())
+    enemy.remove_edge(0)
+    assert enemy.hit_by(Vector2(-20, 0), Vector2(20, 0)) is None
+
+
+def test_el_circulo_no_tiene_segmentos() -> None:
+    assert Enemy(CIRCULO, Vector2()).lines() == []
+
+
+# --- La masa (#59, ADR 0027) ---
+
+
+def test_la_masa_es_mass_per_line_por_las_lineas() -> None:
+    enemy = Enemy(replace(SPEC, mass_per_line=2.5), Vector2())
+    assert enemy.mass == 15.0
+    enemy.remove_edge(0)
+    assert enemy.mass == 12.5
 
 
 # --- Aparecer (dónde, en `test_spawning.py`) ---

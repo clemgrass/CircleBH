@@ -6,16 +6,33 @@ Cada línea es una parte del enemigo: la bala quita la que golpea, y sin líneas
 muere. Chocan por sus líneas, y el círculo envolvente es el primer descarte (ADR 0020).
 """
 
+from collections.abc import Mapping
+
 from pygame.math import Vector2
 
-from circlebh.balance import EnemySpec
+from circlebh.balance import CircleShape, EnemySpec
 from circlebh.world.actions import make_action
 from circlebh.world.clock import STEP
-from circlebh.world.collisions import circles_touch, segment_touches_circle
+from circlebh.world.collisions import (
+    circles_touch,
+    segment_circle_entry,
+    segment_touches_circle,
+)
 from circlebh.world.figures import is_regular, local_lines
 from circlebh.world.patterns import Context, make_pattern
 from circlebh.world.polygon import ENVELOPE_SLACK, edge_sectors, first_crossing
 from circlebh.world.rigid import center_of_mass, rotate, to_local, to_world
+
+
+def check_masses(enemies: Mapping[str, EnemySpec]) -> None:
+    """Rechaza al crear el mundo una masa por línea que no sea positiva, nombrando a su
+    enemigo: con masa 0, `Coulomb` dividiría por cero."""
+    for name, spec in enemies.items():
+        if spec.mass_per_line <= 0:
+            raise ValueError(
+                f"enemies.{name}.mass_per_line: tiene que ser mayor que 0, no"
+                f" {spec.mass_per_line}"
+            )
 
 
 class Enemy:
@@ -51,14 +68,24 @@ class Enemy:
 
     @property
     def mass(self) -> float:
-        """Las líneas que le quedan (ADR 0021)."""
-        return float(len(self.edges))
+        """`mass_per_line` por las líneas que le quedan (ADR 0021 y 0027)."""
+        return self.spec.mass_per_line * len(self.edges)
 
     @property
     def charge(self) -> float:
-        """`charge_per_line` por las líneas que le quedan. Como la masa también son sus
-        líneas, un herido empuja menos, y a él lo empujan igual."""
-        return self.spec.charge_per_line * len(self.edges)
+        """`charge_per_line` por las líneas que le quedan. Como la masa también depende
+        de sus líneas, un herido empuja menos, y a él lo empujan igual.
+
+        Una acción puede escalarla, como el círculo, que atrae mientras se lleva a la
+        masa crítica (decisión 57)."""
+        if not self.actions:
+            # El caso de casi todo el enjambre: sin el generador de abajo, que `Coulomb`
+            # pide por cada vecino.
+            return self.spec.charge_per_line * len(self.edges)
+        scale = next(
+            (a.charge_scale for a in self.actions if a.charge_scale is not None), 1.0
+        )
+        return scale * self.spec.charge_per_line * len(self.edges)
 
     @property
     def radius(self) -> float:
@@ -100,7 +127,9 @@ class Enemy:
 
     def _local_lines(self) -> list[tuple[Vector2, Vector2]]:
         """Las líneas que le quedan, en el marco del enemigo: desde `position`, sin
-        girar."""
+        girar. El círculo no tiene segmentos: su única línea es curva."""
+        if isinstance(self.spec.shape, CircleShape):
+            return []
         return [
             (a + self.offset, b + self.offset)
             for a, b in (self.figure[k] for k in self.edges)
@@ -120,8 +149,11 @@ class Enemy:
         """Si alguna de sus líneas toca al círculo de `center` y `radius`.
 
         Primero descarta con el círculo envolvente; solo si lo toca, prueba cada línea.
-        Un círculo dentro del enemigo que no toca ninguna línea no lo toca.
+        Un círculo dentro del enemigo que no toca ninguna línea no lo toca. El enemigo
+        círculo choca como círculo: su línea es el envolvente.
         """
+        if isinstance(self.spec.shape, CircleShape):
+            return circles_touch(center, radius, self.position, self.radius)
         if not circles_touch(
             center, radius, self.position, self.radius + ENVELOPE_SLACK
         ):
@@ -148,13 +180,22 @@ class Enemy:
             to_local(start, self.previous, self.previous_angle) - self.offset
         )
         relative_end = to_local(end, self.position, self.angle) - self.offset
+        shape = self.spec.shape
+        if isinstance(shape, CircleShape):
+            # Su única línea es el borde: el golpe es donde el tramo entra al círculo.
+            # Sin ella, ya murió en este paso: una segunda bala no lo golpea.
+            if not self.edges:
+                return None
+            t = segment_circle_entry(
+                relative_start, relative_end, Vector2(), self.spec.radius
+            )
+            return None if t is None else (t, 0)
         if not segment_touches_circle(
             relative_start, relative_end, Vector2(), self.spec.radius + ENVELOPE_SLACK
         ):
             return None
         # Los sectores ordenan solo las aristas de un polígono regular (ADR 0020). En
         # otra figura, una línea cruza varios sectores: se revisan todas (F1, ADR 0027).
-        shape = self.spec.shape
         if is_regular(shape):
             sectors = edge_sectors(relative_start, relative_end, shape.vertices)
             candidates = [k for k in sectors if k in self.edges]

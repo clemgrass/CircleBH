@@ -40,6 +40,7 @@ QUIETO = EnemySpec(
     phantom=False,
     solitary=False,
     charge_per_line=0.0,
+    mass_per_line=1.0,
     patterns=(),
     threat=1.0,
     actions=(),

@@ -2,6 +2,7 @@
 (ADR 0021)."""
 
 import math
+import random
 from dataclasses import replace
 from itertools import combinations
 
@@ -10,7 +11,8 @@ from hypothesis import assume, given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, CoulombSpec
+from circlebh.balance import BALANCE, CoulombSpec, EnemySpec
+from circlebh.world.actions import Spiral, SpiralState, step_actions
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
 from circlebh.world.swarm import lattice, separate, step_swarm
@@ -228,3 +230,52 @@ def test_lattice_empieza_por_los_mas_cercanos() -> None:
         [60] * 6
     )
     assert puntos[6].distance_to(Vector2(10, 10)) > 60
+
+
+# --- El círculo (#59): cae en espiral y reparte al enjambre ---
+
+
+def paso_real(enemies: list[Enemy]) -> None:
+    """Un paso como el del mundo, con el jugador quieto en el origen y su carga real:
+    primero las acciones, como la espiral del círculo, y después el enjambre."""
+    step_actions(enemies, Vector2(), random.Random(0), [], BALANCE.enemy_bullet)
+    step_swarm(enemies, Vector2(), BALANCE.player.charge, BALANCE.charges)
+
+
+def dispersion(enemies: list[Enemy]) -> float:
+    """La distancia media de cada uno al centroide del grupo."""
+    centro = sum((e.position for e in enemies), Vector2()) / len(enemies)
+    return sum(e.position.distance_to(centro) for e in enemies) / len(enemies)
+
+
+def test_dispersa_un_grupo() -> None:
+    # El círculo nace bajo el grupo. Al cruzarlo y llevárselo, lo atrae y lo junta
+    # (decisión 57); al soltarlo, lo repele. Por eso se mide 2 s después de que empieza
+    # a girar, y se compara contra el mismo tiempo sin círculo y con uno sin carga. El
+    # choque solo ya los corre un poco: lo que los abre es la carga.
+    real = BALANCE.enemies["circle"]
+
+    def simular(circulo: EnemySpec | None, pasos: int) -> float:
+        grupo = [Enemy(HEXAGON, p) for p in lattice(Vector2(250, 0), 7, 50)]
+        enemies = list(grupo)
+        if circulo is not None:
+            enemies.append(Enemy(circulo, Vector2(250, -160)))
+        for _ in range(pasos):
+            paso_real(enemies)
+        return dispersion(grupo)
+
+    def hasta_soltarlos() -> int:
+        grupo = [Enemy(HEXAGON, p) for p in lattice(Vector2(250, 0), 7, 50)]
+        circulo = Enemy(real, Vector2(250, -160))
+        (espiral,) = circulo.actions
+        assert isinstance(espiral, Spiral)
+        for n in range(round(30 / STEP)):
+            if espiral.state is SpiralState.CIRCLING:
+                return n
+            paso_real([*grupo, circulo])
+        raise AssertionError("el círculo nunca los soltó")
+
+    pasos = hasta_soltarlos() + round(2 / STEP)
+    con_carga = simular(real, pasos)
+    assert con_carga > simular(None, pasos)
+    assert con_carga > simular(replace(real, charge_per_line=0.0), pasos)

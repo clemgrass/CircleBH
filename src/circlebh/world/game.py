@@ -1,14 +1,20 @@
 """La partida: todo lo que pasa en el plano, un paso de `STEP` a la vez (ADR 0005)."""
 
+import math
 import random
 
 from pygame.math import Vector2
 
 from circlebh.balance import Balance
-from circlebh.world.actions import step_actions
+from circlebh.world.actions import check_actions, step_actions
 from circlebh.world.clock import STEP
+from circlebh.world.critical_mass import (
+    CriticalMass,
+    check_critical_mass,
+    heavy_direction,
+)
 from circlebh.world.director import Director, Purchase
-from circlebh.world.enemy import Enemy
+from circlebh.world.enemy import Enemy, check_masses
 from circlebh.world.enemy_bullets import EnemyBullet, bullet_hits_player, step_bullets
 from circlebh.world.events import Death, Event
 from circlebh.world.figures import check_shapes
@@ -44,9 +50,14 @@ class World:
         )
         """Decide qué aparece y cuándo, con la forma del tema (ADR 0025)."""
         check_shapes(balance.enemies)
+        check_actions(balance.enemies)
+        check_masses(balance.enemies)
         check_merge(balance)
         self.merge = Merge(balance.merge, balance.enemies, balance.director.bpm)
         """La fusión de las estrellas en la gran estrella roja."""
+        check_critical_mass(balance)
+        self.critical_mass = CriticalMass(balance.critical_mass, balance.director.bpm)
+        """Cuándo aparece el círculo que reparte al enjambre."""
         check_formations(balance)
         self.queue = SpawnQueue()
         """Lo comprado que espera aparecer, con su lugar relativo al jugador. Sale de a
@@ -131,6 +142,7 @@ class World:
         self.enemies = self.merge.update(
             self._steps, self.enemies, self.player.position
         )
+        self._check_critical_mass()
         self.game_over = self.lethal and (
             shot
             or any(
@@ -139,10 +151,35 @@ class World:
             )
         )
 
-    def _enqueue(self, purchase: Purchase) -> None:
+    def _check_critical_mass(self) -> None:
+        """Si el enjambre se cargó hacia un lado, compra un círculo que lo reparta.
+
+        Cuentan los vivos que siguen al jugador: no los anclados ni los fantasmas. El
+        círculo está presente si hay uno vivo o en la cola. Nace detrás del grupo, hacia
+        donde está cargado, para cruzarlo desde afuera (decisión 56)."""
+        name = self.balance.critical_mass.enemy
+        spec = self.balance.enemies[name]
+        # `is` y no `==`: comparar la dataclass campo por campo, contra cada enemigo y en
+        # cada paso, hacía notar el costo en el benchmark del enjambre.
+        present = any(enemy.spec is spec for enemy in self.enemies) or any(
+            queued == name for queued, _ in self.queue
+        )
+        here = self.player.position
+        offsets = [
+            enemy.position - here
+            for enemy in self.enemies
+            if not (enemy.spec.anchored or enemy.spec.phantom)
+        ]
+        if self.critical_mass.update(self._steps, present, offsets):
+            heavy = heavy_direction(offsets)
+            angle = None if heavy is None else math.atan2(heavy.y, heavy.x)
+            self._enqueue(Purchase(name, "single", 1), angle)
+
+    def _enqueue(self, purchase: Purchase, angle: float | None = None) -> None:
         """Elige dónde nace cada miembro de `purchase`, relativo al jugador, y lo pone en
         la cola. Cuentan los vivos y los que ya esperan, para que una ráfaga se reparta
-        entre los cuadrantes."""
+        entre los cuadrantes. Con `angle`, nace hacia ese ángulo en vez de en el
+        cuadrante más vacío."""
         here = self.player.position
         enemies = self.balance.enemies
         # Los fantasmas no ocupan lugar: los demás los atraviesan.
@@ -160,5 +197,6 @@ class World:
             self.balance.spawning,
             self.balance.charges.core_reach,
             self.rng,
+            angle,
         )
         self.queue.push((purchase.enemy, offset) for offset in offsets)

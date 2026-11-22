@@ -4,6 +4,7 @@ Toda arma hereda de `Weapon` y avanza con `update`, un paso de `STEP` a la vez (
 Cada arma lee su `spec` en cada paso, así que mejorarla es reemplazar su `spec`.
 """
 
+import math
 from abc import ABC, abstractmethod
 
 from pygame.math import Vector2
@@ -64,6 +65,35 @@ class Bullet:
     def step(self) -> None:
         """Avanza un paso."""
         self._steps += 1
+
+
+def intercept(
+    origin: Vector2, target: Vector2, velocity: Vector2, speed: float
+) -> Vector2:
+    """Hacia dónde disparar desde `origin` una bala de rapidez `speed` para que se cruce
+    con un objetivo en `target` que sigue derecho a `velocity` (decisión 55).
+
+    El cruce, en el tiempo `t`, cumple `|d + v·t| = s·t`, con `d = target − origin`. Al
+    cuadrado queda `(v·v − s²)·t² + 2(d·v)·t + d·d = 0`, y se toma la menor raíz
+    positiva. Si no hay ninguna, porque el objetivo se aleja más rápido que la bala,
+    apunta a donde está, como un arma sin anticipación.
+    """
+    d = target - origin
+    a = velocity.dot(velocity) - speed * speed
+    b = d.dot(velocity)
+    c = d.dot(d)
+    if a == 0:
+        # Igual de rápidos: la ecuación es lineal, `2b·t + c = 0`.
+        times = [-c / (2 * b)] if b < 0 else []
+    else:
+        discriminant = b * b - a * c
+        if discriminant < 0:
+            return Vector2(target)
+        root = math.sqrt(discriminant)
+        times = [t for t in ((-b - root) / a, (-b + root) / a) if t > 0]
+    if not times:
+        return Vector2(target)
+    return target + velocity * min(times)
 
 
 def nearest(origin: Vector2, enemies: list[Enemy]) -> Enemy | None:
@@ -149,12 +179,16 @@ class PointWeapon(Weapon):
         return Hit(enemy, k)
 
     def _fire(self, origin: Vector2, enemies: list[Enemy]) -> bool:
-        """Dispara al más cercano y devuelve `True`. Sin objetivo, no dispara."""
+        """Dispara al más cercano, hacia donde se va a cruzar con la bala, y devuelve
+        `True`. Sin objetivo, no dispara."""
         target = nearest(origin, enemies)
         if target is None:
             return False
-        # `nearest` garantiza una dirección que se puede normalizar.
-        velocity = (target.position - origin).normalize() * self.spec.speed
+        aim = intercept(origin, target.position, target.velocity, self.spec.speed)
+        if aim.distance_squared_to(origin) == 0:
+            # `nearest` garantiza que el objetivo mismo da una dirección.
+            aim = target.position
+        velocity = (aim - origin).normalize() * self.spec.speed
         self.bullets.append(Bullet(origin, velocity, self.spec))
         self._steps_to_next = round(self.spec.cooldown / STEP)
         return True

@@ -140,6 +140,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "phantom": False,
                 "solitary": False,
                 "charge_per_line": 1.0,
+                "mass_per_line": 1.0,
                 "patterns": [{"kind": "seek", "strength": 240.0}, {"kind": "coulomb"}],
                 "threat": 1.0,
                 "actions": [],
@@ -154,6 +155,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "phantom": False,
                 "solitary": False,
                 "charge_per_line": 1.0,
+                "mass_per_line": 1.0,
                 "patterns": [{"kind": "seek", "strength": 240.0}, {"kind": "coulomb"}],
                 "threat": 1.0,
                 "actions": [],
@@ -168,6 +170,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "phantom": False,
                 "solitary": False,
                 "charge_per_line": 1.0,
+                "mass_per_line": 1.0,
                 "patterns": [
                     {
                         "kind": "orbit",
@@ -203,6 +206,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "phantom": False,
                 "solitary": False,
                 "charge_per_line": 1.0,
+                "mass_per_line": 1.0,
                 "patterns": [
                     {
                         "kind": "orbit",
@@ -235,6 +239,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "phantom": False,
                 "solitary": True,
                 "charge_per_line": 0.6,
+                "mass_per_line": 1.0,
                 "patterns": [],
                 "threat": 2.0,
                 "actions": [],
@@ -249,9 +254,34 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "phantom": True,
                 "solitary": True,
                 "charge_per_line": 0.0,
+                "mass_per_line": 1.0,
                 "patterns": [],
                 "threat": 0.0,
                 "actions": [],
+            },
+            "circle": {
+                "shape": {"kind": "circle"},
+                "radius": 8.0,
+                "speed": 0.0,
+                "friction": 0.0,
+                "spin": 0.0,
+                "anchored": False,
+                "phantom": False,
+                "solitary": False,
+                "charge_per_line": 60.0,
+                "mass_per_line": 600.0,
+                "patterns": [],
+                "threat": 0.0,
+                "actions": [
+                    {
+                        "kind": "spiral",
+                        "angular_speed": 1.2,
+                        "decay": 0.3,
+                        "cross_speed": 360.0,
+                        "carry_speed": 100.0,
+                        "carry_radius": 250.0,
+                    }
+                ],
             },
         },
         "spawning": {
@@ -269,6 +299,12 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
             "beats": 3,
             "release": 1.5,
             "fade_beats": 1.0,
+        },
+        "critical_mass": {
+            "enemy": "circle",
+            "count": 30,
+            "imbalance": 0.5,
+            "cooldown_bars": 8.0,
         },
         "point_weapon": {"cooldown": 0.6, "speed": 300.0, "range": 700.0},
         "enemy_bullet": {"speed": 330.0, "radius": 4.0},

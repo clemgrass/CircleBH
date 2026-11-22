@@ -1,14 +1,17 @@
 """Tests del arma punto: una bala que se dispara sola al centro del enemigo más cercano."""
 
+import random
 from dataclasses import replace
 
 import pytest
 from pygame.math import Vector2
 
-from circlebh.balance import EnemySpec, PointWeaponSpec, StarPolygonShape
+from circlebh.balance import BALANCE, EnemySpec, PointWeaponSpec, StarPolygonShape
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
-from circlebh.world.weapons import Bullet, PointWeapon, nearest
+from circlebh.world.events import Hit
+from circlebh.world.game import World
+from circlebh.world.weapons import Bullet, PointWeapon, intercept, nearest
 
 # 0,5 s = 30 pasos entre disparos; 600 / 60 = 10 unidades por paso; 700 / 10 = 70 pasos
 # de vida.
@@ -26,6 +29,7 @@ HEXAGON = EnemySpec(
     phantom=False,
     solitary=False,
     charge_per_line=0.0,
+    mass_per_line=1.0,
     patterns=(),
     threat=1.0,
     actions=(),
@@ -196,3 +200,60 @@ def test_la_bala_no_sigue_al_jugador() -> None:
     bullet = weapon.bullets[0]
     assert bullet.position.y == 0
     assert bullet.position.x == pytest.approx(SPEC.speed * 10 * STEP)
+
+
+# --- La puntería con anticipación (decisión 55) ---
+
+
+def test_intercepta_un_objetivo_que_cruza() -> None:
+    # El punto está a la vez a `s·t` del origen y a `v·t` del objetivo.
+    objetivo, velocidad = Vector2(300, 0), Vector2(0, 120)
+    punto = intercept(Vector2(), objetivo, velocidad, 300.0)
+    t = punto.length() / 300.0
+    assert tuple(punto) == pytest.approx(tuple(objetivo + velocidad * t))
+    assert punto.y > 0
+
+
+def test_objetivo_quieto_apunta_igual_que_antes() -> None:
+    objetivo = Vector2(120, -50)
+    assert intercept(Vector2(10, 10), objetivo, Vector2(), 300.0) == objetivo
+
+
+def test_si_se_aleja_mas_rapido_apunta_a_donde_esta() -> None:
+    objetivo = Vector2(100, 0)
+    assert intercept(Vector2(), objetivo, Vector2(400, 0), 300.0) == objetivo
+
+
+def test_le_acierta_al_que_cruza_de_lado() -> None:
+    # Sin anticipar, la bala llega en 0,5 s y el hexágono ya avanzó 60, más que su
+    # radio (24): fallaría.
+    weapon = PointWeapon(SPEC)
+    objetivo = enemigo(300, 0)
+    objetivo.velocity = Vector2(0, 120)
+    golpes = []
+    for _ in range(round(0.6 / STEP)):
+        golpes += [
+            e for e in weapon.update(Vector2(), [objetivo]) if isinstance(e, Hit)
+        ]
+        objetivo.step(Vector2())
+    assert golpes
+
+
+def test_al_circulo_le_acierta_lejos() -> None:
+    # El círculo del balance, solo, gira alrededor del jugador quieto. Sin anticipar,
+    # el primer golpe llegaba recién a r ≈ 45. La anticipación supone que va derecho y
+    # él curva, así que no acierta desde cualquier distancia: medido, a r ≈ 104.
+    sin_apariciones = replace(
+        BALANCE,
+        director=replace(
+            BALANCE.director,
+            sections=(replace(BALANCE.director.sections[0], deck=()),),
+        ),
+    )
+    world = World(sin_apariciones, random.Random(1), lethal=False)
+    circulo = Enemy(BALANCE.enemies["circle"], Vector2(400, 0))
+    world.enemies = [circulo]
+    while circulo.alive:
+        distancia = circulo.position.distance_to(world.player.position)
+        world.update(Vector2())
+    assert distancia > 80

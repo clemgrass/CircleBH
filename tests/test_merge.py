@@ -13,7 +13,7 @@ from itertools import groupby
 import pytest
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE
+from circlebh.balance import BALANCE, CircleShape
 from circlebh.world.enemy import Enemy
 from circlebh.world.events import Death
 from circlebh.world.game import World
@@ -203,6 +203,15 @@ def test_el_mundo_rechaza_un_merge_que_tocaria_al_jugador() -> None:
     # Con radio 30, la línea más cercana queda a 30·cos 72° ≈ 9,3, dentro del jugador.
     chica = replace(BALANCE.enemies["red_star"], radius=30.0)
     balance = replace(BALANCE, enemies={**BALANCE.enemies, "red_star": chica})
+    with pytest.raises(ValueError, match=r"merge\.into"):
+        World(balance, random.Random(0))
+
+
+def test_el_mundo_rechaza_un_merge_hacia_un_circulo() -> None:
+    # La gran estrella es un polígono estrellado: un círculo no tiene línea más
+    # cercana al centro que medir.
+    redonda = replace(BALANCE.enemies["red_star"], shape=CircleShape())
+    balance = replace(BALANCE, enemies={**BALANCE.enemies, "red_star": redonda})
     with pytest.raises(ValueError, match=r"merge\.into"):
         World(balance, random.Random(0))
 

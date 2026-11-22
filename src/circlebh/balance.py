@@ -184,6 +184,36 @@ class VolleySpec:
 
 
 @dataclass(frozen=True, kw_only=True)
+class SpiralSpec:
+    """Acción: la espiral del círculo. Cruza el centro de la masa crítica a
+    `cross_speed`, atrayendo; da media vuelta alrededor del jugador a `carry_speed` y a
+    `carry_radius`, llevándose a los que atrapó, y los suelta; y después te persigue en
+    la espiral logarítmica `ṙ = −λr`, `θ̇ = ω`, mirando solo dónde estás, no cómo te
+    mueves (`world/actions.py`, decisiones 53, 54 y 57)."""
+
+    kind: Literal["spiral"] = "spiral"
+
+    angular_speed: float
+    """`ω`, en rad/s, antihorario si es positiva. No puede ser 0: caería recto."""
+
+    decay: float
+    """`λ`, en 1/s: el radio se multiplica por `e^(−λ)` cada segundo. Tiene que ser
+    mayor que 0, o nunca se acercaría."""
+
+    cross_speed: float
+    """Su rapidez al cruzar la masa crítica, en unidades del plano por segundo. Más que
+    la del jugador, para que alcance al grupo aunque el jugador se mueva."""
+
+    carry_speed: float
+    """Su rapidez en la media vuelta en que se lleva a los que atrapó al otro lado del
+    jugador (decisión 57). Menos que la de ellos, para que alcancen a seguirlo."""
+
+    carry_radius: float
+    """A qué distancia del jugador da la media vuelta. Tiene que dejar a la bola de
+    atrapados lejos de él."""
+
+
+@dataclass(frozen=True, kw_only=True)
 class StarPolygonShape:
     """La figura de un enemigo: el polígono estrellado `{n/s}` (`world/figures.py`).
 
@@ -205,7 +235,24 @@ class StarPolygonShape:
         return self.vertices * len(self.steps)
 
 
-type ActionSpec = ChargeSpec | VolleySpec
+@dataclass(frozen=True, kw_only=True)
+class CircleShape:
+    """La figura del círculo: una sola línea curva, el círculo del radio del enemigo.
+    Choca como círculo, no por segmentos (spec de la 0.2.0, "El círculo")."""
+
+    kind: Literal["circle"] = "circle"
+
+    @property
+    def line_count(self) -> int:
+        """Una sola línea: muere de un golpe."""
+        return 1
+
+
+type Shape = StarPolygonShape | CircleShape
+"""La figura de un enemigo. En el JSON, su campo `kind` dice cuál es."""
+
+
+type ActionSpec = ChargeSpec | VolleySpec | SpiralSpec
 """Una acción: lo que el enemigo hace y no es una fuerza (ADR 0021). En el JSON, su
 campo `kind` dice cuál es."""
 
@@ -215,7 +262,7 @@ class EnemySpec:
     """Un tipo de enemigo: una figura hecha de líneas, que se mueve por sus patrones
     (ADR 0020 y 0021)."""
 
-    shape: StarPolygonShape
+    shape: Shape
     """Su figura. Aparece con todas sus líneas: cada bala quita la que golpea y, sin
     líneas, muere."""
 
@@ -250,8 +297,13 @@ class EnemySpec:
     sortee otra formación."""
 
     charge_per_line: float
-    """Carga de cada línea. Su carga es esto por las líneas que le quedan, y su masa,
-    las líneas que le quedan."""
+    """Carga de cada línea. Su carga es esto por las líneas que le quedan."""
+
+    mass_per_line: float
+    """Masa de cada línea. Su masa es esto por las líneas que le quedan (ADR 0027). Vale
+    1 en todos menos el círculo. Al círculo hoy no le cambia nada, porque su espiral
+    impone su velocidad y no siente fuerzas; el campo queda porque lo decide el ADR
+    0027."""
 
     patterns: tuple[PatternSpec, ...]
     """Su conducta: los patrones de movimiento, cuyas aceleraciones se suman."""
@@ -373,6 +425,26 @@ class MergeSpec:
 
 
 @dataclass(frozen=True)
+class CriticalMassSpec:
+    """La masa crítica: con `count` enemigos o más, cargados hacia un lado del jugador,
+    aparece un `enemy` que los reparte (`world/critical_mass.py`). No lo compra el
+    director, y hay a lo más uno a la vez."""
+
+    enemy: str
+    """El tipo que aparece, una clave de `enemies`: el círculo."""
+
+    count: int
+    """Cuántos enemigos tiene que haber, sin contar anclados ni fantasmas."""
+
+    imbalance: float
+    """El mínimo de `R̄ = |Σ ûᵢ| / N`, entre 0 y 1: 0 si te rodean parejo, 1 si están
+    todos del mismo lado."""
+
+    cooldown_bars: float
+    """Cuántos compases espera, después de que muere, antes de que pueda aparecer otro."""
+
+
+@dataclass(frozen=True)
 class PointWeaponSpec:
     """El arma punto: balas que salen del jugador hacia el centro del enemigo más cercano
     y avanzan en línea recta, `p(t) = p₀ + v·t`."""
@@ -424,6 +496,9 @@ class Balance:
     merge: MergeSpec
     """La fusión de las estrellas en la gran estrella roja."""
 
+    critical_mass: CriticalMassSpec
+    """Cuándo aparece el círculo que reparte al enjambre."""
+
     point_weapon: PointWeaponSpec
     """El arma punto."""
 
@@ -454,6 +529,7 @@ BALANCE = Balance(
             phantom=False,
             solitary=False,
             charge_per_line=1.0,
+            mass_per_line=1.0,
             patterns=(
                 SeekSpec(kind="seek", strength=240.0),
                 CoulombSpec(kind="coulomb"),
@@ -471,6 +547,7 @@ BALANCE = Balance(
             phantom=False,
             solitary=False,
             charge_per_line=1.0,
+            mass_per_line=1.0,
             patterns=(
                 SeekSpec(kind="seek", strength=240.0),
                 CoulombSpec(kind="coulomb"),
@@ -488,6 +565,7 @@ BALANCE = Balance(
             phantom=False,
             solitary=False,
             charge_per_line=1.0,
+            mass_per_line=1.0,
             patterns=(
                 OrbitSpec(kind="orbit", radius=280.0, stiffness=4.0, tangential=0.0),
                 CoulombSpec(kind="coulomb"),
@@ -518,6 +596,7 @@ BALANCE = Balance(
             phantom=False,
             solitary=False,
             charge_per_line=1.0,
+            mass_per_line=1.0,
             patterns=(
                 OrbitSpec(kind="orbit", radius=300.0, stiffness=6.0, tangential=0.0),
                 CoulombSpec(kind="coulomb"),
@@ -545,6 +624,7 @@ BALANCE = Balance(
             phantom=False,
             solitary=True,
             charge_per_line=0.6,
+            mass_per_line=1.0,
             patterns=(),
             threat=2.0,
             actions=(),
@@ -559,9 +639,34 @@ BALANCE = Balance(
             phantom=True,
             solitary=True,
             charge_per_line=0.0,
+            mass_per_line=1.0,
             patterns=(),
             threat=0.0,
             actions=(),
+        ),
+        "circle": EnemySpec(
+            shape=CircleShape(kind="circle"),
+            radius=8.0,
+            speed=0.0,
+            friction=0.0,
+            spin=0.0,
+            anchored=False,
+            phantom=False,
+            solitary=False,
+            charge_per_line=60.0,
+            mass_per_line=600.0,
+            patterns=(),
+            threat=0.0,
+            actions=(
+                SpiralSpec(
+                    kind="spiral",
+                    angular_speed=1.2,
+                    decay=0.3,
+                    cross_speed=360.0,
+                    carry_speed=100.0,
+                    carry_radius=250.0,
+                ),
+            ),
         ),
     },
     spawning=SpawningSpec(
@@ -671,6 +776,9 @@ BALANCE = Balance(
     ),
     merge=MergeSpec(
         enemy="star", count=5, into="red_star", beats=3, release=1.5, fade_beats=1.0
+    ),
+    critical_mass=CriticalMassSpec(
+        enemy="circle", count=30, imbalance=0.5, cooldown_bars=8.0
     ),
     point_weapon=PointWeaponSpec(cooldown=0.6, speed=300.0, range=700.0),
     enemy_bullet=EnemyBulletSpec(speed=330.0, radius=4.0),

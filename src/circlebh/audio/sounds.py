@@ -7,7 +7,8 @@ juego.
 
 El timbre de un enemigo sale de su figura: un punto recorre las líneas que le quedan a
 rapidez constante, y su `x` es la onda. Entero, el hexágono suena suave (armónicos en
-k = 1 ± 6m, con magnitud 1/k²); con huecos, el punto salta y suena más brillante.
+k = 1 ± 6m, con magnitud 1/k²); con huecos, el punto salta y suena más brillante. El
+círculo es el caso límite: su `x` es `cos θ`, un seno puro, sin armónicos.
 """
 
 import math
@@ -17,7 +18,7 @@ from functools import cache, lru_cache
 
 from circlebh.audio.harmony import A3, hz
 from circlebh.audio.rhythm import RATE
-from circlebh.balance import StarPolygonShape
+from circlebh.balance import CircleShape, Shape
 from circlebh.world.figures import local_lines
 
 TABLE = 2048
@@ -158,12 +159,14 @@ def blip(freq: float) -> Samples:
 
 
 @lru_cache(maxsize=64)
-def shape_table(shape: StarPolygonShape, edges: tuple[int, ...]) -> Samples:
+def shape_table(shape: Shape, edges: tuple[int, ...]) -> Samples:
     """Un ciclo de onda: la `x` de un punto que recorre las líneas `edges` de `shape` a
     rapidez constante, centrada en 0 y con pico 1. Con huecos entre líneas, el punto
-    salta."""
+    salta. En el círculo, el punto da una vuelta: `cos(2πi / TABLE)`."""
     if not edges:
         raise ValueError("una figura sin líneas no tiene timbre")
+    if isinstance(shape, CircleShape):
+        return _samples([math.cos(math.tau * i / TABLE) for i in range(TABLE)])
     lines = local_lines(shape, 1.0)
     xs: list[float] = []
     per_edge = TABLE / len(edges)
@@ -177,7 +180,7 @@ def shape_table(shape: StarPolygonShape, edges: tuple[int, ...]) -> Samples:
 
 
 @lru_cache(maxsize=256)
-def poly_note(shape: StarPolygonShape, edges: tuple[int, ...], freq: float) -> Samples:
+def poly_note(shape: Shape, edges: tuple[int, ...], freq: float) -> Samples:
     """La nota de un loop de enemigo: la forma que le queda es el timbre."""
     table = shape_table(shape, edges)
     step = freq * TABLE / RATE

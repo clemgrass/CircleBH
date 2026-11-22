@@ -13,6 +13,14 @@ class Scenario:
     """Enemigos extra al empezar, en una red triangular alrededor del jugador."""
     crowd_enemy: str = "hexagon"
     """El tipo de esos enemigos, una clave de `enemies` en el balance."""
+    crowd_center: tuple[float, float] = (0.0, 0.0)
+    """El centro de esa red, relativo al jugador."""
+    crowd_spacing: float = 90.0
+    """La separación de esa red. 90 es más abierta que el equilibrio (≈ 55)."""
+    guest: str | None = None
+    """Un enemigo más al empezar, como el círculo que persigue al jugador."""
+    guest_at: tuple[float, float] = (0.0, 0.0)
+    """Dónde nace el invitado, relativo al jugador."""
     lethal: bool = True
     """Si el contacto termina la partida."""
     armed: bool = True
@@ -134,6 +142,43 @@ SCENARIOS: dict[str, Scenario] = {
             crowd=5,
             crowd_enemy="star",
             lethal=False,
+        ),
+        Scenario(
+            "circulo-dispersa",
+            "7 hexágonos juntos a un lado del jugador quieto, que no muere ni dispara,"
+            " y un círculo que nace bajo ellos: los atrae al cruzarlos, se los lleva en"
+            " media vuelta alrededor del jugador, los suelta y sigue en espiral.",
+            pilot=False,
+            crowd=7,
+            crowd_center=(250.0, 0.0),
+            crowd_spacing=50.0,
+            guest="circle",
+            guest_at=(250.0, -160.0),
+            lethal=False,
+            armed=False,
+        ),
+        Scenario(
+            "persecucion",
+            "El piloto da vueltas, sin armas y sin morir, con un círculo que lo persigue"
+            " en espiral: mira solo dónde está el piloto, no cómo se mueve, así que"
+            " queda atrás cuando corre y se cierra cuando frena.",
+            pilot=True,
+            guest="circle",
+            guest_at=(400.0, 0.0),
+            lethal=False,
+            armed=False,
+        ),
+        Scenario(
+            "masa-critica",
+            "30 hexágonos juntos a un lado del jugador quieto, que no muere ni dispara:"
+            " la masa crítica trae un círculo, que nace fuera de la vista detrás del"
+            " grupo, lo cruza, se lleva a parte al otro lado y los suelta.",
+            pilot=False,
+            crowd=30,
+            crowd_center=(320.0, 0.0),
+            crowd_spacing=55.0,
+            lethal=False,
+            armed=False,
         ),
     ]
 }

@@ -1,6 +1,7 @@
 """Tests de la aparición: el cuadrante más vacío, las formaciones y la cola (ADR 0025)."""
 
 import itertools
+import math
 import random
 
 import pytest
@@ -160,6 +161,45 @@ def test_ocupado_corre_la_formacion_hacia_afuera() -> None:
     corrido = colocar("single", 1, [libre, *otros], 3)[0]
     assert corrido.length() > libre.length()
     assert corrido.normalize().angle_to(libre.normalize()) == pytest.approx(0, abs=1e-6)
+
+
+# --- Con un ángulo fijo: el círculo nace detrás del grupo (decisión 56) ---
+
+
+def colocar_hacia(
+    angulo: float, ocupados: list[Vector2], rng: random.Random
+) -> Vector2:
+    (punto,) = place_formation(
+        "single",
+        1,
+        RADIO,
+        [(o, RADIO) for o in ocupados],
+        SPAWNING,
+        REACH,
+        rng,
+        angle=angulo,
+    )
+    return punto
+
+
+def test_con_angulo_nace_en_esa_direccion() -> None:
+    punto = colocar_hacia(2.0, [], random.Random(1))
+    assert punto.length() == pytest.approx(SPAWNING.distance)
+    assert math.atan2(punto.y, punto.x) == pytest.approx(2.0)
+
+
+def test_con_angulo_se_corre_si_esta_ocupado() -> None:
+    libre = colocar_hacia(2.0, [], random.Random(1))
+    corrido = colocar_hacia(2.0, [libre], random.Random(1))
+    assert corrido.length() > libre.length()
+    assert math.atan2(corrido.y, corrido.x) == pytest.approx(2.0)
+
+
+def test_con_angulo_no_usa_el_azar() -> None:
+    rng = random.Random(1)
+    antes = rng.getstate()
+    colocar_hacia(2.0, [], rng)
+    assert rng.getstate() == antes
 
 
 def test_anillo_a_la_distancia_de_aparicion() -> None:
