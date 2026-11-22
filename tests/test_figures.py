@@ -8,12 +8,16 @@ import random
 from dataclasses import replace
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 from pygame.math import Vector2
 
 from circlebh.balance import BALANCE, StarPolygonShape
+from circlebh.world.collisions import crossing
+from circlebh.world.enemy import Enemy
 from circlebh.world.figures import check_shape, line_vertices, local_lines
 from circlebh.world.game import World
-from circlebh.world.polygon import polygon_edge
+from circlebh.world.polygon import TIE, polygon_edge
 
 PHI = (1 + math.sqrt(5)) / 2
 ESTRELLA = StarPolygonShape(vertices=5, steps=(1, 2))
@@ -71,6 +75,61 @@ def test_rechaza_menos_de_tres_vertices() -> None:
 
 def test_acepta_la_estrella() -> None:
     check_shape(ESTRELLA, "star")
+
+
+# --- El golpe (F1 del ADR 0027) ---
+
+
+def estrella_en_el_origen() -> Enemy:
+    """Una estrella quieta en el origen, sin girar: el marco del enemigo es el plano."""
+    spec = replace(BALANCE.enemies["hexagon"], shape=ESTRELLA, radius=40.0)
+    return Enemy(spec, Vector2())
+
+
+def golpe_revisando_todas(
+    enemy: Enemy, start: Vector2, end: Vector2
+) -> tuple[float, int] | None:
+    """La referencia: cruza el tramo con cada línea que queda, y gana el menor `t`. Si
+    dos empatan (`TIE`), la de índice menor."""
+    best: tuple[float, int] | None = None
+    for k, (a, b) in zip(enemy.edges, enemy.lines(), strict=True):
+        t = crossing(start, end, a, b)
+        if t is not None and (best is None or t < best[0] - TIE):
+            best = (t, k)
+    return best
+
+
+puntos = st.builds(Vector2, st.floats(-60, 60), st.floats(-60, 60))
+
+
+@given(
+    start=puntos,
+    end=puntos,
+    lineas=st.sets(st.integers(0, 9), min_size=1),
+)
+def test_estrella_golpe_igual_que_todas_las_lineas(
+    start: Vector2, end: Vector2, lineas: set[int]
+) -> None:
+    enemy = estrella_en_el_origen()
+    enemy.edges = sorted(lineas)
+    assert enemy.hit_by(start, end) == golpe_revisando_todas(enemy, start, end)
+
+
+def test_bala_desde_afuera_quita_un_lado_antes_que_una_diagonal() -> None:
+    # A la altura y = 5, desde la izquierda, la bala cruza primero el lado 1, que va
+    # del vértice en 162° al de 234°. Las diagonales quedan detrás.
+    enemy = estrella_en_el_origen()
+    hit = enemy.hit_by(Vector2(-60, 5), Vector2(60, 5))
+    assert hit is not None
+    assert hit[1] == 1
+
+
+def test_sin_el_lado_la_bala_golpea_una_diagonal() -> None:
+    enemy = estrella_en_el_origen()
+    enemy.remove_edge(1)
+    hit = enemy.hit_by(Vector2(-60, 5), Vector2(60, 5))
+    assert hit is not None
+    assert hit[1] >= 5
 
 
 def test_el_mundo_rechaza_una_figura_invalida_nombrando_al_enemigo() -> None:

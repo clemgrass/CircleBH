@@ -32,6 +32,11 @@ def local_lines(
     ]
 
 
+def is_regular(shape: StarPolygonShape) -> bool:
+    """Si es un polígono regular, `{n/1}`: el único caso donde valen los sectores."""
+    return shape.steps == (1,)
+
+
 def check_shape(shape: StarPolygonShape, where: str) -> None:
     """Rechaza una figura cuyas líneas se repetirían o que no encierra nada.
 

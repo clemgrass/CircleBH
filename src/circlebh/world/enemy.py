@@ -12,9 +12,9 @@ from circlebh.balance import EnemySpec
 from circlebh.world.actions import make_action
 from circlebh.world.clock import STEP
 from circlebh.world.collisions import circles_touch, segment_touches_circle
-from circlebh.world.figures import local_lines
+from circlebh.world.figures import is_regular, local_lines
 from circlebh.world.patterns import Context, make_pattern
-from circlebh.world.polygon import ENVELOPE_SLACK, edge_sectors, first_hit
+from circlebh.world.polygon import ENVELOPE_SLACK, edge_sectors, first_crossing
 from circlebh.world.rigid import center_of_mass, rotate, to_local, to_world
 
 
@@ -151,14 +151,16 @@ class Enemy:
             relative_start, relative_end, Vector2(), self.spec.radius + ENVELOPE_SLACK
         ):
             return None
-        sides = self.spec.shape.vertices
-        candidates = [
-            k
-            for k in edge_sectors(relative_start, relative_end, sides)
-            if k in self.edges
-        ]
-        return first_hit(
-            relative_start, relative_end, self.spec.radius, sides, candidates
+        # Los sectores ordenan solo las aristas de un polígono regular (ADR 0020). En
+        # otra figura, una línea cruza varios sectores: se revisan todas (F1, ADR 0027).
+        shape = self.spec.shape
+        if is_regular(shape):
+            sectors = edge_sectors(relative_start, relative_end, shape.vertices)
+            candidates = [k for k in sectors if k in self.edges]
+        else:
+            candidates = self.edges
+        return first_crossing(
+            relative_start, relative_end, {k: self.figure[k] for k in candidates}
         )
 
     def acceleration(self, context: Context) -> Vector2:
