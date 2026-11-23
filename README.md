@@ -1,10 +1,12 @@
+[English](README.en.md)
+
 # CircleBH
 
 Un juego del género survivors hecho en Python con [pygame-ce](https://pyga.me/). Todo se dibuja con código: no hay sprites ni imágenes. El escenario es un plano cartesiano y las armas son curvas matemáticas (una recta, un círculo, un seno, una espiral y una rosa) que se trazan en vivo.
 
 `CircleBH` es un nombre provisorio.
 
-> En construcción. La 0.1.0 es la primera versión jugable: un punto que dispara solo contra hexágonos. Las curvas llegan después.
+> En construcción. La 0.1.0 es la primera versión jugable: un punto que dispara solo contra hexágonos. En `main` avanza la 0.2.0, con más enemigos y una partida con la forma de un tema de house. Las curvas llegan después.
 
 ## Jugar
 
@@ -22,6 +24,8 @@ uv run circlebh
 | Reiniciar al morir | R | ✕ o □ en PlayStation; A o X en Xbox |
 | Pantalla completa | F11 | |
 | Salir | Escape | |
+
+Página en itch.io: https://cgrassdev.itch.io/circle-bh
 
 ## Documentos
 

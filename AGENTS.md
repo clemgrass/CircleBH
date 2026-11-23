@@ -46,6 +46,7 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 ### Textos
 - Español de Chile, tuteando: "puedes", "elige". Nunca voseo.
 - Los identificadores van en inglés. Los comentarios, docstrings, README, issues, PRs y descripciones de commits, en español.
+- `README.en.md` es la traducción al inglés de `README.md`. Si cambias `README.md`, actualiza `README.en.md`.
 - Los términos técnicos van en inglés cuando no tienen traducción natural.
 - Oraciones cortas, lo importante primero, sin relleno.
 - No menciones la organización ni el curso que motivó el proyecto: ni en el código, ni en documentos, commits, issues o PRs.
