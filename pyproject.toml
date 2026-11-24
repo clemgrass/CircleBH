@@ -1,6 +1,6 @@
 [project]
 name = "circlebh"
-version = "0.1.0"
+version = "0.2.0"
 description = "Juego survivors en Python con pygame-ce: todo se dibuja con código y las armas son curvas matemáticas."
 authors = [{ name = "clemgrass" }]
 license = "MIT"
