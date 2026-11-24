@@ -43,6 +43,7 @@ def contexto() -> Context:
     """Un contexto sin vecinos y con el jugador sin carga."""
     return Context(
         player_position=Vector2(),
+        player_velocity=Vector2(),
         player_charge=0.0,
         charges=BALANCE.charges,
         neighbors=[],

@@ -16,10 +16,13 @@ SOLO_COULOMB = replace(HEXAGON, patterns=(CoulombSpec(),))
 
 
 def contexto(
-    neighbors: list[Enemy] | None = None, player_charge: float = 0.0
+    neighbors: list[Enemy] | None = None,
+    player_charge: float = 0.0,
+    player_velocity: Vector2 | None = None,
 ) -> Context:
     return Context(
         player_position=Vector2(),
+        player_velocity=player_velocity or Vector2(),
         player_charge=player_charge,
         charges=BALANCE.charges,
         neighbors=neighbors or [],
@@ -120,7 +123,7 @@ def test_mas_masa_acelera_menos_con_la_misma_carga() -> None:
 
 # --- orbit ---
 
-ORBITA = OrbitSpec(radius=200.0, stiffness=4.0, tangential=0.0)
+ORBITA = OrbitSpec(radius=200.0, stiffness=4.0, tangential=0.0, follow=False)
 SOLO_ORBITA = replace(HEXAGON, friction=3.0, speed=1000.0, patterns=(ORBITA,))
 
 
@@ -161,3 +164,107 @@ def test_orbit_sin_tangencial_converge_al_radio() -> None:
     for _ in range(round(10 / STEP)):
         enemy.step(enemy.acceleration(contexto()))
     assert enemy.position.length() == pytest.approx(ORBITA.radius, abs=0.5)
+
+
+# --- el octágono: orbit con empuje tangencial ---
+
+CONVERGER = round(10 / STEP)
+MEDIR = round(5 / STEP)
+
+
+def octagono() -> EnemySpec:
+    # Se lee en cada test, para que un balance sin octágono no rompa la colección.
+    return BALANCE.enemies["octagon"]
+
+
+def con_tangencial(spec: EnemySpec, tangential: float) -> EnemySpec:
+    patterns = tuple(
+        replace(p, tangential=tangential) if isinstance(p, OrbitSpec) else p
+        for p in spec.patterns
+    )
+    return replace(spec, patterns=patterns)
+
+
+type Pose = tuple[Vector2, Vector2]
+"""La posición y la velocidad en un paso, con el jugador en el origen."""
+
+
+def orbitar(spec: EnemySpec) -> list[Pose]:
+    """Lo deja converger solo, y devuelve su pose en cada paso mientras mide."""
+    enemy = Enemy(spec, Vector2(600, 0))
+    context = contexto(player_charge=BALANCE.player.charge)
+    for _ in range(CONVERGER):
+        enemy.step(enemy.acceleration(context))
+    poses = []
+    for _ in range(MEDIR):
+        enemy.step(enemy.acceleration(context))
+        poses.append((Vector2(enemy.position), Vector2(enemy.velocity)))
+    return poses
+
+
+def giro(pose: Pose) -> float:
+    """La velocidad angular alrededor del jugador: `p × v / |p|²`."""
+    p, v = pose
+    return p.cross(v) / p.length_squared()
+
+
+def radio_del_orbit(spec: EnemySpec) -> float:
+    return next(p.radius for p in spec.patterns if isinstance(p, OrbitSpec))
+
+
+def test_octagono_se_mantiene_en_el_radio() -> None:
+    spec = octagono()
+    radio = radio_del_orbit(spec)
+    assert all(abs(p.length() - radio) < 20 for p, _ in orbitar(spec))
+
+
+def test_orbit_con_tangencial_gira_antihorario() -> None:
+    assert all(giro(pose) > 0 for pose in orbitar(octagono()))
+
+
+def test_tangencial_negativo_gira_horario() -> None:
+    # Borde: el signo del empuje decide el sentido, nada más.
+    assert all(giro(pose) < 0 for pose in orbitar(con_tangencial(octagono(), -120.0)))
+
+
+def test_tangencial_cero_no_gira() -> None:
+    # Negativo: en el anillo, sin empuje tangencial, el roce lo deja quieto.
+    assert all(abs(giro(pose)) < 1e-3 for pose in orbitar(SOLO_ORBITA))
+
+
+def test_octagono_alcanza_a_seguir_al_jugador() -> None:
+    # Decisión 61: para girar mientras te sigue necesita tu rapidez más la de su giro,
+    # `tangential / friction`. Con menos, el cerco queda detrás de ti (Foco 10).
+    spec = octagono()
+    orbit = next(p for p in spec.patterns if isinstance(p, OrbitSpec))
+    assert spec.speed >= BALANCE.player.speed + orbit.tangential / spec.friction
+
+
+# --- follow: el roce medido desde el jugador ---
+
+SIGUE = replace(ORBITA, follow=True)
+CORRIENDO = Vector2(100, 0)
+
+
+def test_orbit_follow_suma_el_roce_por_la_velocidad_del_jugador() -> None:
+    # En `r = R` y sin tangencial, solo queda `friction · u`: el roce total pasa a ser
+    # `−friction · (v − u)`.
+    enemy = Enemy(SOLO_ORBITA, Vector2(0, -200))
+    a = Orbit(SIGUE).acceleration(enemy, contexto(player_velocity=CORRIENDO))
+    assert tuple(a) == pytest.approx((SOLO_ORBITA.friction * 100, 0.0))
+
+
+def test_orbit_follow_con_el_jugador_quieto_da_lo_mismo() -> None:
+    # Borde: con `u = 0`, seguir al jugador no agrega nada.
+    enemy = Enemy(SOLO_ORBITA, Vector2(300, 40))
+    assert Orbit(SIGUE).acceleration(enemy, contexto()) == Orbit(ORBITA).acceleration(
+        enemy, contexto()
+    )
+
+
+def test_orbit_sin_follow_ignora_la_velocidad_del_jugador() -> None:
+    # Negativo: el triángulo y el pentágono no cambian.
+    enemy = Enemy(SOLO_ORBITA, Vector2(300, 40))
+    assert Orbit(ORBITA).acceleration(
+        enemy, contexto(player_velocity=CORRIENDO)
+    ) == Orbit(ORBITA).acceleration(enemy, contexto())

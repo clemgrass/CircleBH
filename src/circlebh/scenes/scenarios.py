@@ -169,6 +169,16 @@ SCENARIOS: dict[str, Scenario] = {
             armed=False,
         ),
         Scenario(
+            "octagono-cerco",
+            "10 octágonos alrededor del piloto, que no muere y dispara: se reparten por"
+            " su anillo, giran antihorario y viajan con él sin tocarlo, porque su roce"
+            " se mide desde el piloto. Las balas les van quitando líneas.",
+            pilot=True,
+            crowd=10,
+            crowd_enemy="octagon",
+            lethal=False,
+        ),
+        Scenario(
             "masa-critica",
             "30 hexágonos juntos a un lado del jugador quieto, que no muere ni dispara:"
             " la masa crítica trae un círculo, que nace fuera de la vista detrás del"

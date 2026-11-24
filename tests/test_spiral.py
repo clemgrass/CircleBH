@@ -54,7 +54,7 @@ def pasos(seconds: float) -> int:
 def paso(enemies: list[Enemy], jugador: Vector2) -> None:
     """Un paso como el del mundo: primero las acciones, después el enjambre."""
     step_actions(enemies, jugador, random.Random(0), [], BALANCE.enemy_bullet)
-    step_swarm(enemies, jugador, BALANCE.player.charge, BALANCE.charges)
+    step_swarm(enemies, jugador, Vector2(), BALANCE.player.charge, BALANCE.charges)
 
 
 def contexto(enemies: list[Enemy], jugador: Vector2) -> ActionContext:

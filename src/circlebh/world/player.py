@@ -21,6 +21,11 @@ class Player:
         """Radio del círculo de choque, en unidades del plano."""
         return self.spec.radius
 
+    @property
+    def velocity(self) -> Vector2:
+        """La velocidad del último `step`, en unidades / s."""
+        return (self.position - self.previous) / STEP
+
     def step(self, intent: Vector2) -> None:
         """Avanza un paso: `intent · speed · STEP`, con `intent` recortada a largo 1.
 

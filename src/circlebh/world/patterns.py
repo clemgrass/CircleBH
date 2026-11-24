@@ -33,6 +33,8 @@ class Context:
     """Lo que un patrón puede mirar en este paso."""
 
     player_position: Vector2
+    player_velocity: Vector2
+    """En unidades / s, medida en el último paso del jugador."""
     player_charge: float
     charges: ChargesSpec
     neighbors: Sequence[Enemy]
@@ -96,22 +98,31 @@ class Orbit(Pattern):
 
     `r̂` apunta del jugador al enemigo, y `θ̂ = (−r̂y, r̂x)` es `r̂` girado 90°
     antihorario. Sin tangencial, el enemigo se queda a distancia `R`, mirando.
+
+    Con `follow`, suma `friction·u`, con `u` la velocidad del jugador: el roce se mide
+    desde él, y el anillo viaja con quien corre.
     """
 
     def __init__(self, spec: OrbitSpec) -> None:
         self.spec = spec
 
     def acceleration(self, enemy: Enemy, context: Context) -> Vector2:
-        """Encima del jugador no hay dirección radial, y vale 0, como en `Seek`."""
+        """Encima del jugador no hay dirección radial, y el resorte y el empuje valen 0,
+        como en `Seek`. El roce desde el jugador no la necesita, y sigue."""
+        spec = self.spec
+        carry = (
+            context.player_velocity * enemy.spec.friction if spec.follow else Vector2()
+        )
         offset = enemy.position - context.player_position
         r = offset.length()
         if r == 0:
-            return Vector2()
+            return carry
         radial = offset / r
         tangent = Vector2(-radial.y, radial.x)
-        spec = self.spec
         return (
-            radial * (-spec.stiffness * (r - spec.radius)) + tangent * spec.tangential
+            radial * (-spec.stiffness * (r - spec.radius))
+            + tangent * spec.tangential
+            + carry
         )
 
 
