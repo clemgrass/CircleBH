@@ -12,6 +12,9 @@ from typing import Literal
 from pygame.math import Vector2
 
 from circlebh.audio.rhythm import SIXTEENTHS
+
+# Las frases son del tema, y el director las respeta al terminar una oleada.
+from circlebh.world.director import PHRASE_BARS
 from circlebh.world.enemy import Enemy
 
 DISTANCE = 400.0
@@ -23,8 +26,6 @@ FALL_TAU = 5.0
 """Segundos para recorrer ~63 % del camino al subir y al bajar: sube rápido, baja lento."""
 THRESHOLDS = (0.08, 0.2, 0.38)
 """La intensidad suavizada que hay que pasar para cada capa, de la 1 a la 3."""
-PHRASE_BARS = 4
-"""Compases por frase."""
 PHRASE = PHRASE_BARS * SIXTEENTHS
 """Semicorcheas por frase."""
 TOP = 3

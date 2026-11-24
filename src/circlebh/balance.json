@@ -519,11 +519,11 @@
       },
       {
         "name": "drop_1",
-        "kind": "build",
-        "bars": 32.0,
-        "budget_start": 2.5,
-        "budget_end": 2.5,
-        "burst": 12.0,
+        "kind": "wave",
+        "bars": 8.0,
+        "budget_start": 0.0,
+        "budget_end": 0.0,
+        "burst": 30.0,
         "layers": [
           3,
           3
@@ -642,11 +642,11 @@
       },
       {
         "name": "drop_2",
-        "kind": "build",
-        "bars": 32.0,
-        "budget_start": 3.0,
-        "budget_end": 3.0,
-        "burst": 20.0,
+        "kind": "wave",
+        "bars": 8.0,
+        "budget_start": 0.0,
+        "budget_end": 0.0,
+        "burst": 50.0,
         "layers": [
           3,
           3

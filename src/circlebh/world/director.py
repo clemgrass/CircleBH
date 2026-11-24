@@ -3,6 +3,9 @@
 Cuenta compases con el tempo del balance y recorre las secciones del tema: intro,
 subida, drop, respiro, subida y drop. Cada sección gana presupuesto de amenaza y lo
 gasta comprando enemigos de su mazo, al azar por peso, con la `Random` del mundo.
+
+Los drops son oleadas: compran todo al empezar, y el tema no sigue hasta que el jugador
+las limpia (decisión 72 de la spec de la 0.2.0).
 """
 
 import bisect
@@ -18,6 +21,10 @@ from circlebh.world.spawning import FORMATIONS, check_spawning
 
 STEPS_PER_MINUTE = round(60 / STEP)
 """3600. Es entero, y así el compás se calcula sin el error binario de `1/60`."""
+
+PHRASE_BARS = 4
+"""Compases por frase. La música cambia de capa solo al empezar una frase (ADR 0026),
+así que cada sección tiene que empezar en una."""
 
 
 def bar_at(steps: int, bpm: float) -> float:
@@ -55,6 +62,20 @@ class Purchase:
     count: int
     """Cuántos. Siempre 1 en `single`."""
 
+    wave: int | None = None
+    """El índice de la sección `wave` que la compró, o `None` si no es de una oleada."""
+
+
+def _split_chain(name: str, enemies: Mapping[str, EnemySpec]) -> list[str]:
+    """`name` y todo lo que deja al morir, siguiendo `split_into`: lo que hay que
+    matar para limpiar a uno de la oleada. Se detiene ante un tipo desconocido o un
+    ciclo, que `check_splits` rechaza al crear el mundo."""
+    chain: list[str] = []
+    while name in enemies and name not in chain:
+        chain.append(name)
+        name = enemies[name].split_into
+    return chain
+
 
 def _validate(
     spec: DirectorSpec, enemies: Mapping[str, EnemySpec], spawning: SpawningSpec
@@ -63,8 +84,9 @@ def _validate(
 
     Con amenaza 0 el director compraría sin fin en un solo paso; sin compases, `earned`
     dividiría por 0; y un tipo o una formación desconocidos, o un peso no positivo,
-    fallarían recién al llegar a esa sección. Mejor fallar al empezar, nombrando el
-    campo.
+    fallarían recién al llegar a esa sección. Una oleada con tasa no la usaría, y una
+    con un anclado podría no limpiarse nunca (Foco 4). Mejor fallar al empezar,
+    nombrando el campo.
     """
     check_spawning(spawning)
     if not spec.sections:
@@ -78,9 +100,24 @@ def _validate(
         for formation in section.formations:
             if formation not in FORMATIONS:
                 raise ValueError(f"{where}.formations: no existe {formation}")
+        wave = section.kind == "wave"
+        for field in ("budget_start", "budget_end"):
+            if wave and getattr(section, field) != 0:
+                raise ValueError(
+                    f"{where}.{field}: una oleada compra solo su burst al empezar,"
+                    " así que su tasa tiene que ser 0"
+                )
         for entry in section.deck:
             if entry.enemy not in enemies:
                 raise ValueError(f"{where}.deck: no existe el enemigo {entry.enemy}")
+            chain = _split_chain(entry.enemy, enemies) if wave else []
+            anchored = next((n for n in chain if enemies[n].anchored), None)
+            if anchored is not None:
+                raise ValueError(
+                    f"{where}.deck[{entry.enemy}]: una oleada no puede tener"
+                    f" anclados ({anchored}), porque no te siguen y quizás nunca se"
+                    " limpie"
+                )
             if entry.weight <= 0:
                 raise ValueError(
                     f"{where}.deck[{entry.enemy}].weight: tiene que ser mayor que 0"
@@ -109,8 +146,13 @@ class Director:
         self._starts = list(
             itertools.accumulate((s.bars for s in spec.sections), initial=0.0)
         )
-        """El compás en que empieza cada sección, y al final, en que termina la última."""
+        """El compás en que empieza cada sección, y al final, en que termina la última.
+        Una oleada corre los de las que siguen: a infinito mientras espera, y a su final
+        cuando se limpia."""
         self.section_index = 0
+        self._entered = -1
+        """La última sección que ya hizo lo de su primer paso: una oleada compra ahí."""
+        self._waiting = False
         self._spent = 0.0
         self._next = self._pick()
 
@@ -118,6 +160,12 @@ class Director:
     def section(self) -> SectionSpec:
         """La sección en que va la partida."""
         return self.spec.sections[self.section_index]
+
+    @property
+    def waiting(self) -> bool:
+        """Si espera que el jugador limpie la oleada en curso. Es verdadero desde el
+        paso en que la oleada compra hasta el paso en que se limpia."""
+        return self._waiting
 
     def section_at(self, bar: float) -> SectionSpec:
         """La sección del compás `bar`. Antes del compás 0 es la primera, y después del
@@ -128,23 +176,75 @@ class Director:
         last = len(self.spec.sections) - 1
         return max(0, min(bisect.bisect_right(self._starts, bar) - 1, last))
 
-    def update(self, steps: int) -> list[Purchase]:
+    def update(self, steps: int, *, wave_alive: bool) -> list[Purchase]:
         """Avanza hasta el paso `steps` y devuelve lo comprado en este paso.
+
+        `wave_alive` dice si queda algún enemigo de la oleada en curso, vivo o en la
+        cola. Fuera de una oleada no se usa.
 
         Si en este paso empieza otra sección, la que termina gasta antes lo que le queda
         hasta su último compás, y la compra que esperaba se recorta a lo que alcance. Lo
-        que no alcanza ni para uno se pierde.
+        que no alcanza ni para uno se pierde. Una oleada no gasta al terminar: lo que le
+        sobró se pierde.
         """
         bar = bar_at(steps, self.spec.bpm)
-        index = self._index_at(bar)
+        if self._waiting and not wave_alive:
+            self._clear(bar)
         bought: list[Purchase] = []
-        while self.section_index < index:
-            bought += self._buy(self.section.bars, closing=True)
+        while True:
+            if self._entered < self.section_index:
+                self._entered = self.section_index
+                if self.section.kind == "wave":
+                    bought += self._open_wave()
+            if self.section_index >= self._index_at(bar):
+                break
+            if self.section.kind == "build":
+                bought += self._buy(self.section.bars, closing=True)
             self.section_index += 1
             self._spent = 0.0
             self._next = self._pick()
-        bought += self._buy(bar - self._starts[self.section_index], closing=False)
+        if self.section.kind == "build":
+            bought += self._buy(bar - self._starts[self.section_index], closing=False)
         return bought
+
+    def _open_wave(self) -> list[Purchase]:
+        """Compra la oleada entera: su `burst`, recortando la última formación a lo que
+        alcance. Si compró algo, espera, y las secciones siguientes quedan sin inicio
+        hasta que se limpie.
+
+        En este paso el mundo todavía no ve a nadie de la oleada, que recién entra a
+        la cola: por eso no se mira `wave_alive` hasta el paso siguiente."""
+        bought = self._buy(0.0, closing=True)
+        self._waiting = bool(bought)
+        if self._waiting:
+            self._start_next_at(math.inf)
+        return bought
+
+    def _clear(self, bar: float) -> None:
+        """La oleada se limpió en el compás `bar`. Termina en el primer inicio de frase
+        que llegue a sus compases y que caiga al menos un compás después de `bar`.
+
+        El compás de margen es para la música, que decide la frase siguiente al empezar
+        su último compás (ADR 0026): si la oleada terminara en la frase que ya decidió,
+        la sección siguiente sonaría como el drop durante toda su primera frase. Si la
+        siguiente exige más capas, el margen suma una frase: la de la subida, que la
+        música decide al empezarla."""
+        index = self.section_index
+        own_end = self._starts[index] + self.section.bars
+        following = self.spec.sections[index + 1 : index + 2]
+        rises = any(s.layers[0] > self.section.layers[0] for s in following)
+        margin = 1 + (PHRASE_BARS if rises else 0)
+        end = max(own_end, bar + margin)
+        self._start_next_at(PHRASE_BARS * math.ceil(end / PHRASE_BARS))
+        self._waiting = False
+
+    def _start_next_at(self, bar: float) -> None:
+        """Corre las secciones que siguen a la actual para que la próxima empiece en el
+        compás `bar`, con infinito si todavía no se sabe."""
+        rest = self.spec.sections[self.section_index + 1 :]
+        self._starts[self.section_index + 1 :] = itertools.accumulate(
+            (s.bars for s in rest), initial=bar
+        )
 
     def _buy(self, bars: float, *, closing: bool) -> list[Purchase]:
         """Compra mientras lo ganado en `bars` compases de la sección alcance para la
@@ -190,6 +290,7 @@ class Director:
             if formation == "single"
             else self.rng.randint(*self.spawning.formation_size)
         )
+        wave = self.section_index if section.kind == "wave" else None
         if self.enemies[enemy].solitary:
-            return Purchase(enemy, "single", 1)
-        return Purchase(enemy, formation, count)
+            return Purchase(enemy, "single", 1, wave)
+        return Purchase(enemy, formation, count, wave)

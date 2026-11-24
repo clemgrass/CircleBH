@@ -22,7 +22,12 @@ from circlebh.world.figures import check_shapes
 from circlebh.world.merge import Merge, check_merge
 from circlebh.world.player import Player
 from circlebh.world.regrowth import absorb
-from circlebh.world.spawning import SpawnQueue, check_formations, place_formation
+from circlebh.world.spawning import (
+    Queued,
+    SpawnQueue,
+    check_formations,
+    place_formation,
+)
 from circlebh.world.split import check_splits, fragments
 from circlebh.world.swarm import step_swarm
 from circlebh.world.weapons import PointWeapon, Weapon
@@ -106,7 +111,8 @@ class World:
         pasan a ser líneas sueltas, y los heridos absorben las que tocan: después de las
         balas, para que un herido que murió en este paso no se cure. Los enemigos sin
         líneas desaparecen, y el que se parte al morir, como el divisor, deja sus
-        fragmentos en su lugar. Lo que compró el director entra a la cola, y de ella
+        fragmentos en su lugar, con su oleada. El director sabe si queda alguien de la
+        oleada en curso, vivo o en la cola. Lo que compró entra a la cola, y de ella
         aparecen hasta `spawning.max_per_step`, que empiezan a moverse en el paso
         siguiente; mientras hay una fusión en curso, las estrellas de la cola se
         descartan. La fusión da su paso: puede juntar las estrellas o hacer nacer la gran
@@ -156,13 +162,17 @@ class World:
         self.enemies = [enemy for enemy in self.enemies if enemy.alive]
         for enemy in dead:
             self._split(enemy)
-        for purchase in self.director.update(self._steps):
+        # Fuera de una oleada no hace falta recorrer el plano y la cola.
+        alive = self.director.waiting and self._wave_alive()
+        for purchase in self.director.update(self._steps, wave_alive=alive):
             self._enqueue(purchase)
-        for name, offset in self.queue.pop(self.balance.spawning.max_per_step):
-            if not self.merge.allows(name):
+        for item in self.queue.pop(self.balance.spawning.max_per_step):
+            if not self.merge.allows(item.enemy):
                 continue
-            position = self.player.position + offset
-            self.enemies.append(Enemy(self.balance.enemies[name], position))
+            position = self.player.position + item.offset
+            enemy = Enemy(self.balance.enemies[item.enemy], position)
+            enemy.wave = item.wave
+            self.enemies.append(enemy)
         self.enemies = self.merge.update(
             self._steps, self.enemies, self.player.position
         )
@@ -201,7 +211,18 @@ class World:
         if not enemy.spec.split_into:
             return
         spec = self.balance.enemies[enemy.spec.split_into]
-        self.enemies += fragments(enemy, spec, self.player.position, self.player.radius)
+        children = fragments(enemy, spec, self.player.position, self.player.radius)
+        for child in children:
+            # Los fragmentos de una oleada son parte de ella: no se limpia sin ellos.
+            child.wave = enemy.wave
+        self.enemies += children
+
+    def _wave_alive(self) -> bool:
+        """Si queda algún enemigo de la oleada en curso, vivo o esperando en la cola."""
+        wave = self.director.section_index
+        return any(enemy.wave == wave for enemy in self.enemies) or any(
+            item.wave == wave for item in self.queue
+        )
 
     def _absorb(self) -> None:
         """Los heridos absorben las líneas sueltas que tocan. Las absorbidas salen del
@@ -226,7 +247,7 @@ class World:
         # `is` y no `==`: comparar la dataclass campo por campo, contra cada enemigo y en
         # cada paso, hacía notar el costo en el benchmark del enjambre.
         present = any(enemy.spec is spec for enemy in self.enemies) or any(
-            queued == name for queued, _ in self.queue
+            item.enemy == name for item in self.queue
         )
         here = self.player.position
         offsets = [
@@ -252,7 +273,7 @@ class World:
             for enemy in self.enemies
             if not enemy.spec.phantom
         ]
-        occupied += [(offset, enemies[name].radius) for name, offset in self.queue]
+        occupied += [(item.offset, enemies[item.enemy].radius) for item in self.queue]
         offsets = place_formation(
             purchase.formation,
             purchase.count,
@@ -263,4 +284,4 @@ class World:
             self.rng,
             angle,
         )
-        self.queue.push((purchase.enemy, offset) for offset in offsets)
+        self.queue.push(Queued(purchase.enemy, o, purchase.wave) for o in offsets)

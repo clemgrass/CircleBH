@@ -113,7 +113,7 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 - **Ramas e issues:**
   - nunca se trabaja directo en `main`;
   - un issue es una rama `tipo/descripcion-corta` y un PR;
-  - el issue lleva un título en español y un cuerpo con Qué, Por qué y Terminado cuando. Va en un milestone por versión y en el tablero.
+  - el issue lleva un título en español y un cuerpo con Qué, Por qué y Terminado cuando. Va en el tablero. Si es parte de una versión, va también en su milestone y en la columna Milestone. Los bugs y las investigaciones van sin milestone, en Todo.
 - **Commits:** Conventional Commits, con el tipo en inglés y la descripción en español (`feat: agregar arma seno`). El push va al final, con `poe check` en verde.
 - **PR:**
   - antes de crearlo, revisa el diff contra los ADR y este archivo, y muestra el título y el cuerpo;

@@ -69,6 +69,9 @@ class Enemy:
         """Su conducta: instancias propias de los patrones de su tipo (ADR 0021)."""
         self.actions = [make_action(action) for action in spec.actions]
         """Sus acciones, con su propio estado: lo que hace y no es una fuerza."""
+        self.wave: int | None = None
+        """La oleada a la que pertenece: el índice de su sección `wave`, o `None`. La
+        oleada no se limpia mientras quede uno vivo con su etiqueta."""
 
     @property
     def mass(self) -> float:

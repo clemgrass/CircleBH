@@ -10,13 +10,13 @@ from pygame.math import Vector2
 
 from circlebh.audio.intensity import (
     FREE,
-    PHRASE_BARS,
     Arrangement,
     Layers,
     raw_intensity,
 )
 from circlebh.audio.rhythm import SIXTEENTHS
 from circlebh.balance import BALANCE
+from circlebh.world.director import PHRASE_BARS
 from circlebh.world.enemy import Enemy
 
 HEXAGON = BALANCE.enemies["hexagon"]

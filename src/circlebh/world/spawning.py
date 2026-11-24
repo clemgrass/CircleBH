@@ -10,6 +10,7 @@ import math
 import random
 from collections import deque
 from collections.abc import Iterable, Iterator, Sequence
+from typing import NamedTuple
 
 from pygame.math import Vector2
 
@@ -190,20 +191,34 @@ def place_formation(
     return points
 
 
+class Queued(NamedTuple):
+    """Un enemigo comprado que espera aparecer."""
+
+    enemy: str
+    """El tipo, una clave de `enemies`."""
+
+    offset: Vector2
+    """Dónde nace, relativo al jugador."""
+
+    wave: int | None
+    """La oleada a la que pertenece, como `Purchase.wave`. Mientras espera, cuenta para
+    que la oleada no esté limpia."""
+
+
 class SpawnQueue:
-    """Lo comprado que espera aparecer, en orden de compra, como `(tipo, offset)`."""
+    """Lo comprado que espera aparecer, en orden de compra."""
 
     def __init__(self) -> None:
-        self._items: deque[tuple[str, Vector2]] = deque()
+        self._items: deque[Queued] = deque()
 
-    def push(self, items: Iterable[tuple[str, Vector2]]) -> None:
+    def push(self, items: Iterable[Queued]) -> None:
         """Agrega al final, en orden."""
         self._items.extend(items)
 
-    def pop(self, limit: int) -> list[tuple[str, Vector2]]:
+    def pop(self, limit: int) -> list[Queued]:
         """Saca los primeros `limit`, o los que haya."""
         return [self._items.popleft() for _ in range(min(limit, len(self._items)))]
 
-    def __iter__(self) -> Iterator[tuple[str, Vector2]]:
+    def __iter__(self) -> Iterator[Queued]:
         """Los que esperan, sin sacarlos."""
         return iter(self._items)
