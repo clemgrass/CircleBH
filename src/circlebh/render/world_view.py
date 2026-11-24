@@ -93,6 +93,14 @@ def draw_world(
         color = palette.background.lerp(palette.accent, merge.fade(world.steps))
         draw_lines(screen, viewport, merge.fading.lines(), color, line_width)
 
+    # La línea suelta absorbida se apaga hacia el fondo mientras el hueco del herido se
+    # enciende: un cross dissolve (decisión 66).
+    fade = world.balance.regrow.fade
+    for line, at in world.ghosts:
+        left = 1.0 - (world.steps - at) * STEP / fade
+        shade = palette.background.lerp(palette.foreground, max(0.0, left))
+        draw_lines(screen, viewport, [line], shade, line_width)
+
     # Las balas enemigas van encima de todo, con el acento: lo que mata se ve siempre.
     radius = world.balance.enemy_bullet.radius * viewport.scale
     for enemy_bullet in world.enemy_bullets:

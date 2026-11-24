@@ -11,7 +11,7 @@ from collections.abc import Mapping
 
 from pygame.math import Vector2
 
-from circlebh.balance import CircleShape, EnemySpec
+from circlebh.balance import CircleShape, EnemySpec, SegmentShape
 from circlebh.world.actions import make_action
 from circlebh.world.clock import STEP
 from circlebh.world.collisions import (
@@ -104,6 +104,12 @@ class Enemy:
     def alive(self) -> bool:
         """Vive mientras le quede alguna línea."""
         return bool(self.edges)
+
+    @property
+    def stray(self) -> bool:
+        """Si es una línea suelta, la que dona el regenerador: el único segmento del
+        balance. No es enjambre: no cuenta para la masa crítica, y no se cura."""
+        return isinstance(self.spec.shape, SegmentShape)
 
     @property
     def wounded(self) -> bool:

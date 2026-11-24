@@ -232,7 +232,20 @@ class RegenerateSpec:
     recuperada."""
 
     stray: str
-    """El tipo de la línea que suelta al donar, una clave de `enemies`."""
+    """El tipo de la línea que suelta al donar, una clave de `enemies`: un segmento con
+    `deliver`."""
+
+
+@dataclass(frozen=True, kw_only=True)
+class DeliverSpec:
+    """Acción: la línea suelta va a su paciente, el herido al que la donó el médico. Si
+    el paciente muere, frena por su roce y queda flotando (decisión 68 de la spec de la
+    0.2.0)."""
+
+    kind: Literal["deliver"] = "deliver"
+
+    speed: float
+    """Su rapidez hacia el paciente, en unidades del plano por segundo."""
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -270,11 +283,25 @@ class CircleShape:
         return 1
 
 
-type Shape = StarPolygonShape | CircleShape
+@dataclass(frozen=True, kw_only=True)
+class SegmentShape:
+    """La figura de la línea suelta que dona el regenerador: un solo segmento, el
+    diámetro de largo `2·radius` sobre el eje x de su marco (decisión 68 de la spec de
+    la 0.2.0)."""
+
+    kind: Literal["segment"] = "segment"
+
+    @property
+    def line_count(self) -> int:
+        """Una sola línea: muere de un golpe."""
+        return 1
+
+
+type Shape = StarPolygonShape | CircleShape | SegmentShape
 """La figura de un enemigo. En el JSON, su campo `kind` dice cuál es."""
 
 
-type ActionSpec = ChargeSpec | VolleySpec | SpiralSpec | RegenerateSpec
+type ActionSpec = ChargeSpec | VolleySpec | SpiralSpec | RegenerateSpec | DeliverSpec
 """Una acción: lo que el enemigo hace y no es una fuerza (ADR 0021). En el JSON, su
 campo `kind` dice cuál es."""
 
@@ -722,6 +749,21 @@ BALANCE = Balance(
             actions=(
                 RegenerateSpec(kind="regenerate", interval=2.0, stray="stray_line"),
             ),
+        ),
+        "stray_line": EnemySpec(
+            shape=SegmentShape(kind="segment"),
+            radius=12.0,
+            speed=200.0,
+            friction=3.0,
+            spin=0.0,
+            anchored=False,
+            phantom=False,
+            solitary=True,
+            charge_per_line=0.2,
+            mass_per_line=1.0,
+            patterns=(CoulombSpec(kind="coulomb"),),
+            threat=0.0,
+            actions=(DeliverSpec(kind="deliver", speed=180.0),),
         ),
         "star": EnemySpec(
             shape=StarPolygonShape(kind="star_polygon", vertices=5, steps=(1, 2)),

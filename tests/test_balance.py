@@ -293,6 +293,21 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                     {"kind": "regenerate", "interval": 2.0, "stray": "stray_line"}
                 ],
             },
+            "stray_line": {
+                "shape": {"kind": "segment"},
+                "radius": 12.0,
+                "speed": 200.0,
+                "friction": 3.0,
+                "spin": 0.0,
+                "anchored": False,
+                "phantom": False,
+                "solitary": True,
+                "charge_per_line": 0.2,
+                "mass_per_line": 1.0,
+                "patterns": [{"kind": "coulomb"}],
+                "threat": 0.0,
+                "actions": [{"kind": "deliver", "speed": 180.0}],
+            },
             "star": {
                 "shape": {"kind": "star_polygon", "vertices": 5, "steps": [1, 2]},
                 "radius": 40.0,

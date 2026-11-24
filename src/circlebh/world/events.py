@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from pygame.math import Vector2
+
     from circlebh.world.enemy import Enemy
     from circlebh.world.weapons import Weapon
 
@@ -49,4 +51,15 @@ class Regrow:
     edge: int
 
 
-type Event = Shot | Hit | Death | Telegraph | Regrow
+@dataclass(frozen=True)
+class Donate:
+    """`enemy` soltó su línea `edge`, que en el plano es `line`, para `patient`. El mundo
+    la convierte en una línea suelta (decisión 67 de la spec de la 0.2.0)."""
+
+    enemy: Enemy
+    edge: int
+    line: tuple[Vector2, Vector2]
+    patient: Enemy
+
+
+type Event = Shot | Hit | Death | Telegraph | Regrow | Donate

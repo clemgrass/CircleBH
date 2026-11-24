@@ -11,10 +11,18 @@ Todo se mide desde el centro de la figura, sin girar.
 """
 
 from collections.abc import Mapping
+from typing import TypeGuard
 
 from pygame.math import Vector2
 
-from circlebh.balance import CircleShape, EnemySpec, Shape, StarPolygonShape, VolleySpec
+from circlebh.balance import (
+    CircleShape,
+    EnemySpec,
+    SegmentShape,
+    Shape,
+    StarPolygonShape,
+    VolleySpec,
+)
 from circlebh.world.polygon import vertex
 
 
@@ -26,18 +34,21 @@ def line_vertices(shape: StarPolygonShape) -> list[tuple[int, int]]:
 
 def local_lines(shape: Shape, radius: float) -> list[tuple[Vector2, Vector2]]:
     """Las líneas rectas de la figura entera, en el círculo de `radius`. El círculo no
-    tiene ninguna."""
+    tiene ninguna, y el segmento es su diámetro sobre el eje x."""
     if isinstance(shape, CircleShape):
         return []
+    if isinstance(shape, SegmentShape):
+        return [(Vector2(-radius, 0), Vector2(radius, 0))]
     n = shape.vertices
     return [
         (vertex(radius, n, a), vertex(radius, n, b)) for a, b in line_vertices(shape)
     ]
 
 
-def is_regular(shape: StarPolygonShape) -> bool:
-    """Si es un polígono regular, `{n/1}`: el único caso donde valen los sectores."""
-    return shape.steps == (1,)
+def is_regular(shape: Shape) -> TypeGuard[StarPolygonShape]:
+    """Si es un polígono regular, `{n/1}`: el único caso donde valen los sectores.
+    `TypeGuard` y no `TypeIs`: un `False` no descarta que sea un polígono estrellado."""
+    return isinstance(shape, StarPolygonShape) and shape.steps == (1,)
 
 
 def check_shape(shape: StarPolygonShape, where: str) -> None:
@@ -61,15 +72,16 @@ def check_shapes(enemies: Mapping[str, EnemySpec]) -> None:
     """Rechaza al crear el mundo la primera figura inválida del balance, nombrando a
     su enemigo, para no fallar a mitad de la partida.
 
-    Un círculo no puede tener una `volley`: la salva sale de los vértices."""
+    Un círculo o un segmento no pueden tener una `volley`: la salva sale de los vértices
+    de un polígono."""
     for name, spec in enemies.items():
         where = f"enemies.{name}"
         match spec.shape:
             case StarPolygonShape():
                 check_shape(spec.shape, where)
-            case CircleShape():
+            case CircleShape() | SegmentShape():
                 if any(isinstance(action, VolleySpec) for action in spec.actions):
                     raise ValueError(
-                        f"{where}.actions: un círculo no tiene vértices desde donde"
-                        " disparar una volley"
+                        f"{where}.actions: un {spec.shape.kind} no tiene vértices desde"
+                        " donde disparar una volley"
                     )
