@@ -125,6 +125,7 @@ class World:
         self.separations += step_swarm(
             self.enemies,
             self.player.position,
+            self.player.velocity,
             self.balance.player.charge,
             self.balance.charges,
         )

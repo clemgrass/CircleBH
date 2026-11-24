@@ -107,6 +107,12 @@ class OrbitSpec:
     """El empuje tangencial, en unidades / s², antihorario si es positivo. Con 0, solo
     mantiene la distancia."""
 
+    follow: bool
+    """Si el roce se mide desde el jugador y no desde el suelo. Suma `friction·u`, con
+    `u` la velocidad del jugador: el roce total queda `−friction·(v − u)`, y en el marco
+    del jugador es la misma órbita que con él quieto. Sin esto, el resorte radial no
+    arrastra a los que van a los costados y el anillo queda detrás de quien corre."""
+
 
 type PatternSpec = SeekSpec | CoulombSpec | OrbitSpec
 """Un patrón de movimiento. En el JSON, su campo `kind` dice cuál es."""
@@ -567,7 +573,13 @@ BALANCE = Balance(
             charge_per_line=1.0,
             mass_per_line=1.0,
             patterns=(
-                OrbitSpec(kind="orbit", radius=280.0, stiffness=4.0, tangential=0.0),
+                OrbitSpec(
+                    kind="orbit",
+                    radius=280.0,
+                    stiffness=4.0,
+                    tangential=0.0,
+                    follow=False,
+                ),
                 CoulombSpec(kind="coulomb"),
             ),
             threat=1.5,
@@ -598,7 +610,13 @@ BALANCE = Balance(
             charge_per_line=1.0,
             mass_per_line=1.0,
             patterns=(
-                OrbitSpec(kind="orbit", radius=300.0, stiffness=6.0, tangential=0.0),
+                OrbitSpec(
+                    kind="orbit",
+                    radius=300.0,
+                    stiffness=6.0,
+                    tangential=0.0,
+                    follow=False,
+                ),
                 CoulombSpec(kind="coulomb"),
             ),
             threat=2.0,
@@ -613,6 +631,30 @@ BALANCE = Balance(
                     cooldown=2.5,
                 ),
             ),
+        ),
+        "octagon": EnemySpec(
+            shape=StarPolygonShape(kind="star_polygon", vertices=8, steps=(1,)),
+            radius=26.0,
+            speed=300.0,
+            friction=4.0,
+            spin=0.0,
+            anchored=False,
+            phantom=False,
+            solitary=False,
+            charge_per_line=1.0,
+            mass_per_line=1.0,
+            patterns=(
+                OrbitSpec(
+                    kind="orbit",
+                    radius=200.0,
+                    stiffness=12.0,
+                    tangential=240.0,
+                    follow=True,
+                ),
+                CoulombSpec(kind="coulomb"),
+            ),
+            threat=1.5,
+            actions=(),
         ),
         "star": EnemySpec(
             shape=StarPolygonShape(kind="star_polygon", vertices=5, steps=(1, 2)),
@@ -752,6 +794,7 @@ BALANCE = Balance(
                     DeckEntry(enemy="square", weight=1.0),
                     DeckEntry(enemy="triangle", weight=1.0),
                     DeckEntry(enemy="pentagon", weight=1.0),
+                    DeckEntry(enemy="octagon", weight=1.0),
                     DeckEntry(enemy="star", weight=0.5),
                 ),
                 formations=("single", "line", "cluster"),
@@ -769,6 +812,7 @@ BALANCE = Balance(
                     DeckEntry(enemy="square", weight=1.0),
                     DeckEntry(enemy="triangle", weight=1.0),
                     DeckEntry(enemy="pentagon", weight=1.0),
+                    DeckEntry(enemy="octagon", weight=1.0),
                 ),
                 formations=("ring", "line", "cluster"),
             ),

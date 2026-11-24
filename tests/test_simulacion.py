@@ -61,7 +61,7 @@ def test_los_heridos_no_tiemblan_en_la_multitud() -> None:
     for paso in range(720):
         antes = [Vector2(enemy.velocity) for enemy in enemies]
         separations += step_swarm(
-            enemies, Vector2(), BALANCE.player.charge, BALANCE.charges
+            enemies, Vector2(), Vector2(), BALANCE.player.charge, BALANCE.charges
         )
         if paso >= 600:
             temblores += sum(

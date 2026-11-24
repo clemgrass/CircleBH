@@ -4,14 +4,14 @@
 import math
 import random
 from dataclasses import replace
-from itertools import combinations
+from itertools import combinations, pairwise
 
 import pytest
 from hypothesis import assume, given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, CoulombSpec, EnemySpec
+from circlebh.balance import BALANCE, CoulombSpec, EnemySpec, OrbitSpec
 from circlebh.world.actions import Spiral, SpiralState, step_actions
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
@@ -26,7 +26,7 @@ CELDA = BALANCE.charges.cutoff
 
 
 def paso(enemies: list[Enemy], player_charge: float = 0.0) -> int:
-    return step_swarm(enemies, Vector2(), player_charge, BALANCE.charges)
+    return step_swarm(enemies, Vector2(), Vector2(), player_charge, BALANCE.charges)
 
 
 # --- El paso simultáneo ---
@@ -239,7 +239,7 @@ def paso_real(enemies: list[Enemy]) -> None:
     """Un paso como el del mundo, con el jugador quieto en el origen y su carga real:
     primero las acciones, como la espiral del círculo, y después el enjambre."""
     step_actions(enemies, Vector2(), random.Random(0), [], BALANCE.enemy_bullet)
-    step_swarm(enemies, Vector2(), BALANCE.player.charge, BALANCE.charges)
+    step_swarm(enemies, Vector2(), Vector2(), BALANCE.player.charge, BALANCE.charges)
 
 
 def dispersion(enemies: list[Enemy]) -> float:
@@ -279,3 +279,73 @@ def test_dispersa_un_grupo() -> None:
     con_carga = simular(real, pasos)
     assert con_carga > simular(None, pasos)
     assert con_carga > simular(replace(real, charge_per_line=0.0), pasos)
+
+
+# --- el cerco del octágono (decisión 61) ---
+
+
+def sin_follow(spec: EnemySpec) -> EnemySpec:
+    patterns = tuple(
+        replace(p, follow=False) if isinstance(p, OrbitSpec) else p
+        for p in spec.patterns
+    )
+    return replace(spec, patterns=patterns)
+
+
+def cerco_corriendo(spec: EnemySpec) -> tuple[float, float]:
+    """10 octágonos y el jugador a toda velocidad en línea recta durante 30 s. Devuelve,
+    desde los 10 s, el menor arco que cubren alrededor del jugador, en grados, y la menor
+    distancia de uno al jugador."""
+    enemies = [Enemy(spec, p) for p in lattice(Vector2(), 10, 90.0)]
+    velocidad = Vector2(BALANCE.player.speed, 0)
+    arco, cerca = 360.0, math.inf
+    for k in range(round(30 / STEP)):
+        jugador = velocidad * (k * STEP)
+        step_swarm(enemies, jugador, velocidad, BALANCE.player.charge, BALANCE.charges)
+        if k * STEP < 10:
+            continue
+        angulos = sorted(
+            math.atan2(e.position.y - jugador.y, e.position.x - jugador.x) % math.tau
+            for e in enemies
+        )
+        huecos = [b - a for a, b in pairwise(angulos)]
+        huecos.append(angulos[0] + math.tau - angulos[-1])
+        arco = min(arco, math.degrees(math.tau - max(huecos)))
+        cerca = min(cerca, min(e.position.distance_to(jugador) for e in enemies))
+    return arco, cerca
+
+
+def test_cerco_aguanta_con_el_jugador_corriendo() -> None:
+    octagono = BALANCE.enemies["octagon"]
+    arco, cerca = cerco_corriendo(octagono)
+    assert arco >= 240
+    assert cerca > BALANCE.player.radius + octagono.radius
+
+
+def test_cerco_no_toca_al_jugador_que_da_media_vuelta() -> None:
+    # Bug: al dar media vuelta, el de adelante se le viene encima a `2·u`. Con un
+    # resorte blando, pasaba de largo, caía en el pozo de la carga del jugador y `follow`
+    # lo llevaba pegado: en la partida, te mataba por esquivar.
+    octagono = BALANCE.enemies["octagon"]
+    u = Vector2(BALANCE.player.speed, 0)
+    enemies = []
+    for k in range(10):
+        enemy = Enemy(octagono, Vector2(200, 0).rotate_rad(math.tau * k / 10))
+        enemy.velocity = Vector2(u)
+        enemies.append(enemy)
+    jugador = Vector2()
+    for paso in range(round(30 / STEP)):
+        velocidad = u if paso * STEP % 4 < 2 else -u
+        jugador += velocidad * STEP
+        step_swarm(enemies, jugador, velocidad, BALANCE.player.charge, BALANCE.charges)
+        assert all(
+            e.position.distance_to(jugador) > BALANCE.player.radius + octagono.radius
+            for e in enemies
+        )
+
+
+def test_sin_follow_el_cerco_se_queda_atras() -> None:
+    # Negativo: con el roce contra el suelo, el resorte radial no arrastra a los de los
+    # costados, y el cerco se aplasta detrás del jugador.
+    arco, _ = cerco_corriendo(sin_follow(BALANCE.enemies["octagon"]))
+    assert arco < 90

@@ -23,6 +23,7 @@ FIXED_DIRECTION = Vector2(1, 0)
 def step_swarm(
     enemies: Sequence[Enemy],
     player_position: Vector2,
+    player_velocity: Vector2,
     player_charge: float,
     charges: ChargesSpec,
 ) -> int:
@@ -46,7 +47,9 @@ def step_swarm(
         neighbors[j].append(alive[i])
     accelerations = [
         enemy.acceleration(
-            Context(player_position, player_charge, charges, neighbors[k])
+            Context(
+                player_position, player_velocity, player_charge, charges, neighbors[k]
+            )
         )
         for k, enemy in enumerate(alive)
     ]
