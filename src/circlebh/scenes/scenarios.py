@@ -21,6 +21,8 @@ class Scenario:
     """Un enemigo más al empezar, como el círculo que persigue al jugador."""
     guest_at: tuple[float, float] = (0.0, 0.0)
     """Dónde nace el invitado, relativo al jugador."""
+    guest_wounded: tuple[int, ...] = ()
+    """Las líneas que se le quitan al invitado al nacer."""
     lethal: bool = True
     """Si el contacto termina la partida."""
     armed: bool = True
@@ -189,6 +191,18 @@ SCENARIOS: dict[str, Scenario] = {
             crowd_spacing=70.0,
             guest="magnet",
             guest_at=(-520.0, 0.0),
+            lethal=False,
+            armed=False,
+        ),
+        Scenario(
+            "regenerador-se-cura",
+            "El jugador quieto, sin armas y sin morir, y un regenerador al que le faltan"
+            " tres líneas: recupera una cada 2 s, cada una con su fundido, hasta quedar"
+            " entero.",
+            pilot=False,
+            guest="regenerator",
+            guest_at=(250.0, 0.0),
+            guest_wounded=(0, 2, 3),
             lethal=False,
             armed=False,
         ),

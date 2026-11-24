@@ -41,4 +41,12 @@ class Telegraph:
     enemy: Enemy
 
 
-type Event = Shot | Hit | Death | Telegraph
+@dataclass(frozen=True)
+class Regrow:
+    """`enemy` recuperó la línea `edge` en este paso."""
+
+    enemy: Enemy
+    edge: int
+
+
+type Event = Shot | Hit | Death | Telegraph | Regrow

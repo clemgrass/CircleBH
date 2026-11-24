@@ -24,6 +24,7 @@ from circlebh.balance import (
     ChargeSpec,
     EnemyBulletSpec,
     EnemySpec,
+    RegenerateSpec,
     SpiralSpec,
     StarPolygonShape,
     VolleySpec,
@@ -31,7 +32,7 @@ from circlebh.balance import (
 from circlebh.world.clock import STEP
 from circlebh.world.collisions import segment_touches_circle
 from circlebh.world.enemy_bullets import EnemyBullet
-from circlebh.world.events import Event, Telegraph
+from circlebh.world.events import Event, Regrow, Telegraph
 from circlebh.world.figures import line_vertices
 from circlebh.world.polygon import vertex
 from circlebh.world.rigid import rotate
@@ -53,6 +54,8 @@ class ActionContext:
     """Las balas enemigas del mundo. Una acción que dispara agrega las suyas aquí."""
     bullet_spec: EnemyBulletSpec
     """Cómo son esas balas."""
+    steps: int = 0
+    """El paso del mundo. Lo guarda la línea que vuelve, para su fundido."""
 
 
 class Action(ABC):
@@ -482,6 +485,41 @@ class Spiral(Action):
         self._velocity = (target - enemy.position) / STEP
 
 
+class Regenerate(Action):
+    """El médico: herido, recupera la línea que le falta de índice menor cada
+    `interval`, una tasa constante de `1/interval` líneas por segundo (decisión 65 de la
+    spec de la 0.2.0).
+
+    La cuenta parte de nuevo con cada golpe y con cada línea recuperada. Sabe que lo
+    golpearon porque le quedan menos líneas que en su paso anterior: no necesita que el
+    arma le avise.
+    """
+
+    def __init__(self, spec: RegenerateSpec) -> None:
+        self.spec = spec
+        self._interval = steps_of(spec.interval)
+        self._left = self._interval
+        """Los pasos que faltan para recuperar una línea, contando el actual."""
+        self._seen: int | None = None
+        """Cuántas líneas tenía al terminar su paso anterior."""
+
+    def update(self, enemy: Enemy, context: ActionContext) -> list[Event]:
+        if not enemy.alive:
+            return []
+        if self._seen is not None and len(enemy.edges) < self._seen:
+            self._left = self._interval
+        events: list[Event] = []
+        self._left = max(0, self._left - 1)
+        if self._left == 0 and enemy.wounded:
+            missing = set(range(enemy.spec.shape.line_count)) - set(enemy.edges)
+            k = min(missing)
+            enemy.restore_edge(k, context.steps)
+            events.append(Regrow(enemy, k))
+            self._left = self._interval
+        self._seen = len(enemy.edges)
+        return events
+
+
 def check_actions(enemies: Mapping[str, EnemySpec]) -> None:
     """Rechaza al crear el mundo una espiral que no se acerca (`decay ≤ 0`), que no
     gira (`angular_speed = 0`), que no cruza (`cross_speed ≤ 0`) o que no carga
@@ -511,6 +549,8 @@ def make_action(spec: ActionSpec) -> Action:
             return Volley(spec)
         case SpiralSpec():
             return Spiral(spec)
+        case RegenerateSpec():
+            return Regenerate(spec)
 
 
 def step_actions(
@@ -519,16 +559,19 @@ def step_actions(
     rng: random.Random,
     bullets: list[EnemyBullet],
     bullet_spec: EnemyBulletSpec,
+    steps: int = 0,
 ) -> list[Event]:
     """Avanza un paso las acciones de todos los enemigos vivos, y devuelve sus eventos.
-    Las balas que disparen quedan en `bullets`.
+    Las balas que disparen quedan en `bullets`, y `steps` es el paso del mundo.
 
     Van en el orden de la lista, que es el de aparición: así, lo que sacan de `rng` es
     siempre lo mismo con la misma semilla.
 
     Los fantasmas no cuentan: los demás los atraviesan, así que no tapan una recta."""
     alive = [enemy for enemy in enemies if enemy.alive and not enemy.spec.phantom]
-    context = ActionContext(Vector2(player_position), alive, rng, bullets, bullet_spec)
+    context = ActionContext(
+        Vector2(player_position), alive, rng, bullets, bullet_spec, steps
+    )
     events: list[Event] = []
     for enemy in alive:
         for action in enemy.actions:

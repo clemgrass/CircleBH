@@ -220,6 +220,22 @@ class SpiralSpec:
 
 
 @dataclass(frozen=True, kw_only=True)
+class RegenerateSpec:
+    """Acción: el médico. Herido, recupera la línea que le falta de índice menor cada
+    `interval`, y un golpe reinicia la cuenta (`world/actions.py`, decisiones 65 a 67
+    de la spec de la 0.2.0)."""
+
+    kind: Literal["regenerate"] = "regenerate"
+
+    interval: float
+    """Su cooldown, en segundos: cuánto espera desde el último golpe o la última línea
+    recuperada."""
+
+    stray: str
+    """El tipo de la línea que suelta al donar, una clave de `enemies`."""
+
+
+@dataclass(frozen=True, kw_only=True)
 class StarPolygonShape:
     """La figura de un enemigo: el polígono estrellado `{n/s}` (`world/figures.py`).
 
@@ -258,7 +274,7 @@ type Shape = StarPolygonShape | CircleShape
 """La figura de un enemigo. En el JSON, su campo `kind` dice cuál es."""
 
 
-type ActionSpec = ChargeSpec | VolleySpec | SpiralSpec
+type ActionSpec = ChargeSpec | VolleySpec | SpiralSpec | RegenerateSpec
 """Una acción: lo que el enemigo hace y no es una fuerza (ADR 0021). En el JSON, su
 campo `kind` dice cuál es."""
 
@@ -481,6 +497,16 @@ class EnemyBulletSpec:
 
 
 @dataclass(frozen=True)
+class RegrowSpec:
+    """Las líneas que vuelven: nunca aparecen de golpe (decisión 66 de la spec de la
+    0.2.0)."""
+
+    fade: float
+    """Cuánto dura el fundido de una línea que vuelve, en segundos, desde el color del
+    fondo hasta el del trazo."""
+
+
+@dataclass(frozen=True)
 class Balance:
     """Todas las entidades del juego."""
 
@@ -510,6 +536,9 @@ class Balance:
 
     enemy_bullet: EnemyBulletSpec
     """Las balas que disparan los enemigos."""
+
+    regrow: RegrowSpec
+    """Cómo vuelven las líneas."""
 
 
 # >>> datos (lo genera poe balance-importar)
@@ -673,6 +702,26 @@ BALANCE = Balance(
             ),
             threat=2.0,
             actions=(),
+        ),
+        "regenerator": EnemySpec(
+            shape=StarPolygonShape(kind="star_polygon", vertices=5, steps=(1,)),
+            radius=22.0,
+            speed=120.0,
+            friction=2.0,
+            spin=0.0,
+            anchored=False,
+            phantom=False,
+            solitary=True,
+            charge_per_line=1.0,
+            mass_per_line=1.0,
+            patterns=(
+                SeekSpec(kind="seek", strength=240.0),
+                CoulombSpec(kind="coulomb"),
+            ),
+            threat=3.0,
+            actions=(
+                RegenerateSpec(kind="regenerate", interval=2.0, stray="stray_line"),
+            ),
         ),
         "star": EnemySpec(
             shape=StarPolygonShape(kind="star_polygon", vertices=5, steps=(1, 2)),
@@ -846,5 +895,6 @@ BALANCE = Balance(
     ),
     point_weapon=PointWeaponSpec(cooldown=0.6, speed=300.0, range=700.0),
     enemy_bullet=EnemyBulletSpec(speed=330.0, radius=4.0),
+    regrow=RegrowSpec(fade=0.4),
 )
 # <<< datos

@@ -273,6 +273,26 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "threat": 2.0,
                 "actions": [],
             },
+            "regenerator": {
+                "shape": {"kind": "star_polygon", "vertices": 5, "steps": [1]},
+                "radius": 22.0,
+                "speed": 120.0,
+                "friction": 2.0,
+                "spin": 0.0,
+                "anchored": False,
+                "phantom": False,
+                "solitary": True,
+                "charge_per_line": 1.0,
+                "mass_per_line": 1.0,
+                "patterns": [
+                    {"kind": "seek", "strength": 240.0},
+                    {"kind": "coulomb"},
+                ],
+                "threat": 3.0,
+                "actions": [
+                    {"kind": "regenerate", "interval": 2.0, "stray": "stray_line"}
+                ],
+            },
             "star": {
                 "shape": {"kind": "star_polygon", "vertices": 5, "steps": [1, 2]},
                 "radius": 40.0,
@@ -352,6 +372,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
         },
         "point_weapon": {"cooldown": 0.6, "speed": 300.0, "range": 700.0},
         "enemy_bullet": {"speed": 330.0, "radius": 4.0},
+        "regrow": {"fade": 0.4},
     }
 
 

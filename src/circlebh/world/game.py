@@ -120,7 +120,12 @@ class World:
             for b in self.enemy_bullets
         )
         self.events += step_actions(
-            self.enemies, self.player.position, self.rng, self.enemy_bullets, bullet
+            self.enemies,
+            self.player.position,
+            self.rng,
+            self.enemy_bullets,
+            bullet,
+            self._steps,
         )
         self.separations += step_swarm(
             self.enemies,

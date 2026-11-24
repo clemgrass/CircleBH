@@ -6,6 +6,7 @@ from pygame.math import Vector2
 from circlebh.balance import CircleShape
 from circlebh.render.palette import Palette
 from circlebh.viewport import Viewport
+from circlebh.world.clock import STEP
 from circlebh.world.figures import local_lines
 from circlebh.world.game import World
 from circlebh.world.weapons import PointWeapon
@@ -64,6 +65,17 @@ def draw_world(
                 enemy.radius * viewport.scale,
                 line_width,
             )
+        elif enemy.restored_at:
+            # Una línea que vuelve no aparece de golpe: se funde desde el fondo
+            # (decisión 66). `lines()` sigue el orden de `edges`.
+            fade = world.balance.regrow.fade
+            for k, line in zip(enemy.edges, enemy.lines(), strict=True):
+                at = enemy.restored_at.get(k)
+                shade = color
+                if at is not None:
+                    age = (world.steps - at) * STEP
+                    shade = palette.background.lerp(color, min(1.0, age / fade))
+                draw_lines(screen, viewport, [line], shade, line_width)
         else:
             draw_lines(screen, viewport, enemy.lines(), color, line_width)
 

@@ -149,6 +149,8 @@ class GameScene:
             ]
         if demo is not None and demo.guest is not None:
             guest = Enemy(BALANCE.enemies[demo.guest], Vector2(demo.guest_at))
+            for k in demo.guest_wounded:
+                guest.remove_edge(k)
             self.world.enemies.append(guest)
         self.dead_steps = 0
         self.section = -1
