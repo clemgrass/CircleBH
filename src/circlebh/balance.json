@@ -191,6 +191,35 @@
       "threat": 1.5,
       "actions": []
     },
+    "magnet": {
+      "shape": {
+        "kind": "star_polygon",
+        "vertices": 6,
+        "steps": [
+          2
+        ]
+      },
+      "radius": 26.0,
+      "speed": 120.0,
+      "friction": 2.0,
+      "spin": 0.0,
+      "anchored": false,
+      "phantom": false,
+      "solitary": true,
+      "charge_per_line": -2.0,
+      "mass_per_line": 1.0,
+      "patterns": [
+        {
+          "kind": "seek",
+          "strength": 240.0
+        },
+        {
+          "kind": "coulomb"
+        }
+      ],
+      "threat": 2.0,
+      "actions": []
+    },
     "star": {
       "shape": {
         "kind": "star_polygon",
@@ -438,6 +467,10 @@
             "weight": 1.0
           },
           {
+            "enemy": "magnet",
+            "weight": 0.5
+          },
+          {
             "enemy": "star",
             "weight": 0.5
           }
@@ -479,6 +512,10 @@
           {
             "enemy": "octagon",
             "weight": 1.0
+          },
+          {
+            "enemy": "magnet",
+            "weight": 0.5
           }
         ],
         "formations": [
