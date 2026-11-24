@@ -30,6 +30,7 @@ SPEC = EnemySpec(
     patterns=(),
     threat=1.0,
     actions=(),
+    split_into="",
 )
 
 coordenadas = st.floats(min_value=-1e4, max_value=1e4)

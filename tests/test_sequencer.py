@@ -44,6 +44,7 @@ QUIETO = EnemySpec(
     patterns=(),
     threat=1.0,
     actions=(),
+    split_into="",
 )
 
 

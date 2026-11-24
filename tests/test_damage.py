@@ -31,6 +31,7 @@ HEXAGON = EnemySpec(
     patterns=(),
     threat=1.0,
     actions=(),
+    split_into="",
 )
 ORIGEN = Vector2(0, 0)
 

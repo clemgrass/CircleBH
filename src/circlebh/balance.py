@@ -364,6 +364,11 @@ class EnemySpec:
     """Sus acciones, como la embestida. Mientras una está activa, puede apagar sus
     patrones."""
 
+    split_into: str
+    """El tipo de enemigo en que se parte al morir, o `""`. Un polígono regular de `n`
+    lados suelta `n − 2`, en los centroides de su triangulación (decisión 71 de la spec
+    de la 0.2.0)."""
+
 
 @dataclass(frozen=True)
 class SpawningSpec:
@@ -598,6 +603,7 @@ BALANCE = Balance(
             ),
             threat=1.0,
             actions=(),
+            split_into="",
         ),
         "square": EnemySpec(
             shape=StarPolygonShape(kind="star_polygon", vertices=4, steps=(1,)),
@@ -616,6 +622,7 @@ BALANCE = Balance(
             ),
             threat=1.0,
             actions=(),
+            split_into="",
         ),
         "triangle": EnemySpec(
             shape=StarPolygonShape(kind="star_polygon", vertices=3, steps=(1,)),
@@ -653,6 +660,7 @@ BALANCE = Balance(
                     lead_angle=0.3,
                 ),
             ),
+            split_into="",
         ),
         "pentagon": EnemySpec(
             shape=StarPolygonShape(kind="star_polygon", vertices=5, steps=(1,)),
@@ -687,6 +695,7 @@ BALANCE = Balance(
                     cooldown=2.5,
                 ),
             ),
+            split_into="",
         ),
         "octagon": EnemySpec(
             shape=StarPolygonShape(kind="star_polygon", vertices=8, steps=(1,)),
@@ -711,6 +720,7 @@ BALANCE = Balance(
             ),
             threat=1.5,
             actions=(),
+            split_into="",
         ),
         "magnet": EnemySpec(
             shape=StarPolygonShape(kind="star_polygon", vertices=6, steps=(2,)),
@@ -729,6 +739,7 @@ BALANCE = Balance(
             ),
             threat=2.0,
             actions=(),
+            split_into="",
         ),
         "regenerator": EnemySpec(
             shape=StarPolygonShape(kind="star_polygon", vertices=7, steps=(3,)),
@@ -755,6 +766,7 @@ BALANCE = Balance(
             actions=(
                 RegenerateSpec(kind="regenerate", interval=2.0, stray="stray_line"),
             ),
+            split_into="",
         ),
         "stray_line": EnemySpec(
             shape=SegmentShape(kind="segment"),
@@ -770,6 +782,7 @@ BALANCE = Balance(
             patterns=(CoulombSpec(kind="coulomb"),),
             threat=0.0,
             actions=(DeliverSpec(kind="deliver", speed=180.0),),
+            split_into="",
         ),
         "star": EnemySpec(
             shape=StarPolygonShape(kind="star_polygon", vertices=5, steps=(1, 2)),
@@ -785,6 +798,7 @@ BALANCE = Balance(
             patterns=(),
             threat=2.0,
             actions=(),
+            split_into="",
         ),
         "red_star": EnemySpec(
             shape=StarPolygonShape(kind="star_polygon", vertices=5, steps=(2,)),
@@ -800,6 +814,7 @@ BALANCE = Balance(
             patterns=(),
             threat=0.0,
             actions=(),
+            split_into="",
         ),
         "circle": EnemySpec(
             shape=CircleShape(kind="circle"),
@@ -824,6 +839,64 @@ BALANCE = Balance(
                     carry_radius=250.0,
                 ),
             ),
+            split_into="",
+        ),
+        "divider": EnemySpec(
+            shape=StarPolygonShape(kind="star_polygon", vertices=7, steps=(1,)),
+            radius=36.0,
+            speed=120.0,
+            friction=2.0,
+            spin=0.0,
+            anchored=False,
+            phantom=False,
+            solitary=False,
+            charge_per_line=1.0,
+            mass_per_line=1.0,
+            patterns=(
+                SeekSpec(kind="seek", strength=240.0),
+                CoulombSpec(kind="coulomb"),
+            ),
+            threat=2.5,
+            actions=(),
+            split_into="shard",
+        ),
+        "shard": EnemySpec(
+            shape=StarPolygonShape(kind="star_polygon", vertices=3, steps=(1,)),
+            radius=7.0,
+            speed=150.0,
+            friction=3.0,
+            spin=0.0,
+            anchored=False,
+            phantom=False,
+            solitary=False,
+            charge_per_line=1.0,
+            mass_per_line=1.0,
+            patterns=(
+                OrbitSpec(
+                    kind="orbit",
+                    radius=280.0,
+                    stiffness=4.0,
+                    tangential=0.0,
+                    follow=False,
+                ),
+                CoulombSpec(kind="coulomb"),
+            ),
+            threat=0.0,
+            actions=(
+                ChargeSpec(
+                    kind="charge",
+                    watch_distance=320.0,
+                    telegraph=0.5,
+                    recoil=14.0,
+                    speed=720.0,
+                    duration=0.8,
+                    cooldown=2.0,
+                    turn_rate=6.0,
+                    lead_chance=0.1,
+                    lead_angle=0.3,
+                ),
+            ),
+            split_into="",
         ),
     },
     spawning=SpawningSpec(
@@ -912,6 +985,7 @@ BALANCE = Balance(
                     DeckEntry(enemy="octagon", weight=1.0),
                     DeckEntry(enemy="magnet", weight=0.5),
                     DeckEntry(enemy="regenerator", weight=0.5),
+                    DeckEntry(enemy="divider", weight=0.5),
                     DeckEntry(enemy="star", weight=0.5),
                 ),
                 formations=("single", "line", "cluster"),
@@ -932,6 +1006,7 @@ BALANCE = Balance(
                     DeckEntry(enemy="octagon", weight=1.0),
                     DeckEntry(enemy="magnet", weight=0.5),
                     DeckEntry(enemy="regenerator", weight=0.5),
+                    DeckEntry(enemy="divider", weight=0.5),
                 ),
                 formations=("ring", "line", "cluster"),
             ),
