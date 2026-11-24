@@ -1,0 +1,815 @@
+<title>Taller de curvas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<!--
+Prototipo desechable de las mejoras de armas (#88 y #89).
+
+No es código del juego: no se mantiene ni se testea. Sirve para ver las fichas de
+`docs/investigaciones/2026-11-24-mejoras.md`: los tres términos (avance, armónico y giro),
+los operadores (d/dt, ∫dt, Cₙ, reflejo y paralela) y las combinaciones por suma de términos.
+El daño es por barrido (decisión A del informe): cada punto de la curva es una bala durante
+un paso. No simula al jugador ni a las balas enemigas, y los números y los precios son de ejemplo.
+Es HTML y no pygame porque `pygame.draw` solo se permite en `render/` (ADR 0016).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Layout: a la izquierda, dos planos cartesianos (ahora y con la tarjeta); a la derecha, la
+     fórmula y la mano de tarjetas. El juego es negro con trazo blanco, y el rojo es solo peligro:
+     aquí, el precio de una tarjeta. */
+  :root {
+    --bg: #000000;
+    --fg: #f4f5f7;
+    --dim: #8b919c;
+    --line: #23262c;
+    --panel: #0b0c0f;
+    --danger: #ff3b30;
+    --font-text: "IBM Plex Sans", system-ui, sans-serif;
+    --font-math: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    color-scheme: dark;
+  }
+  html, body { background: var(--bg); color: var(--fg); }
+  body {
+    font-family: var(--font-text);
+    font-size: 15px;
+    line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 24px 40px;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 20px; }
+  header { display: grid; gap: 6px; }
+  h1 { font-size: 1.6rem; font-weight: 600; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  .lede { color: var(--dim); margin: 0; max-width: 70ch; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tab {
+    font: inherit; font-family: var(--font-math); font-size: 0.9rem;
+    background: transparent; color: var(--dim);
+    border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; cursor: pointer;
+  }
+  .tab[aria-selected="true"] { color: var(--bg); background: var(--fg); border-color: var(--fg); }
+  .tab:focus-visible, .card:focus-visible, .btn:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+  main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 860px) { main { grid-template-columns: minmax(0, 1fr); } }
+  .planes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 520px) { .planes { grid-template-columns: minmax(0, 1fr); } }
+  figure { margin: 0; display: grid; gap: 8px; min-width: 0; }
+  figcaption { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; gap: 8px; }
+  canvas { width: 100%; aspect-ratio: 1; max-width: 100%; display: block; border: 1px solid var(--line); background: var(--bg); }
+  .rhythm { display: grid; grid-template-columns: repeat(16, 1fr); gap: 2px; }
+  .rhythm span { height: 8px; border: 1px solid var(--line); }
+  .rhythm span.on { background: var(--fg); border-color: var(--fg); }
+  .rlabel { font-family: var(--font-math); font-size: 0.75rem; color: var(--dim); }
+  .side { display: grid; gap: 16px; min-width: 0; }
+  .panel { border: 1px solid var(--line); background: var(--panel); padding: 14px; display: grid; gap: 8px; min-width: 0; }
+  .panel h2 { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); margin: 0; font-weight: 500; }
+  .formula { font-family: var(--font-math); font-size: 0.95rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+  .params { font-family: var(--font-math); font-size: 0.8rem; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .hand { display: grid; gap: 8px; }
+  .card {
+    font: inherit; text-align: left; color: var(--fg); background: var(--bg);
+    border: 1px solid var(--line); padding: 10px 12px; cursor: pointer; display: grid; gap: 4px;
+  }
+  .card:hover { border-color: var(--dim); }
+  .card[aria-pressed="true"] { border-color: var(--fg); box-shadow: inset 3px 0 0 var(--fg); }
+  .card .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .card .title { font-weight: 600; }
+  .card .model { font-family: var(--font-math); font-size: 0.75rem; color: var(--dim); }
+  .card .change { font-family: var(--font-math); font-size: 0.85rem; color: var(--dim); overflow-wrap: anywhere; }
+  .price { font-size: 0.8rem; color: var(--danger); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btn {
+    font: inherit; font-size: 0.9rem; cursor: pointer; padding: 6px 14px;
+    color: var(--fg); background: transparent; border: 1px solid var(--line);
+  }
+  .btn.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+  ol.history { margin: 0; padding-left: 1.4em; font-family: var(--font-math); font-size: 0.8rem; color: var(--dim); }
+  .empty { color: var(--dim); font-size: 0.85rem; margin: 0; }
+  footer { color: var(--dim); font-size: 0.8rem; max-width: 80ch; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Taller de curvas</h1>
+    <p class="lede">Elige un arma y una tarjeta. A la izquierda ves el arma como está ahora; a la derecha, cómo queda con la tarjeta. Cada arma suma tres términos: avance, armónico y giro. Las tarjetas cambian un parámetro (M1), le suman un término de otra arma (M2) o le aplican un operador (M3).</p>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="Armas" id="tabs"></div>
+
+  <main>
+    <section class="planes" aria-label="Planos">
+      <figure>
+        <figcaption><span>Ahora</span><span id="nowName"></span></figcaption>
+        <canvas id="cvNow" aria-label="El arma como está ahora"></canvas>
+        <div class="rhythm" id="rNow" aria-hidden="true"></div>
+        <div class="rlabel" id="rNowLabel"></div>
+        <div class="rlabel" id="sNow" aria-live="off"></div>
+      </figure>
+      <figure>
+        <figcaption><span>Con la tarjeta</span><span id="nextName">elige una</span></figcaption>
+        <canvas id="cvNext" aria-label="El arma con la tarjeta elegida"></canvas>
+        <div class="rhythm" id="rNext" aria-hidden="true"></div>
+        <div class="rlabel" id="rNextLabel"></div>
+        <div class="rlabel" id="sNext" aria-live="off"></div>
+      </figure>
+    </section>
+
+    <section class="side">
+      <div class="panel">
+        <h2>Fórmula</h2>
+        <div class="formula" id="formula"></div>
+        <div class="params" id="params"></div>
+      </div>
+      <div class="panel">
+        <h2>Tarjetas que puede recibir</h2>
+        <div class="hand" id="hand"></div>
+        <div class="actions">
+          <button class="btn primary" id="take" disabled>Tomar tarjeta</button>
+          <button class="btn" id="undo" disabled>Deshacer</button>
+          <button class="btn" id="reset">Reiniciar arma</button>
+          <button class="btn" id="pause">Pausar</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Tarjetas tomadas</h2>
+        <ol class="history" id="history"></ol>
+        <p class="empty" id="historyEmpty">Todavía ninguna.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>Prototipo desechable del informe de mejoras. Los enemigos avanzan hacia ti y pierden la línea que les barre tu arma (decisión A); al morir vuelven a aparecer lejos. Los números y los precios son de ejemplo. El ritmo es la propuesta del informe: E(k, 16), con k = disparos por compás × copias, a 124 BPM.</footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // --- Constantes del prototipo ---
+  const TAU = 0.5;            // s: deja en largo lo que sale de d/dt y ∫dt
+  const BAR = 240 / 124;      // s: un compás a 124 BPM (director.bpm)
+  const VIEW = 420;           // unidades del plano desde el centro hasta el borde
+  const AIM = Math.PI / 6;    // ángulo al enemigo más cercano (el hexágono)
+  const PAR = 14;             // la distancia de la paralela
+
+  // Enemigos que avanzan hacia el jugador y pierden líneas. Al morir o llegar, vuelven a
+  // aparecer lejos, en un ángulo que no depende del azar: los dos planos ven lo mismo.
+  const SPAWNS = [
+    { n: 6, ang: AIM, d: 260 }, { n: 4, ang: 2.5, d: 250 }, { n: 3, ang: 4.2, d: 270 },
+    { n: 5, ang: 5.6, d: 300 }, { n: 8, ang: 1.2, d: 330 }, { n: 6, ang: 3.3, d: 345 },
+  ];
+  const ENEMY_SPEED = 28;
+  const SPAWN_FAR = 400;
+
+  function makeEnemies() {
+    return SPAWNS.map((s, id) => ({
+      id, gen: 0, n: s.n, r: 14 + s.n * 1.5, baseAng: s.ang, rot: s.ang,
+      x: s.d * Math.cos(s.ang), y: s.d * Math.sin(s.ang), px: 0, py: 0,
+      edges: new Set([...Array(s.n).keys()]),
+    })).map((e) => { e.px = e.x; e.py = e.y; return e; });
+  }
+
+  function respawn(e) {
+    e.gen += 1;
+    const ang = e.baseAng + 0.9 * e.gen;
+    e.x = e.px = SPAWN_FAR * Math.cos(ang);
+    e.y = e.py = SPAWN_FAR * Math.sin(ang);
+    e.rot = ang;
+    e.edges = new Set([...Array(e.n).keys()]);
+  }
+
+  function vertex(e, i) {
+    const a = e.rot + (2 * Math.PI * i) / e.n;
+    return [e.r * Math.cos(a), e.r * Math.sin(a)];
+  }
+
+  // El cruce de dos tramos: la fracción t del primero, o null.
+  function segT(ax, ay, bx, by, cx, cy, dx, dy) {
+    const rx = bx - ax, ry = by - ay, sx = dx - cx, sy = dy - cy;
+    const den = rx * sy - ry * sx;
+    if (Math.abs(den) < 1e-12) return null;
+    const qx = cx - ax, qy = cy - ay;
+    const t = (qx * sy - qy * sx) / den, u = (qx * ry - qy * rx) / den;
+    return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? t : null;
+  }
+
+  function nearSeg(ax, ay, bx, by, r) {
+    const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+    const t = L2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2)) : 0;
+    const x = ax + t * dx, y = ay + t * dy;
+    return x * x + y * y <= r * r;
+  }
+
+  // Como `Enemy.hit_by`: el tramo de un punto en el último paso, medido en el marco del
+  // enemigo (antes con su posición de antes, ahora con la de ahora). La primera línea viva.
+  function hitBy(e, p0, p1) {
+    const ax = p0[0] - e.px, ay = p0[1] - e.py, bx = p1[0] - e.x, by = p1[1] - e.y;
+    if (!nearSeg(ax, ay, bx, by, e.r + 1)) return null;
+    let best = null;
+    for (const k of e.edges) {
+      const [cx, cy] = vertex(e, k), [dx, dy] = vertex(e, (k + 1) % e.n);
+      const t = segT(ax, ay, bx, by, cx, cy, dx, dy);
+      if (t !== null && (!best || t < best.t)) best = { t, k };
+    }
+    return best;
+  }
+
+  // Quita la línea k y, si quedan golpes, las vecinas vivas.
+  function removeEdges(e, k, count) {
+    let removed = 0;
+    const order = [k];
+    for (let d = 1; d < e.n; d++) order.push((k + d) % e.n, (k - d + e.n) % e.n);
+    for (const j of order) {
+      if (removed >= count) break;
+      if (e.edges.delete(j)) removed += 1;
+    }
+    return removed;
+  }
+
+  // --- Las seis armas: tipo, marco y sus términos (ficha del informe) ---
+  const BASE = {
+    punto:   { name: "Punto",   kind: "proj",  frame: "cart",  dir: "aim",     adv: { c: 300, deg: 1 }, harm: [], spin: 0,   cooldown: 0.6, range: 380 },
+    recta:   { name: "Recta",   kind: "trace", frame: "cart",  dir: "heading", adv: { c: 900, deg: 1 }, harm: [], spin: 0,   cooldown: 1.2, L: 360, duration: 0.5 },
+    seno:    { name: "Seno",    kind: "proj",  frame: "cart",  dir: "heading", adv: { c: 220, deg: 1 }, harm: [{ A: 40, k: 8 }], spin: 0, cooldown: 0.7, range: 380 },
+    circulo: { name: "Círculo", kind: "trace", frame: "polar", dir: "heading", adv: { c: 200, deg: 1 }, harm: [], spin: 0,   cooldown: 1.6, R: 320, duration: 1.2 },
+    espiral: { name: "Espiral", kind: "proj",  frame: "polar", dir: "heading", adv: { c: 120, deg: 1 }, harm: [], spin: 3,   cooldown: 0.25, range: 380 },
+    rosa:    { name: "Rosa",    kind: "trace", frame: "polar", dir: "heading", adv: null,               harm: [{ A: 150, k: 3 }], spin: 0.8, cooldown: 2.0, R: 340, duration: 1.2 },
+  };
+  for (const w of Object.values(BASE)) {
+    w.ops = { deriv: 0, n: 1, mirror: false, par: 0 };
+    w.payload = { size: 0, lines: 1, pierce: 0 };
+  }
+
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  const fmt = (x) => Number(x).toLocaleString("es-CL", { maximumFractionDigits: 2 });
+
+  // --- Evaluación de los términos ---
+  function advVal(adv, a) {
+    if (!adv) return 0;
+    if (adv.deg === 0) return adv.c * TAU;
+    if (adv.deg === 1) return adv.c * a;
+    return (adv.c * a * a) / (2 * TAU);
+  }
+
+  // Las copias, en el orden fijo: paralela, después Cₙ, después reflejo.
+  function variants(w) {
+    const out = [];
+    const offs = w.ops.par ? [-w.ops.par, w.ops.par] : [0];
+    const mirrors = w.ops.mirror ? [false, true] : [false];
+    for (let j = 0; j < w.ops.n; j++)
+      for (const off of offs)
+        for (const m of mirrors) out.push({ off, mirror: m, rot: (2 * Math.PI * j) / w.ops.n });
+    return out;
+  }
+
+  // El jugador gira despacio, como si se moviera en círculos: así las armas que salen hacia
+  // donde se mueve cubren todo el plano, como en una partida.
+  const HEAD_SPEED = 0.35;
+  const heading = (t) => HEAD_SPEED * t;
+
+  // La dirección con que nace cada disparo o pulso: el punto apunta al enemigo más cercano;
+  // las demás, hacia donde se mueve el jugador.
+  function spawnAngle(sim) {
+    if (sim.w.dir !== "aim") return heading(sim.t);
+    let best = null;
+    for (const e of sim.enemies) {
+      const d = e.x * e.x + e.y * e.y;
+      if (e.edges.size && d > 0 && (!best || d < best.d)) best = { d, e };
+    }
+    return best ? Math.atan2(best.e.y, best.e.x) : heading(sim.t);
+  }
+
+  function toWorld(w, v, x, y, base) {
+    if (v.mirror) y = -y;
+    const ang = base + v.rot;
+    const c = Math.cos(ang), s = Math.sin(ang);
+    return [x * c - y * s, x * s + y * c];
+  }
+
+  // Proyectil: dónde va a la edad `a`, en el marco del arma.
+  function projLocal(w, a, off) {
+    const s = advVal(w.adv, a);
+    let h = 0;
+    for (const hm of w.harm) h += hm.A * Math.sin(hm.k * a);
+    if (w.frame === "cart") {
+      let x = s, y = h + off;
+      if (w.spin) {
+        const c = Math.cos(w.spin * a), sn = Math.sin(w.spin * a);
+        [x, y] = [x * c - y * sn, x * sn + y * c];
+      }
+      return [x, y];
+    }
+    const r = s + h + off, th = w.spin * a;
+    return [r * Math.cos(th), r * Math.sin(th)];
+  }
+
+  function projAlive(w, a) {
+    if (w.adv && w.adv.deg > 0) return Math.abs(advVal(w.adv, a)) <= w.range && a < 8;
+    return a < 2.4; // sin avance que crezca: una mina o un satélite que dura un rato
+  }
+
+  function traceAlive(w, a) {
+    if (w.frame === "cart") return a < w.duration;
+    if (!w.adv) return true;                       // la rosa sola: orbita siempre
+    if (w.adv.deg === 0) return a < Math.max(w.duration, w.cooldown); // escudo fijo, sin parpadeo
+    return advVal(w.adv, a) <= w.R;                 // revienta en R
+  }
+
+  // Trazo: la curva entera en el instante `T` (global) y la edad `a` del pulso.
+  function traceLocal(w, a, T, off, coarse) {
+    const pts = [];
+    if (w.frame === "polar") {
+      const base = advVal(w.adv, a), N = coarse ? 120 : 360;
+      for (let i = 0; i <= N; i++) {
+        const th = (2 * Math.PI * i) / N;
+        let rho = base + off;
+        for (const hm of w.harm) rho += hm.A * Math.cos(hm.k * (th - w.spin * T));
+        pts.push([rho * Math.cos(th), rho * Math.sin(th)]);
+      }
+      return pts;
+    }
+    const len = Math.min(advVal(w.adv, a), w.L), N = coarse ? 60 : 120;
+    const c = Math.cos(w.spin * T), sn = Math.sin(w.spin * T);
+    for (let i = 0; i <= N; i++) {
+      const s = (len * i) / N;
+      let y = off;
+      for (const hm of w.harm) y += hm.A * Math.sin((2 * Math.PI * hm.k * s) / w.L);
+      pts.push(w.spin ? [s * c - y * sn, s * sn + y * c] : [s, y]);
+    }
+    return pts;
+  }
+
+  // --- Lo que tiene efecto (las celdas "sin efecto" no se ofrecen) ---
+  const rotSymmetric = (w) => w.frame === "polar" && w.kind === "trace" && w.harm.length === 0;
+  const mirrorSymmetric = (w) => w.harm.length === 0 && !w.spin;
+
+  // --- La mano de tarjetas de un arma ---
+  function cardsFor(w) {
+    const cards = [];
+    const add = (model, title, change, price, apply) => cards.push({ model, title, change, price, apply });
+    const isProj = w.kind === "proj";
+
+    // M1: perillas de la trayectoria
+    if (w.adv) add("M1", "v sube", `v: ${fmt(w.adv.c)} → ${fmt(w.adv.c * 1.25)}`, null, (x) => { x.adv.c *= 1.25; });
+    if (w.adv || isProj) add("M1", "cooldown baja", `cooldown: ${fmt(w.cooldown)} s → ${fmt(w.cooldown * 0.8)} s`, null, (x) => { x.cooldown *= 0.8; });
+    w.harm.forEach((hm, i) => {
+      const sub = i ? "₂" : "";
+      add("M1", `A${sub} sube`, `A${sub}: ${fmt(hm.A)} → ${fmt(hm.A * 1.4)}`, null, (x) => { x.harm[i].A *= 1.4; });
+      if (isProj) add("M1", `ω${sub} sube`, `ω${sub}: ${fmt(hm.k)} → ${fmt(hm.k * 1.4)}`, null, (x) => { x.harm[i].k *= 1.4; });
+      else add("M1", `k${sub} sube`, `k${sub}: ${fmt(hm.k)} → ${fmt(hm.k + 1)}`, null, (x) => { x.harm[i].k += 1; });
+    });
+    if (w.spin) add("M1", "Ω sube", `Ω: ${fmt(w.spin)} → ${fmt(w.spin * 1.5)}`, null, (x) => { x.spin *= 1.5; });
+    if (w.R && w.adv) add("M1", "R sube", `revienta en R: ${fmt(w.R)} → ${fmt(w.R * 1.2)}`, null, (x) => { x.R *= 1.2; });
+    if (w.L) add("M1", "L sube", `largo L: ${fmt(w.L)} → ${fmt(w.L * 1.2)}`, null, (x) => { x.L *= 1.2; });
+
+    // M1: perillas de lo que viaja
+    if (!isProj) add("M1", "Una línea más por pasada", `líneas por pasada: ${w.payload.lines} → ${w.payload.lines + 1}`, null, (x) => { x.payload.lines += 1; });
+    if (isProj) {
+      add("M1", "Bala más grande", `tamaño: ${w.payload.size} → ${w.payload.size + 3}`, null, (x) => { x.payload.size += 3; });
+      add("M1", "Quita una línea más", `líneas por golpe: ${w.payload.lines} → ${w.payload.lines + 1}`, null, (x) => { x.payload.lines += 1; });
+      add("M1", "Atraviesa", `atraviesa: ${w.payload.pierce} → ${w.payload.pierce + 1}`, null, (x) => { x.payload.pierce += 1; });
+    }
+
+    // M3: operadores
+    if (w.adv && w.adv.deg >= 1) {
+      const to = w.adv.deg === 2 ? "v·t" : "v·τ";
+      const from = w.adv.deg === 2 ? "v·t²/2τ" : "v·t";
+      add("M3", "d/dt", `avance: ${from} → ${to}`, "Contra: pierde alcance", (x) => { x.adv.deg -= 1; x.ops.deriv -= 1; });
+    }
+    if (w.adv && w.adv.deg <= 1) {
+      const to = w.adv.deg === 0 ? "v·t" : "v·t²/2τ";
+      const from = w.adv.deg === 0 ? "v·τ" : "v·t";
+      add("M3", "∫dt", `avance: ${from} → ${to}`, "Contra: lento al salir", (x) => { x.adv.deg += 1; x.ops.deriv += 1; });
+    }
+    if (!rotSymmetric(w)) add("M3", `C${sub(w.ops.n + 1)}`, `copias: ${w.ops.n} → ${w.ops.n + 1}, cada ${fmt(360 / (w.ops.n + 1))}°`, "Presupuesto × 1,2", (x) => { x.ops.n += 1; });
+    if (!w.ops.mirror && !mirrorSymmetric(w)) add("M3", "Reflejo", "una copia espejada respecto de û", "Presupuesto × 1,1", (x) => { x.ops.mirror = true; });
+    if (!w.ops.par) add("M3", "Paralela", `dos copias a ±${PAR}`, null, (x) => { x.ops.par = PAR; });
+
+    // M2: sumar un término de otra arma
+    if (w.harm.length < 2) {
+      let term, title;
+      if (w.harm.length === 1) {
+        term = isProj ? { A: 15, k: w.harm[0].k * 3 } : { A: Math.max(20, w.harm[0].A * 0.4), k: w.harm[0].k * 2 + 1 };
+        title = "+ segundo armónico";
+      } else if (isProj) {
+        term = w.frame === "cart" ? { A: 30, k: 10 } : { A: 25, k: 12 };
+        title = "+ armónico del seno";
+      } else {
+        term = w.frame === "cart" ? { A: 20, k: 3 } : { A: 18, k: 5 };
+        title = "+ armónico de la rosa";
+      }
+      const what = isProj ? `A·sin(ω·t), A = ${fmt(term.A)}, ω = ${fmt(term.k)}` : `A·sin(k·u), A = ${fmt(term.A)}, k = ${fmt(term.k)}`;
+      add("M2", title, `suma ${what}`, "Presupuesto × 1,15", (x) => { x.harm.push(term); });
+    }
+    const spinGivesSpiral = w.kind === "proj" && w.frame === "cart" && w.harm.length === 0;
+    if (!w.spin && !spinGivesSpiral && !rotSymmetric(w)) {
+      const om = w.kind === "trace" && w.frame === "cart" ? 1.2 : 2;
+      add("M2", "+ giro de la espiral", `suma Ω·t, Ω = ${fmt(om)}`, "Presupuesto × 1,15", (x) => {
+        x.spin = om;
+        if (x.kind === "trace" && x.frame === "cart") x.duration = 2.2; // el faro necesita tiempo para barrer
+      });
+    }
+    if (!w.adv) add("M2", "+ avance del círculo", "suma v·t, v = 90", "Presupuesto × 1,15", (x) => { x.adv = { c: 90, deg: 1 }; });
+    return cards;
+  }
+
+  function sub(n) { return String(n).split("").map((d) => "₀₁₂₃₄₅₆₇₈₉"[+d]).join(""); }
+
+  // --- La fórmula, escrita desde los términos ---
+  function formula(w) {
+    const advS = !w.adv ? "" : ["v·τ", "v·t", "v·t²/2τ"][w.adv.deg];
+    const subs = ["", "₂"];
+    let lines = [];
+    if (w.kind === "proj") {
+      const h = w.harm.map((hm, i) => `A${subs[i]}·sin(ω${subs[i]}t)`).join(" + ");
+      if (w.frame === "cart") {
+        if (w.spin) lines.push(`p(t) = p₀ + R(Ωt)·[${advS}·û${h ? ` + (${h})·n̂` : ""}]`);
+        else lines.push(`p(t) = p₀ + ${advS}·û${h ? ` + (${h})·n̂` : ""}`);
+      } else {
+        lines.push(`p(t) = p₀ + (${[advS, h].filter(Boolean).join(" + ")})·e^{i(θ₀ + Ωt)}`);
+      }
+    } else if (w.frame === "cart") {
+      const h = w.harm.map((hm, i) => `A${subs[i]}·sin(2πk${subs[i]}·s/L)`).join(" + ");
+      lines.push(`{ p₀ + s·û${w.spin ? "(t)" : ""}${h ? " + h(s)·n̂" : ""} : 0 ≤ s ≤ min(${advS}, L) }`);
+      if (h) lines.push(`h(s) = ${h}`);
+      if (w.spin) lines.push("û(t) = R(Ωt)·û₀");
+    } else {
+      const ang = w.spin ? "(θ − Ωt)" : "θ";
+      const h = w.harm.map((hm, i) => `A${subs[i]}·cos(k${subs[i]}${ang})`).join(" + ");
+      lines.push(`ρ(θ, t) = ${[advS, h].filter(Boolean).join(" + ")}`);
+    }
+    const ops = [];
+    if (w.ops.par) ops.push(`paralela ±${w.ops.par}`);
+    if (w.ops.n > 1) ops.push(`C${sub(w.ops.n)}`);
+    if (w.ops.mirror) ops.push("reflejo");
+    if (ops.length) lines.push(`operadores: ${ops.join(" → ")}`);
+    return lines.join("\n");
+  }
+
+  function params(w) {
+    const p = [];
+    if (w.adv) p.push(`v = ${fmt(w.adv.c)}`);
+    w.harm.forEach((hm, i) => p.push(`A${i ? "₂" : ""} = ${fmt(hm.A)}`, `${w.kind === "proj" ? "ω" : "k"}${i ? "₂" : ""} = ${fmt(hm.k)}`));
+    if (w.spin) p.push(`Ω = ${fmt(w.spin)}`);
+    if (w.adv && (w.kind === "proj" || w.R || w.L)) p.push(`cooldown = ${fmt(w.cooldown)} s`);
+    if (w.kind === "proj") p.push(`alcance = ${fmt(w.range)}`, `tamaño = ${w.payload.size}`, `líneas por golpe = ${w.payload.lines}`, `atraviesa = ${w.payload.pierce}`);
+    if (w.R && w.adv) p.push(`R = ${fmt(w.R)}`);
+    if (w.L) p.push(`L = ${fmt(w.L)}`);
+    p.push(`τ = ${TAU} s`);
+    return p.join(" · ");
+  }
+
+  // --- Ritmo: E(k, 16) ---
+  function rhythmK(w) {
+    if (!w.adv && w.kind === "trace") {
+      const k = Math.round(w.harm[0].k);
+      return Math.min(16, (k % 2 ? k : 2 * k) * w.ops.n);
+    }
+    return Math.max(1, Math.min(16, Math.round(BAR / w.cooldown) * w.ops.n));
+  }
+  function renderRhythm(el, label, w) {
+    const k = rhythmK(w);
+    el.innerHTML = "";
+    for (let i = 0; i < 16; i++) {
+      const s = document.createElement("span");
+      if ((i * k) % 16 < k) s.className = "on";
+      el.appendChild(s);
+    }
+    label.textContent = `E(${k}, 16)`;
+  }
+
+  // --- Simulación y dibujo ---
+  function makeSim(w) { return { w, t: 0, timer: 0, ents: [], enemies: makeEnemies(), lines: 0, kills: 0 }; }
+
+  function moveEnemies(sim, dt) {
+    for (const e of sim.enemies) {
+      e.px = e.x; e.py = e.y;
+      const d = Math.hypot(e.x, e.y);
+      if (d < 26) { respawn(e); continue; }
+      e.x -= (e.x / d) * ENEMY_SPEED * dt;
+      e.y -= (e.y / d) * ENEMY_SPEED * dt;
+    }
+  }
+
+  function strikeProjectiles(sim, dt) {
+    const w = sim.w, vars = variants(w);
+    for (const ent of sim.ents) {
+      ent.dead ??= new Set();
+      ent.pierced ??= {};
+      const a1 = sim.t - ent.born, a0 = Math.max(0, a1 - dt);
+      vars.forEach((v, vi) => {
+        if (ent.dead.has(vi)) return;
+        const p0 = toWorld(w, v, ...projLocal(w, a0, v.off), ent.ang);
+        const p1 = toWorld(w, v, ...projLocal(w, a1, v.off), ent.ang);
+        let best = null;
+        for (const e of sim.enemies) {
+          if (ent.hitGen?.[`${vi}:${e.id}`] === e.gen) continue; // ya lo atravesó
+          const h = hitBy(e, p0, p1);
+          if (h && (!best || h.t < best.h.t)) best = { e, h };
+        }
+        if (!best) return;
+        sim.lines += removeEdges(best.e, best.h.k, w.payload.lines);
+        ent.hitGen ??= {};
+        ent.hitGen[`${vi}:${best.e.id}`] = best.e.gen;
+        ent.pierced[vi] = (ent.pierced[vi] ?? 0) + 1;
+        if (ent.pierced[vi] > w.payload.pierce) ent.dead.add(vi);
+      });
+    }
+    sim.ents = sim.ents.filter((ent) => !ent.dead || ent.dead.size < vars.length);
+  }
+
+  // Barrido: cada punto de la curva es una bala durante este paso. Una pasada dura mientras
+  // la curva toca al enemigo, y quita a lo más `lines` líneas.
+  function strikeTraces(sim, dt) {
+    const w = sim.w, vars = variants(w);
+    for (const ent of sim.ents) {
+      ent.pass ??= {};
+      const a1 = sim.t - ent.born, a0 = Math.max(0, a1 - dt);
+      vars.forEach((v, vi) => {
+        const pts0 = traceLocal(w, a0, sim.t - dt, v.off, true).map(([x, y]) => toWorld(w, v, x, y, ent.ang));
+        const pts1 = traceLocal(w, a1, sim.t, v.off, true).map(([x, y]) => toWorld(w, v, x, y, ent.ang));
+        for (const e of sim.enemies) {
+          const key = `${vi}:${e.id}:${e.gen}`;
+          const touching = pts1.some(([x, y]) => (x - e.x) ** 2 + (y - e.y) ** 2 <= (e.r + 2) ** 2);
+          const hits = [];
+          for (let i = 0; i < pts1.length; i++) {
+            const h = hitBy(e, pts0[i], pts1[i]);
+            if (h) hits.push(h);
+          }
+          if (!touching && !hits.length) { delete ent.pass[key]; continue; }
+          hits.sort((p, q) => p.t - q.t);
+          for (const h of hits) {
+            const used = ent.pass[key] ?? 0;
+            if (used >= w.payload.lines) break;
+            if (e.edges.delete(h.k)) { ent.pass[key] = used + 1; sim.lines += 1; }
+          }
+        }
+      });
+    }
+  }
+
+  function stepSim(sim, dt) {
+    const w = sim.w;
+    sim.t += dt;
+    sim.timer -= dt;
+    moveEnemies(sim, dt);
+    const once = w.kind === "trace" && !w.adv;
+    if (once) {
+      if (!sim.ents.length) sim.ents.push({ born: sim.t, ang: 0 });
+    } else if (sim.timer <= 0) {
+      sim.ents.push({ born: sim.t, ang: w.frame === "polar" && w.kind === "trace" ? 0 : spawnAngle(sim) });
+      sim.timer = w.cooldown;
+    }
+    if (w.kind === "proj") strikeProjectiles(sim, dt);
+    else strikeTraces(sim, dt);
+    for (const e of sim.enemies) {
+      if (!e.edges.size) { sim.kills += 1; respawn(e); }
+    }
+    sim.ents = sim.ents.filter((e) => {
+      const a = sim.t - e.born;
+      return w.kind === "proj" ? projAlive(w, a) : traceAlive(w, a);
+    });
+  }
+
+  function setupCanvas(cv) {
+    const dpr = window.devicePixelRatio || 1;
+    const size = cv.clientWidth;
+    if (cv.width !== Math.round(size * dpr)) { cv.width = Math.round(size * dpr); cv.height = Math.round(size * dpr); }
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, size };
+  }
+
+  function drawSim(cv, sim) {
+    const { ctx, size } = setupCanvas(cv);
+    const k = size / (2 * VIEW);
+    const X = (x) => size / 2 + x * k;
+    const Y = (y) => size / 2 - y * k; // Y hacia arriba, como en world/
+    const css = getComputedStyle(document.documentElement);
+    const fg = css.getPropertyValue("--fg").trim();
+    const line = css.getPropertyValue("--line").trim();
+    const dim = css.getPropertyValue("--dim").trim();
+
+    ctx.fillStyle = css.getPropertyValue("--bg").trim();
+    ctx.fillRect(0, 0, size, size);
+    // La cuadrícula suave y los ejes
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = line;
+    ctx.beginPath();
+    for (let g = -400; g <= 400; g += 50) {
+      ctx.moveTo(X(g), 0); ctx.lineTo(X(g), size);
+      ctx.moveTo(0, Y(g)); ctx.lineTo(size, Y(g));
+    }
+    ctx.stroke();
+    ctx.strokeStyle = dim;
+    ctx.beginPath();
+    ctx.moveTo(X(0), 0); ctx.lineTo(X(0), size);
+    ctx.moveTo(0, Y(0)); ctx.lineTo(size, Y(0));
+    ctx.stroke();
+
+    // Los enemigos: solo sus líneas vivas
+    ctx.strokeStyle = fg;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (const e of sim.enemies) {
+      for (const kk of e.edges) {
+        const [ax, ay] = vertex(e, kk), [bx, by] = vertex(e, (kk + 1) % e.n);
+        ctx.moveTo(X(e.x + ax), Y(e.y + ay));
+        ctx.lineTo(X(e.x + bx), Y(e.y + by));
+      }
+    }
+    ctx.stroke();
+
+    // El jugador: un círculo con un punto hacia donde mira
+    ctx.strokeStyle = fg;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(X(0), Y(0), 12 * k, 0, 2 * Math.PI); ctx.stroke();
+    ctx.fillStyle = fg;
+    const hd = heading(sim.t);
+    ctx.beginPath(); ctx.arc(X(8 * Math.cos(hd)), Y(8 * Math.sin(hd)), 2 * k + 1, 0, 2 * Math.PI); ctx.fill();
+
+    const w = sim.w;
+    const vars = variants(w);
+    if (w.kind === "proj") {
+      const rad = (2.5 + w.payload.size) * k + 1;
+      for (const e of sim.ents) {
+        const a = sim.t - e.born;
+        for (const v of vars) {
+          // la estela: se ve, pero no daña
+          ctx.strokeStyle = dim;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          for (let i = 0; i <= 10; i++) {
+            const ai = Math.max(0, a - 0.25 + (0.25 * i) / 10);
+            const [lx, ly] = projLocal(w, ai, v.off);
+            const [wx, wy] = toWorld(w, v, lx, ly, e.ang);
+            i ? ctx.lineTo(X(wx), Y(wy)) : ctx.moveTo(X(wx), Y(wy));
+          }
+          ctx.stroke();
+          const [lx, ly] = projLocal(w, a, v.off);
+          const [wx, wy] = toWorld(w, v, lx, ly, e.ang);
+          ctx.fillStyle = fg;
+          ctx.beginPath(); ctx.arc(X(wx), Y(wy), rad, 0, 2 * Math.PI); ctx.fill();
+        }
+      }
+    } else {
+      ctx.strokeStyle = fg;
+      ctx.lineWidth = 2;
+      for (const e of sim.ents) {
+        const a = sim.t - e.born;
+        for (const v of vars) {
+          const pts = traceLocal(w, a, sim.t, v.off);
+          ctx.beginPath();
+          pts.forEach(([lx, ly], i) => {
+            const [wx, wy] = toWorld(w, v, lx, ly, e.ang);
+            i ? ctx.lineTo(X(wx), Y(wy)) : ctx.moveTo(X(wx), Y(wy));
+          });
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  // --- Estado de la página ---
+  const state = {};
+  for (const [id, w] of Object.entries(BASE)) state[id] = { spec: clone(w), past: [], taken: [] };
+  let current = "punto";
+  let selected = -1;
+  let hand = [];
+  let simNow, simNext;
+  let paused = false;
+
+  const $ = (id) => document.getElementById(id);
+
+  function renderTabs() {
+    const tabs = $("tabs");
+    tabs.innerHTML = "";
+    for (const [id, w] of Object.entries(BASE)) {
+      const b = document.createElement("button");
+      b.className = "tab";
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", String(id === current));
+      b.textContent = w.name;
+      b.addEventListener("click", () => { current = id; selected = -1; refresh(); });
+      tabs.appendChild(b);
+    }
+  }
+
+  function preview() {
+    const s = state[current].spec;
+    if (selected < 0) return s;
+    const x = clone(s);
+    hand[selected].apply(x);
+    return x;
+  }
+
+  function refresh() {
+    const st = state[current];
+    hand = cardsFor(st.spec);
+    renderTabs();
+    $("nowName").textContent = st.spec.name;
+    $("formula").textContent = formula(st.spec);
+    $("params").textContent = params(st.spec);
+
+    const handEl = $("hand");
+    handEl.innerHTML = "";
+    hand.forEach((c, i) => {
+      const b = document.createElement("button");
+      b.className = "card";
+      b.setAttribute("aria-pressed", String(i === selected));
+      b.innerHTML = `<span class="top"><span class="title"></span><span class="model"></span></span><span class="change"></span>`;
+      b.querySelector(".title").textContent = c.title;
+      b.querySelector(".model").textContent = c.model;
+      b.querySelector(".change").textContent = c.change;
+      if (c.price) {
+        const p = document.createElement("span");
+        p.className = "price";
+        p.textContent = `Precio: ${c.price}`;
+        b.appendChild(p);
+      }
+      b.addEventListener("click", () => { selected = selected === i ? -1 : i; refresh(); });
+      handEl.appendChild(b);
+    });
+
+    const next = preview();
+    $("nextName").textContent = selected < 0 ? "elige una" : hand[selected].title;
+    $("take").disabled = selected < 0;
+    $("undo").disabled = st.past.length === 0;
+
+    const hist = $("history");
+    hist.innerHTML = "";
+    for (const t of st.taken) {
+      const li = document.createElement("li");
+      li.textContent = t;
+      hist.appendChild(li);
+    }
+    $("historyEmpty").hidden = st.taken.length > 0;
+
+    renderRhythm($("rNow"), $("rNowLabel"), st.spec);
+    renderRhythm($("rNext"), $("rNextLabel"), next);
+
+    simNow = makeSim(st.spec);
+    simNext = makeSim(next);
+  }
+
+  $("take").addEventListener("click", () => {
+    if (selected < 0) return;
+    const st = state[current];
+    st.past.push(clone(st.spec));
+    const card = hand[selected];
+    const x = clone(st.spec);
+    card.apply(x);
+    st.spec = x;
+    st.taken.push(`${card.title} (${card.model}): ${card.change}${card.price ? ` · ${card.price}` : ""}`);
+    selected = -1;
+    refresh();
+  });
+  $("undo").addEventListener("click", () => {
+    const st = state[current];
+    if (!st.past.length) return;
+    st.spec = st.past.pop();
+    st.taken.pop();
+    selected = -1;
+    refresh();
+  });
+  $("reset").addEventListener("click", () => {
+    state[current] = { spec: clone(BASE[current]), past: [], taken: [] };
+    selected = -1;
+    refresh();
+  });
+  $("pause").addEventListener("click", () => {
+    paused = !paused;
+    $("pause").textContent = paused ? "Seguir" : "Pausar";
+  });
+
+  function stats(sim) {
+    const rate = sim.t > 0 ? sim.lines / sim.t : 0;
+    return `${fmt(rate)} líneas/s · ${sim.kills} destruidos`;
+  }
+
+  // Paso fijo de 1/60 s con acumulador, como el juego (ADR 0005).
+  const STEP = 1 / 60;
+  let last = performance.now(), acc = 0;
+  function frame(now) {
+    acc += Math.min(0.25, (now - last) / 1000);
+    last = now;
+    if (!paused) {
+      while (acc >= STEP) { stepSim(simNow, STEP); stepSim(simNext, STEP); acc -= STEP; }
+    } else acc = 0;
+    drawSim($("cvNow"), simNow);
+    drawSim($("cvNext"), simNext);
+    $("sNow").textContent = stats(simNow);
+    $("sNext").textContent = stats(simNext);
+    requestAnimationFrame(frame);
+  }
+
+  refresh();
+  // Que la primera vista ya muestre una tarjeta: C₃ no, la primera de operadores (C₂).
+  selected = hand.findIndex((c) => c.model === "M3" && c.title.startsWith("C"));
+  refresh();
+  // Calienta la simulación para que el primer cuadro ya tenga balas en vuelo.
+  for (let i = 0; i < 120; i++) { stepSim(simNow, STEP); stepSim(simNext, STEP); }
+  requestAnimationFrame(frame);
+})();
+</script>
