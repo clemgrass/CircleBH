@@ -1,4 +1,5 @@
-"""La pantalla de muerte: un efecto corto al tocarte y, después, la semilla y el tiempo.
+"""La pantalla de muerte: un efecto corto al tocarte y, después, la semilla y el tiempo,
+con el del modo infinito si llegaste.
 
 El efecto es solo visual: `world` ya se detuvo. Desde el jugador sale un anillo que
 crece y se desvanece mientras la escena se oscurece. Al terminar, aparece el texto.
@@ -48,13 +49,15 @@ class DeathScreen:
         dead_steps: int,
         seed: int,
         elapsed: float,
+        endless: float,
         *,
         show_hint: bool,
     ) -> None:
         """El efecto según los pasos desde la muerte, y el texto cuando termina.
 
-        `player` es la posición y el radio del jugador al morir. Con `show_hint`, el
-        texto dice cómo reiniciar.
+        `player` es la posición y el radio del jugador al morir. `elapsed` es el tiempo
+        total y `endless`, el del modo infinito, que solo se escribe si llegaste. Con
+        `show_hint`, el texto dice cómo reiniciar.
         """
         progress = min(dead_steps / EFFECT_STEPS, 1.0)
         left, top, width, height = viewport.rect
@@ -78,10 +81,11 @@ class DeathScreen:
         screen.blit(layer, (left, top))
 
         if progress == 1:
-            lines = [
-                (f"duraste {elapsed:.1f} s".replace(".", ","), TITLE_SIZE),
-                (f"semilla: {seed}", TEXT_SIZE),
-            ]
+            lines = [(f"duraste {elapsed:.1f} s".replace(".", ","), TITLE_SIZE)]
+            if endless > 0:
+                text = f"en el infinito: {endless:.1f} s".replace(".", ",")
+                lines.append((text, TEXT_SIZE))
+            lines.append((f"semilla: {seed}", TEXT_SIZE))
             if show_hint:
                 lines.append(("R o X para reiniciar", TEXT_SIZE))
             self._draw_lines(screen, viewport, lines)

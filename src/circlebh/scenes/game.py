@@ -1,6 +1,7 @@
 """La partida en pantalla: lee la entrada, avanza `world` paso a paso y lo dibuja."""
 
 import random
+from dataclasses import replace
 
 import pygame
 import pygame._sdl2.controller as sdl_controller
@@ -27,7 +28,7 @@ from circlebh.seeds import next_seed
 from circlebh.settings import Settings
 from circlebh.viewport import Viewport, camera_center
 from circlebh.world.clock import STEP
-from circlebh.world.director import bar_at
+from circlebh.world.director import bar_at, start_from
 from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
 from circlebh.world.swarm import lattice
@@ -135,8 +136,11 @@ class GameScene:
         print(f"semilla: {seed}")
         self.seed = seed
         demo = self.demo
+        # Para el desarrollo, el tema puede partir en otra sección (decisión 75).
+        section = self.settings.debug.start_section if demo is None else demo.section
+        balance = replace(BALANCE, director=start_from(BALANCE.director, section))
         self.world = World(
-            BALANCE,
+            balance,
             random.Random(seed),
             lethal=demo is None or demo.lethal,
             armed=demo is None or demo.armed,
@@ -250,6 +254,7 @@ class GameScene:
                 self.dead_steps,
                 self.seed,
                 self.world.elapsed,
+                self.world.endless_steps * STEP,
                 # En la demo la entrada no se lee: la ayuda para reiniciar mentiría.
                 show_hint=self.demo is None,
             )

@@ -14,13 +14,14 @@ from pathlib import Path
 
 import pygame
 
+from circlebh.balance import BALANCE
 from circlebh.balance_tools import check
 from circlebh.cli import RunOptions, parse_args
-from circlebh.datafile import DataFileError
 from circlebh.scenes.game import GameScene
 from circlebh.scenes.music import init_mixer
-from circlebh.settings import Settings, load_settings
+from circlebh.settings import Settings, check_packaged, load_settings
 from circlebh.world.clock import STEP, FixedStepClock, capture_steps
+from circlebh.world.director import start_from
 
 FPS = 60
 CAPTURE_DIR = Path(".capturas")
@@ -53,13 +54,21 @@ def exit_if_balance_differs() -> None:
 
 
 def load_settings_or_exit() -> Settings:
-    """ADR 0018: el juego no abre si `settings.json` no calza con `Settings`."""
+    """ADR 0018: el juego no abre si `settings.json` no calza con `Settings`.
+
+    Tampoco abre si `debug.start_section` nombra una sección que no está en el tema, o
+    si no está vacío en el juego empaquetado (decisión 75)."""
     try:
-        return load_settings()
+        settings = load_settings()
+        check_packaged(settings, frozen=getattr(sys, "frozen", False))
+        start_from(BALANCE.director, settings.debug.start_section)
     except json.JSONDecodeError as error:
         print(f"settings.json: no es JSON válido: {error}", file=sys.stderr)
-    except DataFileError as error:
+    except ValueError as error:
+        # `DataFileError` es un `ValueError`, como el de `start_from`.
         print(f"settings.json: {error}", file=sys.stderr)
+    else:
+        return settings
     raise SystemExit(1)
 
 
