@@ -129,9 +129,10 @@ class World:
         balas, para que un herido que murió en este paso no se cure. Los enemigos sin
         líneas desaparecen, y el que se parte al morir, como el divisor, deja sus
         fragmentos en su lugar, con su oleada. El director sabe si queda alguien de la
-        oleada en curso, vivo o en la cola. Lo que compró entra a la cola, y de ella
-        aparecen hasta `spawning.max_per_step`, que empiezan a moverse en el paso
-        siguiente; mientras hay una fusión en curso, las estrellas de la cola se
+        oleada en curso, vivo o en la cola, y cuántos cuerpos cuentan para el tope del
+        infinito. Lo que compró entra a la cola, y de ella aparecen hasta
+        `spawning.max_per_step`, con el peligro del director, que empiezan a moverse en
+        el paso siguiente; mientras hay una fusión en curso, las estrellas de la cola se
         descartan. La fusión da su paso: puede juntar las estrellas o hacer nacer la gran
         estrella roja. Recién entonces se revisa el contacto: matar a uno en el mismo paso
         en que te tocaría te salva. Si una bala o un enemigo lo toca, la partida termina;
