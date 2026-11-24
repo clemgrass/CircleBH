@@ -135,5 +135,5 @@ Sobre el color: el blanco y negro estricto es lo más fiel a la idea, pero cuest
 ## Preguntas abiertas
 
 - El nombre del juego. `circlebh` es provisorio.
-- Los números de equilibrio: los lados de cada polígono y del jefe, la velocidad, la frecuencia de las oleadas y de las protecciones, y la curva de experiencia.
+- Los números de equilibrio: los lados de cada polígono y del jefe, la velocidad, la frecuencia de las oleadas y de las protecciones, y la curva de experiencia. Cómo se miden lo decide el [ADR 0030](decisiones/0030-balance-medido-por-tema.md): una meta por tema, con lo que llega a cada jefe y la forma del riesgo por sección *(decisiones del autor, 2026-11-24)*.
 - Qué tarjetas hay, con qué valores y qué precios. La estructura la decide el ADR 0029; el contenido vive en el balance y se afina jugando (#90).
