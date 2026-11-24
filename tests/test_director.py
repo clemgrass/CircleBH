@@ -345,6 +345,84 @@ def test_drops_del_balance_son_oleadas() -> None:
     assert kinds["drop_1"] == kinds["drop_2"] == "wave"
 
 
+def test_las_siguientes_se_corren_lo_mismo() -> None:
+    spec = replace(
+        OLEADA,
+        sections=(*OLEADA.sections, seccion("final", 4.0, 1.0, 1.0, mazo("intro"))),
+    )
+    _, resultado = limpiar_en(13.5, 24.0, spec)
+    assert empieza(resultado, 2) == primer_paso(16.0, spec.bpm)
+    assert empieza(resultado, 3) == primer_paso(20.0, spec.bpm)
+
+
+def test_oleada_de_compases_sueltos_termina_en_una_frase() -> None:
+    # Borde (Foco 6): una oleada de 6 compases que se limpia al tiro no termina en el
+    # compás 10, a mitad de frase, sino en el 12.
+    spec = replace(
+        OLEADA,
+        sections=tuple(
+            replace(s, bars=6.0) if s.kind == "wave" else s for s in OLEADA.sections
+        ),
+    )
+    _, resultado = limpiar_en(5.0, 16.0, spec)
+    assert empieza(resultado, 2) == primer_paso(12.0, spec.bpm)
+
+
+def test_antes_de_una_seccion_que_exige_mas_deja_frase_para_la_subida() -> None:
+    # Si lo que sigue exige más capas, la música necesita una frase entera de subida
+    # que empiece después de limpiar: limpia en el 13,5 y el drop sigue hasta el 20.
+    intensa = replace(OLEADA.sections[2], layers=(3, 3))
+    spec = replace(OLEADA, sections=(*OLEADA.sections[:2], intensa))
+    _, resultado = limpiar_en(13.5, 24.0, spec)
+    assert empieza(resultado, 2) == primer_paso(20.0, spec.bpm)
+
+
+def test_oleadas_seguidas() -> None:
+    # La primera se limpia en el 5 y termina en el 8; la segunda compra con su
+    # etiqueta y espera, aunque la primera ya no tenga a nadie.
+    spec = tema(
+        seccion("uno", 4.0, 0.0, 0.0, mazo("drop"), burst=7.0, kind="wave"),
+        seccion("dos", 4.0, 0.0, 0.0, mazo("drop"), burst=7.0, kind="wave"),
+    )
+    director = Director(spec, ENEMIGOS, SPAWNING, random.Random(1))
+    segunda = primer_paso(8.0, spec.bpm)
+    compras = {}
+    for paso in range(1, segunda + 100):
+        viva = bar_at(paso, spec.bpm) < 5.0 or paso > segunda
+        compras[paso] = director.update(paso, wave_alive=viva)
+    assert {p.wave for p in compras[1]} == {0}
+    assert {p.wave for p in compras[segunda]} == {1}
+    assert director.section_index == 1
+    assert director.waiting
+
+
+def test_oleada_unica_no_compra_mas_al_limpiarse() -> None:
+    # Borde: una oleada que es la primera y la última sección compra en el primer
+    # paso y, limpia, ya no compra nada, hasta que exista el modo infinito.
+    spec = tema(seccion("unica", 4.0, 0.0, 0.0, mazo("drop"), burst=7.0, kind="wave"))
+    director, resultado = limpiar_en(1.0, 40.0, spec)
+    assert resultado[0][1]
+    assert all(p.wave == 0 for p in resultado[0][1])
+    assert not any(c for _, c in resultado[1:])
+    assert not director.waiting
+
+
+def test_un_salto_se_detiene_en_la_oleada() -> None:
+    # Borde: si un paso salta varias secciones, se detiene en la oleada, compra y
+    # espera.
+    spec = tema(
+        seccion("intro", 4.0, 1.0, 1.0, mazo("intro")),
+        seccion("subida", 4.0, 1.0, 1.0, mazo("intro")),
+        seccion("drop", 4.0, 0.0, 0.0, mazo("drop"), burst=7.0, kind="wave"),
+        seccion("respiro", 4.0, 1.0, 1.0, mazo("respiro")),
+    )
+    director = Director(spec, ENEMIGOS, SPAWNING, random.Random(1))
+    compras = director.update(primer_paso(100.0, spec.bpm), wave_alive=True)
+    assert director.section.name == "drop"
+    assert director.waiting
+    assert {p.wave for p in compras if p.enemy.startswith("drop")} == {2}
+
+
 # --- Las formaciones (decisión 28) ---
 
 ANILLOS_DE_5 = replace(SPAWNING, formation_size=(5, 5))
@@ -503,6 +581,16 @@ def test_secciones_empiezan_en_una_frase() -> None:
             tema(seccion("x", 4.0, 0.0, 0.0, (DeckEntry("nadie", 1.0),), kind="wave")),
             ENEMIGOS,
             "nadie",
+        ),
+        # Foco 4, un nivel más abajo: el que se parte en un anclado deja fragmentos que
+        # no te siguen.
+        (
+            tema(seccion("x", 4.0, 0.0, 0.0, (DeckEntry("padre", 1.0),), kind="wave")),
+            {
+                "padre": replace(HEXAGONO, split_into="ancla"),
+                "ancla": replace(HEXAGONO, anchored=True, threat=0.0),
+            },
+            r"deck\[padre\]",
         ),
     ],
 )

@@ -66,6 +66,17 @@ class Purchase:
     """El índice de la sección `wave` que la compró, o `None` si no es de una oleada."""
 
 
+def _split_chain(name: str, enemies: Mapping[str, EnemySpec]) -> list[str]:
+    """`name` y todo lo que deja al morir, siguiendo `split_into`: lo que hay que
+    matar para limpiar a uno de la oleada. Se detiene ante un tipo desconocido o un
+    ciclo, que `check_splits` rechaza al crear el mundo."""
+    chain: list[str] = []
+    while name in enemies and name not in chain:
+        chain.append(name)
+        name = enemies[name].split_into
+    return chain
+
+
 def _validate(
     spec: DirectorSpec, enemies: Mapping[str, EnemySpec], spawning: SpawningSpec
 ) -> None:
@@ -99,10 +110,13 @@ def _validate(
         for entry in section.deck:
             if entry.enemy not in enemies:
                 raise ValueError(f"{where}.deck: no existe el enemigo {entry.enemy}")
-            if wave and enemies[entry.enemy].anchored:
+            chain = _split_chain(entry.enemy, enemies) if wave else []
+            anchored = next((n for n in chain if enemies[n].anchored), None)
+            if anchored is not None:
                 raise ValueError(
                     f"{where}.deck[{entry.enemy}]: una oleada no puede tener"
-                    " anclados, porque no te siguen y quizás nunca se limpie"
+                    f" anclados ({anchored}), porque no te siguen y quizás nunca se"
+                    " limpie"
                 )
             if entry.weight <= 0:
                 raise ValueError(
@@ -212,10 +226,16 @@ class Director:
 
         El compás de margen es para la música, que decide la frase siguiente al empezar
         su último compás (ADR 0026): si la oleada terminara en la frase que ya decidió,
-        la sección siguiente sonaría como el drop durante toda su primera frase."""
-        own_end = self._starts[self.section_index] + self.section.bars
-        phrase = PHRASE_BARS * math.ceil((bar + 1) / PHRASE_BARS)
-        self._start_next_at(max(own_end, phrase))
+        la sección siguiente sonaría como el drop durante toda su primera frase. Si la
+        siguiente exige más capas, el margen suma una frase: la de la subida, que la
+        música decide al empezarla."""
+        index = self.section_index
+        own_end = self._starts[index] + self.section.bars
+        following = self.spec.sections[index + 1 : index + 2]
+        rises = any(s.layers[0] > self.section.layers[0] for s in following)
+        margin = 1 + (PHRASE_BARS if rises else 0)
+        end = max(own_end, bar + margin)
+        self._start_next_at(PHRASE_BARS * math.ceil(end / PHRASE_BARS))
         self._waiting = False
 
     def _start_next_at(self, bar: float) -> None:

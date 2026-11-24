@@ -112,7 +112,7 @@ class World:
         balas, para que un herido que murió en este paso no se cure. Los enemigos sin
         líneas desaparecen, y el que se parte al morir, como el divisor, deja sus
         fragmentos en su lugar, con su oleada. El director sabe si queda alguien de la
-        oleada en curso, vivo o en la cola. Lo que compró el director entra a la cola, y de ella
+        oleada en curso, vivo o en la cola. Lo que compró entra a la cola, y de ella
         aparecen hasta `spawning.max_per_step`, que empiezan a moverse en el paso
         siguiente; mientras hay una fusión en curso, las estrellas de la cola se
         descartan. La fusión da su paso: puede juntar las estrellas o hacer nacer la gran
@@ -162,9 +162,9 @@ class World:
         self.enemies = [enemy for enemy in self.enemies if enemy.alive]
         for enemy in dead:
             self._split(enemy)
-        for purchase in self.director.update(
-            self._steps, wave_alive=self._wave_alive()
-        ):
+        # Fuera de una oleada no hace falta recorrer el plano y la cola.
+        alive = self.director.waiting and self._wave_alive()
+        for purchase in self.director.update(self._steps, wave_alive=alive):
             self._enqueue(purchase)
         for item in self.queue.pop(self.balance.spawning.max_per_step):
             if not self.merge.allows(item.enemy):

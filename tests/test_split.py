@@ -16,7 +16,15 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, Balance, EnemySpec, StarPolygonShape
+from circlebh.balance import (
+    BALANCE,
+    Balance,
+    DeckEntry,
+    DirectorSpec,
+    EnemySpec,
+    SectionSpec,
+    StarPolygonShape,
+)
 from circlebh.world.clock import STEP
 from circlebh.world.collisions import circles_touch
 from circlebh.world.enemy import Enemy
@@ -25,6 +33,7 @@ from circlebh.world.figures import triangulation_centroids
 from circlebh.world.game import World
 from circlebh.world.polygon import vertex
 from circlebh.world.rigid import to_world
+from circlebh.world.spawning import SpawnQueue
 from circlebh.world.split import fragments
 
 LEJOS = Vector2(1e6, 0)
@@ -165,6 +174,41 @@ def test_hijos_del_divisor_cuentan_en_la_oleada() -> None:
     hijos = [e for e in matar(world, padre) if e.spec is fragmento()]
     assert len(hijos) == 5
     assert all(hijo.wave == 3 for hijo in hijos)
+
+
+def test_fragmentos_vivos_mantienen_la_oleada() -> None:
+    # El drop no se limpia mientras quede un fragmento: el director sigue esperando
+    # después de que muere el divisor, y deja de esperar cuando ya no queda ninguno.
+    oleada = DirectorSpec(
+        bpm=124.0,
+        max_alive=300,
+        sections=(
+            SectionSpec(
+                name="drop",
+                kind="wave",
+                bars=4.0,
+                budget_start=0.0,
+                budget_end=0.0,
+                burst=1.0,
+                layers=(3, 3),
+                deck=(DeckEntry("hexagon", 1.0),),
+                formations=("single",),
+            ),
+        ),
+    )
+    world = World(replace(BALANCE, director=oleada), random.Random(0), lethal=False)
+    world.update(Vector2())
+    # Lo que compró la oleada sale de escena: solo queda el divisor, de la oleada 0.
+    world.queue = SpawnQueue()
+    padre = con_una_linea_de_frente(divisor(), Vector2(150, 0))
+    padre.wave = 0
+    world.enemies = [padre]
+    hijos = [e for e in matar(world, padre) if e.spec is fragmento()]
+    assert hijos
+    assert world.director.waiting
+    world.enemies = []
+    world.update(Vector2())
+    assert not world.director.waiting
 
 
 def test_hijos_sin_oleada_no_tienen_etiqueta() -> None:
