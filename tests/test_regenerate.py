@@ -16,7 +16,14 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, EnemySpec, RegenerateSpec, StarPolygonShape
+from circlebh.balance import (
+    BALANCE,
+    EnemySpec,
+    OrbitSpec,
+    RegenerateSpec,
+    StarPolygonShape,
+)
+from circlebh.pilot import pilot_intent
 from circlebh.world.actions import (
     ActionContext,
     Deliver,
@@ -24,10 +31,13 @@ from circlebh.world.actions import (
     step_actions,
     steps_of,
 )
+from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
 from circlebh.world.events import Death, Donate, Event, Regrow
 from circlebh.world.game import World
+from circlebh.world.player import Player
 from circlebh.world.regrowth import absorb
+from circlebh.world.swarm import lattice, step_swarm
 
 
 def regenerador() -> EnemySpec:
@@ -402,3 +412,36 @@ def test_stray_desconocido_se_rechaza() -> None:
     balance = replace(BALANCE, enemies={**BALANCE.enemies, "regenerator": sin_entrega})
     with pytest.raises(ValueError, match=r"enemies\.regenerator\.actions"):
         World(balance, random.Random(0))
+
+
+# --- 13.C: apoya desde lejos (decisión 65) ---
+
+
+def test_medico_se_mantiene_lejos() -> None:
+    # Con 16 hexágonos detrás y el jugador dando vueltas como el piloto, en los últimos
+    # 10 s de 30: lejos del jugador, a la distancia de su órbita, y fuera del enjambre.
+    [orbita] = [p for p in regenerador().patterns if isinstance(p, OrbitSpec)]
+    jugador = Player(BALANCE.player)
+    enemy = Enemy(regenerador(), Vector2(-300, 80))
+    hexagonos = [
+        Enemy(BALANCE.enemies["hexagon"], p)
+        for p in lattice(Vector2(-300, 0), 17, 70)[1:]
+    ]
+    al_jugador, al_enjambre = [], []
+    for k in range(steps_of(30)):
+        jugador.step(pilot_intent(k))
+        velocidad = (jugador.position - jugador.previous) / STEP
+        step_swarm(
+            [enemy, *hexagonos],
+            jugador.position,
+            velocidad,
+            BALANCE.player.charge,
+            BALANCE.charges,
+        )
+        if k >= steps_of(20):
+            al_jugador.append(enemy.position.distance_to(jugador.position))
+            al_enjambre.append(
+                min(h.position.distance_to(enemy.position) for h in hexagonos)
+            )
+    assert sum(al_jugador) / len(al_jugador) >= 0.8 * orbita.radius
+    assert sum(al_enjambre) / len(al_enjambre) >= 120
