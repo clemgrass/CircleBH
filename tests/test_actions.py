@@ -28,6 +28,7 @@ from circlebh.world.actions import (
     step_actions,
 )
 from circlebh.world.clock import STEP
+from circlebh.world.danger import Danger
 from circlebh.world.enemy import Enemy
 from circlebh.world.events import Telegraph
 from circlebh.world.game import World
@@ -172,6 +173,28 @@ def test_etapas_en_orden_y_con_su_duracion() -> None:
         (ChargeState.RECOVERING, pasos(CHARGE.cooldown)),
         (ChargeState.TELEGRAPHING, 1),
     ]
+
+
+def test_cadencia_acorta_la_recuperacion() -> None:
+    # En el infinito, con el doble de cadencia, se recupera en la mitad. El aviso y la
+    # embestida no cambian: siguen siendo justos.
+    triangle = Enemy(TRIANGLE, Vector2(200, 0), Danger(cadence=2.0))
+    total = pasos(CHARGE.telegraph + CHARGE.duration + CHARGE.cooldown / 2) + 1
+    assert tramos(estados(triangle, [triangle], total)) == [
+        (ChargeState.TELEGRAPHING, pasos(CHARGE.telegraph)),
+        (ChargeState.CHARGING, pasos(CHARGE.duration)),
+        (ChargeState.RECOVERING, pasos(CHARGE.cooldown / 2)),
+        (ChargeState.TELEGRAPHING, 1),
+    ]
+
+
+def test_embestida_no_cambia_con_peligro() -> None:
+    # Negativo: la embestida va a su `speed` aunque el peligro suba la velocidad, para
+    # que se pueda esquivar.
+    spec = replace(TRIANGLE, actions=(replace(CHARGE, lead_chance=0.0),))
+    triangle = Enemy(spec, Vector2(200, 0), Danger(speed=1.5))
+    hasta_soltarse(triangle, [triangle], Vector2())
+    assert embestida(triangle).velocity == Vector2(-CHARGE.speed, 0)
 
 
 def test_avisar_emite_telegraph_una_vez() -> None:

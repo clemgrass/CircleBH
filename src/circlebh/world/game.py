@@ -92,11 +92,17 @@ class World:
         en el plano: quedan `regrow.fade` segundos para que el render las apague mientras
         el hueco del herido se enciende (decisión 66)."""
         self._steps = 0
+        self._endless_steps = 0
 
     @property
     def steps(self) -> int:
         """Pasos dados en esta partida. Se detiene al morir."""
         return self._steps
+
+    @property
+    def endless_steps(self) -> int:
+        """Pasos dados en el modo infinito: 0 si no llegaste. Se detiene al morir."""
+        return self._endless_steps
 
     @property
     def bodies(self) -> int:
@@ -180,11 +186,14 @@ class World:
         )
         for purchase in updates:
             self._enqueue(purchase)
+        if self.director.section.kind == "endless":
+            self._endless_steps += 1
+        danger = self.director.danger
         for item in self.queue.pop(self.balance.spawning.max_per_step):
             if not self.merge.allows(item.enemy):
                 continue
             position = self.player.position + item.offset
-            enemy = Enemy(self.balance.enemies[item.enemy], position)
+            enemy = Enemy(self.balance.enemies[item.enemy], position, danger)
             enemy.wave = item.wave
             self.enemies.append(enemy)
         self.enemies = self.merge.update(

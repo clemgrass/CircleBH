@@ -57,11 +57,12 @@ class Seek(Pattern):
         self.spec = spec
 
     def acceleration(self, enemy: Enemy, context: Context) -> Vector2:
-        """Encima del jugador no hay dirección, y vale 0."""
+        """Encima del jugador no hay dirección, y vale 0. En el infinito, el peligro la
+        multiplica: con el roce igual, la velocidad final `strength/γ` sube lo mismo."""
         direction = context.player_position - enemy.position
         if direction.length_squared() == 0:
             return Vector2()
-        return direction.normalize() * self.spec.strength
+        return direction.normalize() * self.spec.strength * enemy.danger.speed
 
 
 class Coulomb(Pattern):
@@ -108,7 +109,11 @@ class Orbit(Pattern):
 
     def acceleration(self, enemy: Enemy, context: Context) -> Vector2:
         """Encima del jugador no hay dirección radial, y el resorte y el empuje valen 0,
-        como en `Seek`. El roce desde el jugador no la necesita, y sigue."""
+        como en `Seek`. El roce desde el jugador no la necesita, y sigue.
+
+        En el infinito, el peligro multiplica el resorte y el empuje, pero no el roce
+        desde el jugador: ese hace que el anillo viaje con él, y escalado lo dejaría
+        atrás o lo haría correr más que él."""
         spec = self.spec
         carry = (
             context.player_velocity * enemy.spec.friction if spec.follow else Vector2()
@@ -119,11 +124,10 @@ class Orbit(Pattern):
             return carry
         radial = offset / r
         tangent = Vector2(-radial.y, radial.x)
-        return (
-            radial * (-spec.stiffness * (r - spec.radius))
-            + tangent * spec.tangential
-            + carry
+        pull = (
+            radial * (-spec.stiffness * (r - spec.radius)) + tangent * spec.tangential
         )
+        return pull * enemy.danger.speed + carry
 
 
 def make_pattern(spec: PatternSpec) -> Pattern:

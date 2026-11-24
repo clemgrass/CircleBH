@@ -134,7 +134,9 @@ class Charge(Action):
     recta está tapada, no embiste y vuelve a observar.
     """
 
-    def __init__(self, spec: ChargeSpec) -> None:
+    def __init__(self, spec: ChargeSpec, cadence: float = 1.0) -> None:
+        """Con `cadence` mayor que 1, se recupera antes: es el peligro del infinito. El
+        aviso y la embestida no cambian, para que se sigan pudiendo leer y esquivar."""
         self.spec = spec
         self.state = ChargeState.WATCHING
         self.direction = Vector2()
@@ -142,7 +144,7 @@ class Charge(Action):
         self._durations = {
             ChargeState.TELEGRAPHING: steps_of(spec.telegraph),
             ChargeState.CHARGING: steps_of(spec.duration),
-            ChargeState.RECOVERING: steps_of(spec.cooldown),
+            ChargeState.RECOVERING: steps_of(spec.cooldown / cadence),
         }
         self._left = 0
         """Los pasos que le quedan a la etapa, contando el actual."""
@@ -306,14 +308,16 @@ class Volley(Action):
     deja un brazo de la espiral de Arquímedes `r = (v/ω)·θ` (decisiones 31 a 33).
     """
 
-    def __init__(self, spec: VolleySpec) -> None:
+    def __init__(self, spec: VolleySpec, cadence: float = 1.0) -> None:
+        """Con `cadence` mayor que 1, se recupera antes: es el peligro del infinito. El
+        aviso y la ráfaga no cambian."""
         self.spec = spec
         self.state = VolleyState.WATCHING
         self._interval = steps_of(spec.interval)
         self._durations = {
             VolleyState.TELEGRAPHING: steps_of(spec.telegraph),
             VolleyState.FIRING: spec.shots * self._interval,
-            VolleyState.RECOVERING: steps_of(spec.cooldown),
+            VolleyState.RECOVERING: steps_of(spec.cooldown / cadence),
         }
         self._left = 0
         """Los pasos que le quedan a la etapa, contando el actual."""
@@ -625,13 +629,14 @@ def check_stray(
         )
 
 
-def make_action(spec: ActionSpec) -> Action:
-    """La instancia de la acción que describe `spec`, nueva para cada enemigo."""
+def make_action(spec: ActionSpec, cadence: float = 1.0) -> Action:
+    """La instancia de la acción que describe `spec`, nueva para cada enemigo. La
+    `cadence` del peligro solo cambia a los ataques: la embestida y la ráfaga."""
     match spec:
         case ChargeSpec():
-            return Charge(spec)
+            return Charge(spec, cadence)
         case VolleySpec():
-            return Volley(spec)
+            return Volley(spec, cadence)
         case SpiralSpec():
             return Spiral(spec)
         case RegenerateSpec():

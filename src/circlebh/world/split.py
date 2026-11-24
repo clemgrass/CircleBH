@@ -23,8 +23,9 @@ def fragments(
 
     Cada centroide pasa al plano con la pose del padre: el centro de su figura, que con
     giro está corrido en `offset` desde `position`, y su ángulo. El fragmento nace con
-    el ángulo y la velocidad del padre. Si su círculo envolvente tocaría al jugador, no
-    nace: el jugador pudo meterse por un hueco del padre herido (Foco 3 del plan)."""
+    el ángulo, la velocidad y el peligro del padre. Si su círculo envolvente tocaría al
+    jugador, no nace: el jugador pudo meterse por un hueco del padre herido (Foco 3 del
+    plan)."""
     shape = parent.spec.shape
     # `check_splits` ya rechazó al crear el mundo un padre que no es `{n/1}`.
     assert is_regular(shape)
@@ -33,7 +34,7 @@ def fragments(
         position = to_world(centroid + parent.offset, parent.position, parent.angle)
         if circles_touch(position, spec.radius, player, player_radius):
             continue
-        child = Enemy(spec, position)
+        child = Enemy(spec, position, parent.danger)
         child.angle = child.previous_angle = parent.angle
         child.velocity = Vector2(parent.velocity)
         children.append(child)

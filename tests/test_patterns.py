@@ -8,6 +8,7 @@ from pygame.math import Vector2
 
 from circlebh.balance import BALANCE, CoulombSpec, EnemySpec, OrbitSpec, SeekSpec
 from circlebh.world.clock import STEP
+from circlebh.world.danger import Danger
 from circlebh.world.enemy import Enemy
 from circlebh.world.patterns import Context, Coulomb, Orbit, Seek, make_pattern
 
@@ -268,3 +269,47 @@ def test_orbit_sin_follow_ignora_la_velocidad_del_jugador() -> None:
     assert Orbit(ORBITA).acceleration(
         enemy, contexto(player_velocity=CORRIENDO)
     ) == Orbit(ORBITA).acceleration(enemy, contexto())
+
+
+# --- El peligro del infinito (#65) ---
+
+
+def test_hexagono_con_peligro_llega_a_m_veces_su_velocidad() -> None:
+    # `seek` escala con el peligro, y su tope también: sin eso, el hexágono ya va
+    # justo a su tope (240/2 = 120) y no se apuraría.
+    spec = replace(HEXAGON, patterns=(SeekSpec(strength=240.0),))
+    rapido = Enemy(spec, Vector2(10_000, 0), Danger(speed=1.5))
+    normal = Enemy(spec, Vector2(10_000, 0))
+    for _ in range(round(5 / STEP)):
+        for enemy in (rapido, normal):
+            enemy.step(enemy.acceleration(contexto()))
+    assert rapido.velocity.length() == pytest.approx(180, rel=0.01)
+    assert normal.velocity.length() == pytest.approx(120, rel=0.01)
+
+
+def test_orbit_escala_el_resorte_con_el_peligro() -> None:
+    # A 100 del anillo, el resorte tira con `stiffness · 100`, y con el doble de peligro,
+    # con el doble.
+    enemy = Enemy(SOLO_ORBITA, Vector2(300, 0), Danger(speed=2.0))
+    a = Orbit(ORBITA).acceleration(enemy, contexto())
+    assert tuple(a) == pytest.approx((-2 * ORBITA.stiffness * 100, 0.0))
+
+
+def test_orbita_no_escala_el_arrastre() -> None:
+    # Borde: el arrastre `friction · u` sigue al jugador. Si escalara, el cerco
+    # correría más que él.
+    enemy = Enemy(SOLO_ORBITA, Vector2(0, -200), Danger(speed=2.0))
+    a = Orbit(SIGUE).acceleration(enemy, contexto(player_velocity=CORRIENDO))
+    assert tuple(a) == pytest.approx((SOLO_ORBITA.friction * 100, 0.0))
+
+
+def test_coulomb_no_cambia_con_el_peligro() -> None:
+    # Negativo: la ley de cargas es una sola (ADR 0021). Si un enemigo nuevo cargara
+    # más, la fuerza entre uno nuevo y uno viejo dejaría de ser pareja.
+    vecino = Enemy(SOLO_COULOMB, Vector2(60, 0))
+    rapido = Enemy(SOLO_COULOMB, Vector2(), Danger(speed=2.0))
+    normal = Enemy(SOLO_COULOMB, Vector2())
+    coulomb = Coulomb()
+    assert coulomb.acceleration(rapido, contexto([vecino])) == coulomb.acceleration(
+        normal, contexto([vecino])
+    )
