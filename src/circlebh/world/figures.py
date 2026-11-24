@@ -45,6 +45,20 @@ def local_lines(shape: Shape, radius: float) -> list[tuple[Vector2, Vector2]]:
     ]
 
 
+def triangulation_centroids(shape: StarPolygonShape, radius: float) -> list[Vector2]:
+    """Los centroides de la triangulación en abanico del polígono convexo `{n/1}`.
+
+    Desde el vértice 0, las diagonales lo parten en `n − 2` triángulos: el `k`-ésimo une
+    `v₀`, `vₖ` y `vₖ₊₁`, con `k = 1 … n − 2`, y su centroide es `(v₀ + vₖ + vₖ₊₁) / 3`.
+    Es donde nacen los fragmentos del divisor (decisión 71 de la spec de la 0.2.0)."""
+    n = shape.vertices
+    apex = vertex(radius, n, 0)
+    return [
+        (apex + vertex(radius, n, k) + vertex(radius, n, k + 1)) / 3
+        for k in range(1, n - 1)
+    ]
+
+
 def is_regular(shape: Shape) -> TypeGuard[StarPolygonShape]:
     """Si es un polígono regular, `{n/1}`: el único caso donde valen los sectores.
     `TypeGuard` y no `TypeIs`: un `False` no descarta que sea un polígono estrellado."""

@@ -23,6 +23,7 @@ from circlebh.world.merge import Merge, check_merge
 from circlebh.world.player import Player
 from circlebh.world.regrowth import absorb
 from circlebh.world.spawning import SpawnQueue, check_formations, place_formation
+from circlebh.world.split import check_splits, fragments
 from circlebh.world.swarm import step_swarm
 from circlebh.world.weapons import PointWeapon, Weapon
 
@@ -54,6 +55,7 @@ class World:
         check_shapes(balance.enemies)
         check_actions(balance.enemies)
         check_masses(balance.enemies)
+        check_splits(balance.enemies)
         check_merge(balance)
         self.merge = Merge(balance.merge, balance.enemies, balance.director.bpm)
         """La fusión de las estrellas en la gran estrella roja."""
@@ -103,9 +105,11 @@ class World:
         (`step_swarm`), y las armas golpean y disparan. Las líneas que donó un médico
         pasan a ser líneas sueltas, y los heridos absorben las que tocan: después de las
         balas, para que un herido que murió en este paso no se cure. Los enemigos sin
-        líneas desaparecen. Lo que compró el director entra a la cola, y de ella aparecen hasta
-        `spawning.max_per_step`, que empiezan a moverse en el paso siguiente; mientras
-        hay una fusión en curso, las estrellas de la cola se descartan. La fusión da su
+        líneas desaparecen, y el que se parte al morir, como el divisor, deja sus
+        fragmentos en su lugar. Lo que compró el director entra a la cola, y de ella
+        aparecen hasta `spawning.max_per_step`, que empiezan a moverse en el paso
+        siguiente; mientras hay una fusión en curso, las estrellas de la cola se
+        descartan. La fusión da su
         paso: puede juntar las estrellas o hacer nacer la gran estrella roja. Recién
         entonces se revisa el contacto: matar a uno en el mismo paso en que te tocaría te
         salva. Si una bala o un enemigo lo toca, la partida termina; desde ahí, `update`
@@ -148,8 +152,11 @@ class World:
             if isinstance(event, Donate):
                 self._release(event)
         self._absorb()
-        self.events += [Death(enemy) for enemy in self.enemies if not enemy.alive]
+        dead = [enemy for enemy in self.enemies if not enemy.alive]
+        self.events += [Death(enemy) for enemy in dead]
         self.enemies = [enemy for enemy in self.enemies if enemy.alive]
+        for enemy in dead:
+            self._split(enemy)
         for purchase in self.director.update(self._steps):
             self._enqueue(purchase)
         for name, offset in self.queue.pop(self.balance.spawning.max_per_step):
@@ -187,6 +194,15 @@ class World:
             if isinstance(action, Deliver):
                 action.patient, action.donor = event.patient, event.enemy
         self.enemies.append(stray)
+
+    def _split(self, enemy: Enemy) -> None:
+        """Si `enemy` se parte al morir, suma sus fragmentos. Nacen en este paso, sin
+        pasar por la cola, y se mueven desde el siguiente. El que tocaría al jugador no
+        nace."""
+        if not enemy.spec.split_into:
+            return
+        spec = self.balance.enemies[enemy.spec.split_into]
+        self.enemies += fragments(enemy, spec, self.player.position, self.player.radius)
 
     def _absorb(self) -> None:
         """Los heridos absorben las líneas sueltas que tocan. Las absorbidas salen del

@@ -224,6 +224,17 @@ SCENARIOS: dict[str, Scenario] = {
             armed=False,
         ),
         Scenario(
+            "divisor",
+            "El jugador quieto, armado y sin morir, y un divisor al que solo le queda la"
+            " línea de frente: la primera bala lo mata, y se parte en cinco fragmentos"
+            " dentro de su figura, que avisan y embisten.",
+            pilot=False,
+            guest="divider",
+            guest_at=(180.0, 0.0),
+            guest_wounded=(0, 2, 3, 4, 5, 6),
+            lethal=False,
+        ),
+        Scenario(
             "masa-critica",
             "30 hexágonos juntos a un lado del jugador quieto, que no muere ni dispara:"
             " la masa crítica trae un círculo, que nace fuera de la vista detrás del"

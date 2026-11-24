@@ -15,9 +15,14 @@ from pygame.math import Vector2
 from circlebh.balance import BALANCE, CircleShape, SegmentShape, StarPolygonShape
 from circlebh.world.collisions import crossing
 from circlebh.world.enemy import Enemy
-from circlebh.world.figures import check_shape, line_vertices, local_lines
+from circlebh.world.figures import (
+    check_shape,
+    line_vertices,
+    local_lines,
+    triangulation_centroids,
+)
 from circlebh.world.game import World
-from circlebh.world.polygon import TIE, polygon_edge
+from circlebh.world.polygon import TIE, polygon_edge, vertex
 
 PHI = (1 + math.sqrt(5)) / 2
 ESTRELLA = StarPolygonShape(vertices=5, steps=(1, 2))
@@ -177,3 +182,26 @@ def test_acepta_el_circulo() -> None:
     circulo = replace(BALANCE.enemies["hexagon"], shape=CircleShape(), radius=8.0)
     balance = replace(BALANCE, enemies={**BALANCE.enemies, "circulo": circulo})
     World(balance, random.Random(0))
+
+
+# --- La triangulación del divisor (#63) ---
+
+
+@given(n=st.integers(3, 12))
+def test_triangulacion_da_n_menos_2_centroides(n: int) -> None:
+    # El abanico desde el vértice 0: el triángulo k une v₀, vₖ y vₖ₊₁.
+    r = 30.0
+    centroides = triangulation_centroids(StarPolygonShape(vertices=n, steps=(1,)), r)
+    assert len(centroides) == n - 2
+    for k, c in enumerate(centroides, start=1):
+        esperado = (vertex(r, n, 0) + vertex(r, n, k) + vertex(r, n, k + 1)) / 3
+        assert c.distance_to(esperado) < 1e-9
+
+
+@given(n=st.integers(3, 12), r=st.floats(1, 100))
+def test_centroides_dentro_del_padre(n: int, r: float) -> None:
+    # Dentro de un polígono convexo antihorario: a la izquierda de cada arista.
+    for c in triangulation_centroids(StarPolygonShape(vertices=n, steps=(1,)), r):
+        for k in range(n):
+            a, b = vertex(r, n, k), vertex(r, n, k + 1)
+            assert (b - a).cross(c - a) > 0

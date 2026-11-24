@@ -144,6 +144,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "patterns": [{"kind": "seek", "strength": 240.0}, {"kind": "coulomb"}],
                 "threat": 1.0,
                 "actions": [],
+                "split_into": "",
             },
             "square": {
                 "shape": {"kind": "star_polygon", "vertices": 4, "steps": [1]},
@@ -159,6 +160,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "patterns": [{"kind": "seek", "strength": 240.0}, {"kind": "coulomb"}],
                 "threat": 1.0,
                 "actions": [],
+                "split_into": "",
             },
             "triangle": {
                 "shape": {"kind": "star_polygon", "vertices": 3, "steps": [1]},
@@ -196,6 +198,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                         "lead_angle": 0.3,
                     }
                 ],
+                "split_into": "",
             },
             "pentagon": {
                 "shape": {"kind": "star_polygon", "vertices": 5, "steps": [1]},
@@ -230,6 +233,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                         "cooldown": 2.5,
                     }
                 ],
+                "split_into": "",
             },
             "octagon": {
                 "shape": {"kind": "star_polygon", "vertices": 8, "steps": [1]},
@@ -254,6 +258,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 ],
                 "threat": 1.5,
                 "actions": [],
+                "split_into": "",
             },
             "magnet": {
                 "shape": {"kind": "star_polygon", "vertices": 6, "steps": [2]},
@@ -272,6 +277,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 ],
                 "threat": 2.0,
                 "actions": [],
+                "split_into": "",
             },
             "regenerator": {
                 "shape": {"kind": "star_polygon", "vertices": 7, "steps": [3]},
@@ -298,6 +304,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "actions": [
                     {"kind": "regenerate", "interval": 2.0, "stray": "stray_line"}
                 ],
+                "split_into": "",
             },
             "stray_line": {
                 "shape": {"kind": "segment"},
@@ -313,6 +320,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "patterns": [{"kind": "coulomb"}],
                 "threat": 0.0,
                 "actions": [{"kind": "deliver", "speed": 180.0}],
+                "split_into": "",
             },
             "star": {
                 "shape": {"kind": "star_polygon", "vertices": 5, "steps": [1, 2]},
@@ -328,6 +336,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "patterns": [],
                 "threat": 2.0,
                 "actions": [],
+                "split_into": "",
             },
             "red_star": {
                 "shape": {"kind": "star_polygon", "vertices": 5, "steps": [2]},
@@ -343,6 +352,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "patterns": [],
                 "threat": 0.0,
                 "actions": [],
+                "split_into": "",
             },
             "circle": {
                 "shape": {"kind": "circle"},
@@ -367,6 +377,61 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                         "carry_radius": 250.0,
                     }
                 ],
+                "split_into": "",
+            },
+            "divider": {
+                "shape": {"kind": "star_polygon", "vertices": 7, "steps": [1]},
+                "radius": 36.0,
+                "speed": 120.0,
+                "friction": 2.0,
+                "spin": 0.0,
+                "anchored": False,
+                "phantom": False,
+                "solitary": False,
+                "charge_per_line": 1.0,
+                "mass_per_line": 1.0,
+                "patterns": [{"kind": "seek", "strength": 240.0}, {"kind": "coulomb"}],
+                "threat": 2.5,
+                "actions": [],
+                "split_into": "shard",
+            },
+            "shard": {
+                "shape": {"kind": "star_polygon", "vertices": 3, "steps": [1]},
+                "radius": 7.0,
+                "speed": 150.0,
+                "friction": 3.0,
+                "spin": 0.0,
+                "anchored": False,
+                "phantom": False,
+                "solitary": False,
+                "charge_per_line": 1.0,
+                "mass_per_line": 1.0,
+                "patterns": [
+                    {
+                        "kind": "orbit",
+                        "radius": 280.0,
+                        "stiffness": 4.0,
+                        "tangential": 0.0,
+                        "follow": False,
+                    },
+                    {"kind": "coulomb"},
+                ],
+                "threat": 0.0,
+                "actions": [
+                    {
+                        "kind": "charge",
+                        "watch_distance": 320.0,
+                        "telegraph": 0.5,
+                        "recoil": 14.0,
+                        "speed": 720.0,
+                        "duration": 0.8,
+                        "cooldown": 2.0,
+                        "turn_rate": 6.0,
+                        "lead_chance": 0.1,
+                        "lead_angle": 0.3,
+                    }
+                ],
+                "split_into": "",
             },
         },
         "spawning": {

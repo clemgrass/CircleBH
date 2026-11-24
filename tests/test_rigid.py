@@ -36,6 +36,7 @@ CUADRADO = EnemySpec(
     patterns=(),
     threat=1.0,
     actions=(),
+    split_into="",
 )
 HEXAGONO = replace(CUADRADO, shape=StarPolygonShape(vertices=6, steps=(1,)))
 
