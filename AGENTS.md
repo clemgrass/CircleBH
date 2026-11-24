@@ -78,7 +78,8 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 | `uv run poe benchmark` | medir el paso con muchos enemigos, a mano |
 | `uv run poe musica` | escuchar la música de la demo (WAV en `.capturas/`) y medir su mezcla, a mano |
 
-## Arquitectura (ADR 0003 a 0006, 0016, 0020 a 0023 y 0025 a 0027)
+## Arquitectura (ADR 0003 a 0006, 0016, 0020 a 0023, 0025 a 0027 y 0029)
+- Las armas se arman con tres términos (avance, armónico y giro) y mejoran con tarjetas: un parámetro, un término sumado o un operador en orden fijo. Los trazos dañan por barrido. Armas, tarjetas y precios son datos del balance, sin topes de mejora (ADR 0029).
 - En `src/circlebh/`, las importaciones van en una sola dirección: `scenes` → `render | audio` → `world` → `balance`. `render` y `audio` son hermanas y no se importan entre sí. `lint-imports` lo verifica.
 - La música sale de la geometría del juego, sobre una base de techno (ADR 0022). `audio/` es lógica pura como `world/`: escucha al mundo sin cambiarlo y nunca saca números de su `Random`. Solo `scenes/music.py` toca `pygame.mixer`: la regla `TID251` de ruff lo prohíbe fuera de `render/`, `scenes/` y `__main__.py`.
 - `world/` es lógica pura: no tiene `draw()` ni usa `pygame.display` ni `pygame.draw`. De Pygame solo usa `Vector2`. La regla `TID251` de ruff lo verifica, y solo `render/`, `scenes/` y `__main__.py` tienen la excepción.
@@ -124,4 +125,4 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 
 ## Preguntas abiertas
 - El nombre del juego. `circlebh` es provisorio.
-- Los números de equilibrio y qué parámetro mejora cada tarjeta.
+- Los números de equilibrio, y qué tarjetas hay con sus valores y precios (la estructura la decide el ADR 0029).

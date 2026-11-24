@@ -35,19 +35,36 @@ La tabla es el punto de partida. El prototipo puede ajustarla si algo no se lee 
   - **Seno:** una onda que avanza ondulando.
   - **Espiral:** proyectiles que salen girando desde el centro.
 - **Las mejoras y las combinaciones salen de ideas matemáticas** *(decisión del autor, 2026-11-19)*: derivar, integrar, componer o sumar curvas, por ejemplo `r(θ, t) = v·t + A·sin(kθ)`, un anillo que ondula. La idea es diferenciarse de los survivors donde dos armas al máximo se fusionan. El mecanismo exacto sigue abierto.
+  - **El sistema de armas queda decidido entero para el MVP, con las combinaciones incluidas** *(decisión del autor, 2026-11-24)*. Lo decide el ADR de mejoras de la 0.3.0 (#88 y #89), después de una investigación amplia que no se limita a las ideas de esta sección.
+  - **El mecanismo** *(decisiones del autor, 2026-11-24; [ADR 0029](decisiones/0029-armas-por-terminos-y-tarjetas.md))*:
+    - **Cada arma se arma con tres términos:** un avance, un armónico y un giro. La trayectoria es la fórmula, y lo que viaja es la bala.
+    - **Una tarjeta hace una de tres cosas:**
+      - cambia un parámetro;
+      - le suma a un arma un término que no tiene. Combinar es sumar, y nada se funde;
+      - le aplica un operador: `d/dt` deja el arma contigo, `∫dt` la acelera, `Cₙ` hace n copias, y también están el reflejo y la paralela.
+    - **Una tarjeta puede traer un precio:** más presupuesto para el director, una contra en el arma, un efecto sobre los enemigos o un efecto que dura unos compases.
+    - **Lo que importa es que las partidas lleguen a formas distintas.** Un test lo mide.
+    - **Las armas y las tarjetas son datos del balance y cambian al jugar,** como los enemigos. No hay topes de mejora.
   - **Rosa** (`r = cos(kθ)`): pétalos que orbitan alrededor del jugador.
 - **Al subir de nivel aparecen tres tarjetas.** Cada una muestra la fórmula del arma y el parámetro que cambia, por ejemplo "`y = A·sin(ωx)`: ω sube a 3". Una tarjeta puede dar un arma nueva o mejorar una que ya tienes. No hace falta entender la fórmula para elegir, porque la diferencia se ve en el ataque.
 - **Los enemigos son polígonos hechos de líneas, y sus líneas son su vida** *(decisión del autor, 2026-11-19; antes, un golpe convertía el hexágono en pentágono)*. Cada golpe quita la línea exacta que golpea, así que la forma que queda cuenta dónde le pegaste. Sin líneas, desaparece. Una figura abierta deja pasar las balas por sus huecos: el jugador tiene que moverse para encontrar el ángulo. Los polígonos con más lados llegan más tarde en la partida.
 - **Cada arma hace daño a su manera:**
-  - La **recta** y el **círculo** dañan en todo su trazo: el rayo y el anillo.
+  - La **recta** y el **círculo** dañan en todo su trazo: el rayo y el anillo. Un trazo daña **por barrido** *(decisión del autor, 2026-11-24; ADR 0029)*: cada punto de la curva actúa como una bala, y la línea que la curva barre primero se pierde, con un tope de líneas por pasada. El anillo rompe la cara que te mira, y un escudo quieto daña a quien choca contra él.
   - El **seno** y la **espiral** son proyectiles que recorren la curva. Dejan una estela corta que se ve pero no hace daño.
   - La **rosa** daña con sus pétalos completos mientras orbitan.
 - **Es un bullet hell:** hay enemigos que disparan, además de los que persiguen al jugador.
 - **El jugador es un círculo y muere de un golpe.** Si recoge una protección, se le suma un anillo concéntrico por fuera, y los anillos se acumulan sin límite. Cada anillo es una vida más, pero agranda al jugador: el anillo de afuera es más grande que el de adentro, así que tener más vidas hace más fácil que algo te golpee. Cada golpe rompe el anillo de afuera. *(Lo propuso Claude: que se rompa el de afuera es lo que hace que el jugador se achique al perder una vida.)*
+- **Fuera del ataque hay cinco mejoras** *(decisión del autor, 2026-11-24; ADR 0029)*:
+  - **velocidad;**
+  - **radio menor:** los anillos quedan a `r₀ + i·Δ`, así que achicar el núcleo achica a todos;
+  - **carga:** la experiencia siente tu carga como los enemigos, así que subirla atrae la experiencia y al enjambre a la vez;
+  - **anillo extra;**
+  - **reroll y banish.**
 - **Hay diez tipos de enemigo además del jefe**, cada uno con su idea matemática y una reacción distinta del jugador: triángulo, cuadrado, pentágono, estrella, hexágono, octágono, imán inverso, regenerador, divisor y círculo *(decisión del autor, 2026-11-20; detalle en la spec `docs/specs/2026-11-20-version-0-2-0.md`)*. Todos son justos: ningún ataque llega sin aviso, ninguno queda encima de otro y siempre hay enemigos por todos lados.
 - **La partida sigue la forma de un tema de house o techno** *(decisión del autor, 2026-11-20)*: intro, subida, drop 1, respiro, subida y drop 2, en unos 5 minutos. La forma es fija y lo que entra, dónde y cuándo varía con la semilla.
 - **El jefe aparece cuando termina el drop 2** *(decisión del autor, 2026-11-20; antes, al minuto 10)*. Es un polígono enorme con aristas interiores, y se va rompiendo de a poco. La idea base es una capa de afuera de unos 100 lados con polígonos anidados adentro: al romper una capa queda expuesta la siguiente. El prototipo decide la forma exacta de lo interior. La cantidad de lados y de capas tiene que ser fácil de cambiar, porque dependen del equilibrio al jugar.
 - **Después del último jefe empieza un modo infinito** *(decisión del autor, 2026-11-20)*. Es el último jefe implementado, no el primero. La dificultad crece exponencialmente y el jugador ya no recibe mejoras.
+  - **Su tope de cuerpos es una regla de juego, no un límite del computador** *(decisión del autor, 2026-11-24)*. Se elige por lo que hace interesante al infinito y vale igual en todo computador. El juego final no tiene otros topes de rendimiento ni de mejoras: si algo no cabe en el cuadro, se optimiza (#42).
 - **Cómo termina:** solo al morir, es decir, al recibir un golpe sin anillos *(decisión del autor, 2026-11-20; antes, se ganaba al destruir al jefe)*. La pantalla final muestra el tiempo, el tiempo en el modo infinito, los enemigos eliminados y el nivel alcanzado.
 
 ## La música
@@ -80,7 +97,6 @@ La música sale de la misma geometría que el juego, sobre una base de techno, y
 
 Al terminar el MVP se hace una revisión de cómo expandir el juego. El autor quiere ir sumando dificultad, música y un jefe cada 4 a 6 minutos, como los temas de un set de DJ, y el modo infinito siempre empieza después del último *(2026-11-20)*. Ninguna de estas otras ideas está decidida:
 
-- combinar curvas, por ejemplo seno con círculo para formar una figura de Lissajous;
 - esconder cosas en coordenadas del plano, como un final secreto;
 - sumar color;
 - un editor visual de enemigos, armas y otras piezas, parecido a un editor de niveles: arma una pieza desde sus parámetros y muestra cómo se ven las combinaciones de ataques. Más adelante podría servir para diseñar un jugador que no sea un círculo;
@@ -92,7 +108,7 @@ Para no cerrarle la puerta al editor, el MVP define los enemigos y las armas por
 ## Metas, no-metas y anti-metas
 
 - **Metas:** que se juegue bien y se vea distinto a otros survivors; un código que sirva de ejemplo de Pygame, POO y trigonometría.
-- **No-metas para el MVP:** combinaciones de curvas, secretos en el plano, el editor de enemigos y piezas, más contenido del listado arriba.
+- **No-metas para el MVP:** secretos en el plano, el editor de enemigos y piezas, más contenido del listado arriba.
 - **Anti-metas:** cualquier archivo de imagen o sprite dibujado a mano; un survivors común con una capa geométrica encima, donde las curvas no cambian cómo se juega; cualquier mención de la organización o el curso que motivó el proyecto (en el código, en el README o en los commits).
 
 ## Restricciones
@@ -120,5 +136,4 @@ Sobre el color: el blanco y negro estricto es lo más fiel a la idea, pero cuest
 
 - El nombre del juego. `circlebh` es provisorio.
 - Los números de equilibrio: los lados de cada polígono y del jefe, la velocidad, la frecuencia de las oleadas y de las protecciones, y la curva de experiencia.
-- Qué parámetro mejora cada tarjeta de cada arma.
-- Cómo se mejoran y se combinan las armas con ideas matemáticas (derivar, integrar, componer), y si las combinaciones entran al MVP o quedan para después.
+- Qué tarjetas hay, con qué valores y qué precios. La estructura la decide el ADR 0029; el contenido vive en el balance y se afina jugando (#90).
