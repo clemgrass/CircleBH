@@ -481,7 +481,7 @@ def mundo_cargado(spec: EnemySpec) -> World:
 
 
 def circulos_en_la_cola(world: World) -> int:
-    return sum(1 for name, _ in world.queue if name == "circle")
+    return sum(1 for item in world.queue if item.enemy == "circle")
 
 
 def test_el_mundo_trae_un_circulo_con_masa_critica() -> None:
@@ -496,7 +496,7 @@ def test_el_circulo_nace_detras_del_grupo() -> None:
     world = mundo_cargado(HEXAGON_REAL)
     centro = sum((e.position for e in world.enemies), Vector2()) / len(world.enemies)
     world.update(Vector2())
-    (offset,) = [o for name, o in world.queue if name == "circle"]
+    (offset,) = [item.offset for item in world.queue if item.enemy == "circle"]
     assert offset.length() >= BALANCE.spawning.distance - 1e-9
     assert abs(offset.angle_to(centro - world.player.position)) < 30
 

@@ -157,6 +157,26 @@ def test_heptagono_suelta_cinco() -> None:
         assert hijo.position.distance_to(padre.position) < divisor().radius
 
 
+def test_hijos_del_divisor_cuentan_en_la_oleada() -> None:
+    world = World(BALANCE, random.Random(0), lethal=False)
+    padre = con_una_linea_de_frente(divisor(), Vector2(150, 0))
+    padre.wave = 3
+    world.enemies = [padre]
+    hijos = [e for e in matar(world, padre) if e.spec is fragmento()]
+    assert len(hijos) == 5
+    assert all(hijo.wave == 3 for hijo in hijos)
+
+
+def test_hijos_sin_oleada_no_tienen_etiqueta() -> None:
+    # Negativo: los fragmentos de un divisor que no es de una oleada no la retienen.
+    world = World(BALANCE, random.Random(0), lethal=False)
+    padre = con_una_linea_de_frente(divisor(), Vector2(150, 0))
+    world.enemies = [padre]
+    hijos = [e for e in matar(world, padre) if e.spec is fragmento()]
+    assert hijos
+    assert all(hijo.wave is None for hijo in hijos)
+
+
 def test_sin_split_into_no_suelta_nada() -> None:
     world = World(BALANCE, random.Random(0), lethal=False)
     hexagono = con_una_linea_de_frente(BALANCE.enemies["hexagon"], Vector2(150, 0))

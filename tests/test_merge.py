@@ -18,6 +18,7 @@ from circlebh.world.enemy import Enemy
 from circlebh.world.events import Death
 from circlebh.world.game import World
 from circlebh.world.merge import MergeState, beat_at
+from circlebh.world.spawning import Queued
 
 STAR = BALANCE.enemies["star"]
 RED_STAR = BALANCE.enemies["red_star"]
@@ -182,7 +183,7 @@ def test_una_estrella_con_otro_nombre_tampoco_nace() -> None:
 def test_fuera_de_la_calma_no_nacen_estrellas() -> None:
     world = mundo_con_estrellas(5)
     world.update(QUIETO)
-    world.queue.push([("star", Vector2(400, 0))])
+    world.queue.push([Queued("star", Vector2(400, 0), None)])
     world.update(QUIETO)
     assert not [e for e in world.enemies if e.spec == STAR]
     assert not list(world.queue)
@@ -191,7 +192,7 @@ def test_fuera_de_la_calma_no_nacen_estrellas() -> None:
 def test_en_calma_nacen_estrellas() -> None:
     # Negativo del anterior: sin fusión en curso, la estrella de la cola nace.
     world = mundo_con_estrellas(0)
-    world.queue.push([("star", Vector2(400, 0))])
+    world.queue.push([Queued("star", Vector2(400, 0), None)])
     world.update(QUIETO)
     assert len([e for e in world.enemies if e.spec == STAR]) == 1
 

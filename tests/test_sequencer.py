@@ -12,11 +12,11 @@ from pygame.math import Vector2
 
 from circlebh.audio import sounds
 from circlebh.audio.harmony import chord_at, variation_for
-from circlebh.audio.intensity import PHRASE_BARS
 from circlebh.audio.rhythm import SIXTEENTHS
 from circlebh.audio.sequencer import SAMPLES_PER_STEP, Sequencer
 from circlebh.balance import BALANCE, EnemySpec, SectionSpec, StarPolygonShape
 from circlebh.pilot import pilot_intent
+from circlebh.world.director import PHRASE_BARS
 from circlebh.world.enemy import Enemy
 from circlebh.world.events import Death, Hit
 from circlebh.world.game import World

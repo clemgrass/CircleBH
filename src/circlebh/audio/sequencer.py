@@ -29,7 +29,6 @@ from circlebh.audio.harmony import (
 from circlebh.audio.intensity import (
     FREE,
     PHRASE,
-    PHRASE_BARS,
     Arrangement,
     Cue,
     Layers,
@@ -46,6 +45,7 @@ from circlebh.audio.voices import (
 )
 from circlebh.balance import BALANCE
 from circlebh.world.clock import STEP
+from circlebh.world.director import PHRASE_BARS
 from circlebh.world.events import Death, Event, Hit, Shot
 from circlebh.world.game import World
 from circlebh.world.weapons import Weapon

@@ -6,13 +6,13 @@ import random
 from collections import defaultdict
 from dataclasses import replace
 from fractions import Fraction
+from typing import Literal
 
 import pytest
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.audio.intensity import PHRASE_BARS
 from circlebh.balance import (
     BALANCE,
     DeckEntry,
@@ -21,7 +21,7 @@ from circlebh.balance import (
     SpawningSpec,
 )
 from circlebh.world.clock import STEP
-from circlebh.world.director import Director, bar_at
+from circlebh.world.director import PHRASE_BARS, Director, Purchase, bar_at
 from circlebh.world.game import World
 from circlebh.world.spawning import FORMATIONS
 
@@ -49,10 +49,11 @@ def seccion(
     deck: tuple[DeckEntry, ...],
     burst: float = 0.0,
     formations: tuple[str, ...] = ("single",),
+    kind: Literal["build", "wave"] = "build",
 ) -> SectionSpec:
     return SectionSpec(
         name=name,
-        kind="build",
+        kind=kind,
         bars=bars,
         budget_start=start,
         budget_end=end,
@@ -96,7 +97,9 @@ def correr(director: Director, pasos: int) -> list[tuple[int, list[str]]]:
     por enemigo."""
     return [
         (director.section_index, [p.enemy for p in compras for _ in range(p.count)])
-        for compras in (director.update(paso) for paso in range(1, pasos + 1))
+        for compras in (
+            director.update(paso, wave_alive=False) for paso in range(1, pasos + 1)
+        )
     ]
 
 
@@ -218,6 +221,130 @@ def test_rafaga_solo_al_empezar() -> None:
     assert sum(len(c) for _, c in resultado) == 5
 
 
+# --- Las oleadas (decisión 72) ---
+
+OLEADA = tema(
+    seccion("intro", 4.0, 1.0, 1.0, mazo("intro")),
+    seccion("drop", 8.0, 0.0, 0.0, mazo("drop"), burst=7.0, kind="wave"),
+    seccion("respiro", 4.0, 1.0, 1.0, mazo("respiro")),
+)
+"""El drop es una oleada de 8 compases, del 4 al 12, que compra 7 de amenaza."""
+
+
+def limpiar_en(
+    limpia: float, hasta: float, spec: DirectorSpec = OLEADA
+) -> tuple[Director, list[tuple[int, list[Purchase]]]]:
+    """Corre el director hasta el compás `hasta`, con la oleada viva antes del compás
+    `limpia` y limpia desde ahí. Devuelve, por paso, la sección y lo comprado."""
+    director = Director(spec, ENEMIGOS, SPAWNING, random.Random(1))
+    resultado = []
+    for paso in range(1, primer_paso(hasta, spec.bpm) + 1):
+        compras = director.update(paso, wave_alive=bar_at(paso, spec.bpm) < limpia)
+        resultado.append((director.section_index, compras))
+    return director, resultado
+
+
+def empieza(resultado: list[tuple[int, list[Purchase]]], seccion: int) -> int:
+    """El paso en que empezó la sección de índice `seccion`."""
+    return next(paso for paso, (s, _) in enumerate(resultado, 1) if s == seccion)
+
+
+def test_oleada_compra_su_rafaga_al_empezar() -> None:
+    director = Director(OLEADA, ENEMIGOS, SPAWNING, random.Random(1))
+    golpe = primer_paso(4.0, OLEADA.bpm)
+    for paso in range(1, golpe):
+        director.update(paso, wave_alive=False)
+    # En el paso en que se compra, el mundo todavía no ve a nadie de la oleada: no
+    # cuenta como limpia.
+    oleada = director.update(golpe, wave_alive=False)
+    assert director.waiting
+    assert oleada
+    assert all(p.wave == 1 for p in oleada)
+    gastado = sum(ENEMIGOS[p.enemy].threat * p.count for p in oleada)
+    assert 7.0 - PESADO < gastado <= 7.0
+    despues = [
+        director.update(paso, wave_alive=True)
+        for paso in range(golpe + 1, primer_paso(8.0, OLEADA.bpm))
+    ]
+    assert all(c == [] for c in despues)
+
+
+def test_oleada_no_termina_con_uno_vivo() -> None:
+    # Negativo: mientras quede uno, el director espera, aunque pasen muchos compases.
+    director, resultado = limpiar_en(math.inf, 100.0)
+    assert resultado[-1][0] == 1
+    assert director.waiting
+    # La música pregunta por compases futuros: mientras espera, todos son del drop.
+    assert director.section_at(1000.0).name == "drop"
+
+
+@pytest.mark.parametrize(
+    ("limpia", "inicio"),
+    [
+        (13.5, 16.0),
+        # El compás de margen: limpia a 1,1 compases de la frase, y alcanza.
+        (14.9, 16.0),
+        # Limpia en el último compás de la frase, cuando la música ya decidió la
+        # siguiente: el respiro espera a la otra.
+        (15.1, 20.0),
+    ],
+)
+def test_oleada_termina_al_limpiarse(limpia: float, inicio: float) -> None:
+    director, resultado = limpiar_en(limpia, 24.0)
+    assert empieza(resultado, 2) == primer_paso(inicio, OLEADA.bpm)
+    assert not director.waiting
+    assert director.section_at(inicio).name == "respiro"
+    assert director.section_at(inicio - 0.01).name == "drop"
+
+
+def test_oleada_dura_al_menos_sus_compases() -> None:
+    # Borde: limpia en el compás 5, pero la oleada dura 8 compases, hasta el 12.
+    _, resultado = limpiar_en(5.0, 16.0)
+    assert empieza(resultado, 2) == primer_paso(12.0, OLEADA.bpm)
+    # Y no compra más que al empezar, aunque le sobre `burst`.
+    golpe = primer_paso(4.0, OLEADA.bpm)
+    del_drop = [paso for paso, (s, c) in enumerate(resultado, 1) if s == 1 and c]
+    assert del_drop == [golpe]
+
+
+def test_oleada_sin_compras_queda_limpia() -> None:
+    # Borde: con menos `burst` que la amenaza más barata no compra, y no espera a
+    # nadie aunque el mundo diga que hay alguien.
+    pobre = replace(
+        OLEADA,
+        sections=tuple(
+            replace(s, burst=0.5) if s.kind == "wave" else s for s in OLEADA.sections
+        ),
+    )
+    director, resultado = limpiar_en(math.inf, 16.0, pobre)
+    assert not any(c for s, c in resultado if s == 1)
+    assert empieza(resultado, 2) == primer_paso(12.0, pobre.bpm)
+    assert not director.waiting
+
+
+@settings(max_examples=20, deadline=None)
+@given(data=st.data())
+def test_secciones_empiezan_en_una_frase_tras_la_oleada(data: st.DataObject) -> None:
+    # Foco 6, después de esperar: limpie cuando limpie, cada sección sigue empezando en
+    # una frase.
+    spec = BALANCE.director
+    drop = [s.name for s in spec.sections].index("drop_1")
+    limpia = data.draw(st.floats(inicios(spec)[drop], 120.0))
+    director = Director(spec, BALANCE.enemies, SPAWNING, random.Random(1))
+    seccion = director.section_index
+    for paso in range(1, primer_paso(160.0, spec.bpm) + 1):
+        director.update(paso, wave_alive=bar_at(paso, spec.bpm) < limpia)
+        if director.section_index != seccion:
+            seccion = director.section_index
+            frase = math.floor(bar_at(paso, spec.bpm) / PHRASE_BARS) * PHRASE_BARS
+            assert frase > bar_at(paso - 1, spec.bpm)
+
+
+def test_drops_del_balance_son_oleadas() -> None:
+    kinds = {s.name: s.kind for s in BALANCE.director.sections}
+    assert kinds["drop_1"] == kinds["drop_2"] == "wave"
+
+
 # --- Las formaciones (decisión 28) ---
 
 ANILLOS_DE_5 = replace(SPAWNING, formation_size=(5, 5))
@@ -232,7 +359,11 @@ ANILLO_QUE_CIERRA = tema(
 
 def compras_con_paso(spec: DirectorSpec, spawning: SpawningSpec, pasos: int) -> list:
     director = Director(spec, ENEMIGOS, spawning, random.Random(1))
-    return [(paso, p) for paso in range(1, pasos + 1) for p in director.update(paso)]
+    return [
+        (paso, p)
+        for paso in range(1, pasos + 1)
+        for p in director.update(paso, wave_alive=False)
+    ]
 
 
 def test_formacion_se_compra_entera() -> None:
@@ -268,7 +399,9 @@ def test_solitario_se_compra_siempre_single(seed: int) -> None:
     formaciones = ("ring", "line", "cluster")
     spec = tema(seccion("unica", 8.0, 6.0, 6.0, mazo, formations=formaciones))
     director = Director(spec, enemigos, ANILLOS_DE_5, random.Random(seed))
-    compras = [p for paso in range(1, 2000) for p in director.update(paso)]
+    compras = [
+        p for paso in range(1, 2000) for p in director.update(paso, wave_alive=False)
+    ]
     estrellas = [p for p in compras if p.enemy == "estrella"]
     assert estrellas
     assert all((p.formation, p.count) == ("single", 1) for p in estrellas)
@@ -347,6 +480,30 @@ def test_secciones_empiezan_en_una_frase() -> None:
             "weight",
         ),
         (tema(), ENEMIGOS, "sections"),
+        # Foco 4: una estrella quieta y lejos dejaría el drop sin limpiar nunca.
+        (
+            tema(
+                seccion("x", 4.0, 0.0, 0.0, (DeckEntry("estrella", 1.0),), kind="wave")
+            ),
+            {"estrella": BALANCE.enemies["star"]},
+            r"deck\[estrella\]",
+        ),
+        # Una oleada compra solo al empezar: esa tasa no se usaría.
+        (
+            tema(seccion("x", 4.0, 1.0, 0.0, mazo("drop"), kind="wave")),
+            ENEMIGOS,
+            "budget_start",
+        ),
+        (
+            tema(seccion("x", 4.0, 0.0, 1.0, mazo("drop"), kind="wave")),
+            ENEMIGOS,
+            "budget_end",
+        ),
+        (
+            tema(seccion("x", 4.0, 0.0, 0.0, (DeckEntry("nadie", 1.0),), kind="wave")),
+            ENEMIGOS,
+            "nadie",
+        ),
     ],
 )
 def test_tema_invalido_se_rechaza_al_crear_el_director(
@@ -390,3 +547,33 @@ def test_misma_semilla_mismas_compras() -> None:
         b.update(Vector2(1, 0))
         assert [e.position for e in a.enemies] == [e.position for e in b.enemies]
     assert len(a.enemies) > 4
+
+
+def test_oleada_en_la_cola_no_esta_limpia() -> None:
+    # Borde: la oleada sale de la cola de a uno. Aunque mueran todos los que ya
+    # aparecieron, no está limpia mientras quede alguien esperando.
+    oleada = tema(
+        seccion("intro", 4.0, 0.0, 0.0, ()),
+        seccion(
+            "drop", 4.0, 0.0, 0.0, (DeckEntry("hexagon", 1.0),), burst=5.0, kind="wave"
+        ),
+        seccion("respiro", 4.0, 0.0, 0.0, ()),
+    )
+    balance = replace(
+        BALANCE, director=oleada, spawning=replace(SPAWNING, max_per_step=1)
+    )
+    world = World(balance, random.Random(1), lethal=False, armed=False)
+    while world.director.section_index == 0:
+        world.update(Vector2())
+    salieron = []
+    while list(world.queue):
+        assert world.director.waiting
+        salieron += world.enemies
+        world.enemies = []
+        world.update(Vector2())
+    salieron += world.enemies
+    world.enemies = []
+    world.update(Vector2())
+    assert not world.director.waiting
+    assert len(salieron) == 5
+    assert all(e.wave == 1 for e in salieron)

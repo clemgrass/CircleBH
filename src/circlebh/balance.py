@@ -410,10 +410,12 @@ class SectionSpec:
 
     kind: Literal["build", "wave"]
     """`build` compra de a poco a lo largo de sus compases. `wave` es la oleada de un
-    drop, que hay que limpiar; por ahora se comporta como `build`."""
+    drop: compra todo su `burst` al empezar, y el tema no sigue hasta que se limpia. Una
+    `wave` no tiene tasa, y su mazo no tiene anclados."""
 
     bars: float
-    """Su largo, en compases. La última sección sigue después de ellos."""
+    """Su largo, en compases. La última sección sigue después de ellos. En una `wave`
+    es el largo mínimo: dura al menos esto y, además, hasta que se limpia."""
 
     budget_start: float
     """El presupuesto al empezar, en amenaza por compás."""
@@ -424,7 +426,8 @@ class SectionSpec:
 
     burst: float
     """La ráfaga: amenaza que la sección compra entera en su primer paso, aparte de la
-    tasa. Es lo que llueve justo después del golpe de un drop."""
+    tasa. Es lo que llueve justo después del golpe de un drop. En una `wave`, es la
+    oleada entera."""
 
     layers: tuple[int, int]
     """La capa mínima y la máxima de la música en esta sección, de 0 a 3 (ADR 0026).
@@ -939,11 +942,11 @@ BALANCE = Balance(
             ),
             SectionSpec(
                 name="drop_1",
-                kind="build",
-                bars=32.0,
-                budget_start=2.5,
-                budget_end=2.5,
-                burst=12.0,
+                kind="wave",
+                bars=8.0,
+                budget_start=0.0,
+                budget_end=0.0,
+                burst=30.0,
                 layers=(3, 3),
                 deck=(
                     DeckEntry(enemy="hexagon", weight=1.0),
@@ -992,11 +995,11 @@ BALANCE = Balance(
             ),
             SectionSpec(
                 name="drop_2",
-                kind="build",
-                bars=32.0,
-                budget_start=3.0,
-                budget_end=3.0,
-                burst=20.0,
+                kind="wave",
+                bars=8.0,
+                budget_start=0.0,
+                budget_end=0.0,
+                burst=50.0,
                 layers=(3, 3),
                 deck=(
                     DeckEntry(enemy="hexagon", weight=1.0),
