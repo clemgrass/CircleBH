@@ -225,13 +225,12 @@ SCENARIOS: dict[str, Scenario] = {
         ),
         Scenario(
             "divisor",
-            "El jugador quieto, armado y sin morir, y un divisor al que solo le queda la"
-            " línea de frente: la primera bala lo mata, y se parte en cinco fragmentos"
+            "El piloto se mueve, armado y sin morir, y un divisor entero lo persigue:"
+            " cada bala le quita una línea, y la última lo parte en cinco fragmentos"
             " dentro de su figura, que avisan y embisten.",
-            pilot=False,
+            pilot=True,
             guest="divider",
-            guest_at=(180.0, 0.0),
-            guest_wounded=(0, 2, 3, 4, 5, 6),
+            guest_at=(350.0, 0.0),
             lethal=False,
         ),
         Scenario(
