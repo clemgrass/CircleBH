@@ -110,6 +110,11 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 - Cada bug parte con un test que lo reproduce. Un test inestable se arregla: sin esperas, sin reintentos y sin `skip`.
 - La cobertura es para analizar, no una meta. `render/` y `scenes/` no se testean. El test que no se puede escribir se declara.
 
+## Balance (ADR 0030)
+- **La meta se fija por tema:** cuántos llegan a cada jefe y la forma del riesgo por sección. Los números se afinan midiendo y jugando.
+- **Se mide con dos pilotos:** uno que esquiva con un campo de fuerzas y error σ, y tus partidas grabadas. La medición sale solo de los eventos del mundo, así que un tema que cambie las reglas se mide igual.
+- **Lo que se siente se anota** en `docs/sensacion/`. Un PR que cambia el balance trae en su prueba manual un A/B con la misma semilla.
+
 ## Proceso (ADR 0010)
 - **Ramas e issues:**
   - nunca se trabaja directo en `main`;
@@ -125,4 +130,4 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 
 ## Preguntas abiertas
 - El nombre del juego. `circlebh` es provisorio.
-- Los números de equilibrio, y qué tarjetas hay con sus valores y precios (la estructura la decide el ADR 0029).
+- Los números de equilibrio, y qué tarjetas hay con sus valores y precios (la estructura la decide el ADR 0029, y cómo se miden, el ADR 0030).
