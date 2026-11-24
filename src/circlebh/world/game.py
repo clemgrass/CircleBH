@@ -109,11 +109,10 @@ class World:
         fragmentos en su lugar. Lo que compró el director entra a la cola, y de ella
         aparecen hasta `spawning.max_per_step`, que empiezan a moverse en el paso
         siguiente; mientras hay una fusión en curso, las estrellas de la cola se
-        descartan. La fusión da su
-        paso: puede juntar las estrellas o hacer nacer la gran estrella roja. Recién
-        entonces se revisa el contacto: matar a uno en el mismo paso en que te tocaría te
-        salva. Si una bala o un enemigo lo toca, la partida termina; desde ahí, `update`
-        no hace nada.
+        descartan. La fusión da su paso: puede juntar las estrellas o hacer nacer la gran
+        estrella roja. Recién entonces se revisa el contacto: matar a uno en el mismo paso
+        en que te tocaría te salva. Si una bala o un enemigo lo toca, la partida termina;
+        desde ahí, `update` no hace nada.
 
         `events` queda con lo que pasó en este paso: los avisos de ataque, los disparos
         y golpes de las armas, y una muerte por cada enemigo que perdió su última línea.

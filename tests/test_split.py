@@ -114,6 +114,19 @@ def test_fragmentos_en_la_pose_del_padre(
         assert hijo.velocity == padre.velocity
 
 
+def test_padre_que_gira_suelta_en_su_figura_aunque_se_recentre() -> None:
+    # Con giro, perder una línea corre `position` al centro de masa nuevo, pero ninguna
+    # línea se mueve en el plano (ADR 0027): los centroides tampoco.
+    padre = Enemy(replace(divisor(), spin=1.5), Vector2(80, 30))
+    padre.angle = 0.4
+    antes = [to_world(c, padre.position, padre.angle) for c in centroides()]
+    padre.remove_edge(3)
+    assert padre.offset.length() > 1
+    hijos = fragments(padre, fragmento(), LEJOS, BALANCE.player.radius)
+    for hijo, esperado in zip(hijos, antes, strict=True):
+        assert hijo.position.distance_to(esperado) < 1e-6
+
+
 def test_hijo_que_tocaria_al_jugador_no_nace() -> None:
     # Foco 3: el jugador se metió por un hueco del divisor herido, justo encima del
     # centroide 2. Ese fragmento no nace, y tampoco los de los centroides 1 y 3: quedan
