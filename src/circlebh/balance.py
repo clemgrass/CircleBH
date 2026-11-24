@@ -220,6 +220,35 @@ class SpiralSpec:
 
 
 @dataclass(frozen=True, kw_only=True)
+class RegenerateSpec:
+    """Acción: el médico. Herido, recupera la línea que le falta de índice menor cada
+    `interval`, y un golpe reinicia la cuenta (`world/actions.py`, decisiones 65 a 67
+    de la spec de la 0.2.0)."""
+
+    kind: Literal["regenerate"] = "regenerate"
+
+    interval: float
+    """Su cooldown, en segundos: cuánto espera desde el último golpe o la última línea
+    recuperada."""
+
+    stray: str
+    """El tipo de la línea que suelta al donar, una clave de `enemies`: un segmento con
+    `deliver`."""
+
+
+@dataclass(frozen=True, kw_only=True)
+class DeliverSpec:
+    """Acción: la línea suelta va a su paciente, el herido al que la donó el médico. Si
+    el paciente muere, frena por su roce y queda flotando (decisión 68 de la spec de la
+    0.2.0)."""
+
+    kind: Literal["deliver"] = "deliver"
+
+    speed: float
+    """Su rapidez hacia el paciente, en unidades del plano por segundo."""
+
+
+@dataclass(frozen=True, kw_only=True)
 class StarPolygonShape:
     """La figura de un enemigo: el polígono estrellado `{n/s}` (`world/figures.py`).
 
@@ -254,11 +283,25 @@ class CircleShape:
         return 1
 
 
-type Shape = StarPolygonShape | CircleShape
+@dataclass(frozen=True, kw_only=True)
+class SegmentShape:
+    """La figura de la línea suelta que dona el regenerador: un solo segmento, el
+    diámetro de largo `2·radius` sobre el eje x de su marco (decisión 68 de la spec de
+    la 0.2.0)."""
+
+    kind: Literal["segment"] = "segment"
+
+    @property
+    def line_count(self) -> int:
+        """Una sola línea: muere de un golpe."""
+        return 1
+
+
+type Shape = StarPolygonShape | CircleShape | SegmentShape
 """La figura de un enemigo. En el JSON, su campo `kind` dice cuál es."""
 
 
-type ActionSpec = ChargeSpec | VolleySpec | SpiralSpec
+type ActionSpec = ChargeSpec | VolleySpec | SpiralSpec | RegenerateSpec | DeliverSpec
 """Una acción: lo que el enemigo hace y no es una fuerza (ADR 0021). En el JSON, su
 campo `kind` dice cuál es."""
 
@@ -481,6 +524,16 @@ class EnemyBulletSpec:
 
 
 @dataclass(frozen=True)
+class RegrowSpec:
+    """Las líneas que vuelven: nunca aparecen de golpe (decisión 66 de la spec de la
+    0.2.0)."""
+
+    fade: float
+    """Cuánto dura el fundido de una línea que vuelve, en segundos, desde el color del
+    fondo hasta el del trazo."""
+
+
+@dataclass(frozen=True)
 class Balance:
     """Todas las entidades del juego."""
 
@@ -510,6 +563,9 @@ class Balance:
 
     enemy_bullet: EnemyBulletSpec
     """Las balas que disparan los enemigos."""
+
+    regrow: RegrowSpec
+    """Cómo vuelven las líneas."""
 
 
 # >>> datos (lo genera poe balance-importar)
@@ -674,6 +730,47 @@ BALANCE = Balance(
             threat=2.0,
             actions=(),
         ),
+        "regenerator": EnemySpec(
+            shape=StarPolygonShape(kind="star_polygon", vertices=7, steps=(3,)),
+            radius=24.0,
+            speed=120.0,
+            friction=2.0,
+            spin=0.0,
+            anchored=False,
+            phantom=False,
+            solitary=True,
+            charge_per_line=3.0,
+            mass_per_line=1.0,
+            patterns=(
+                OrbitSpec(
+                    kind="orbit",
+                    radius=300.0,
+                    stiffness=6.0,
+                    tangential=0.0,
+                    follow=False,
+                ),
+                CoulombSpec(kind="coulomb"),
+            ),
+            threat=3.0,
+            actions=(
+                RegenerateSpec(kind="regenerate", interval=2.0, stray="stray_line"),
+            ),
+        ),
+        "stray_line": EnemySpec(
+            shape=SegmentShape(kind="segment"),
+            radius=12.0,
+            speed=200.0,
+            friction=3.0,
+            spin=0.0,
+            anchored=False,
+            phantom=False,
+            solitary=True,
+            charge_per_line=0.2,
+            mass_per_line=1.0,
+            patterns=(CoulombSpec(kind="coulomb"),),
+            threat=0.0,
+            actions=(DeliverSpec(kind="deliver", speed=180.0),),
+        ),
         "star": EnemySpec(
             shape=StarPolygonShape(kind="star_polygon", vertices=5, steps=(1, 2)),
             radius=40.0,
@@ -814,6 +911,7 @@ BALANCE = Balance(
                     DeckEntry(enemy="pentagon", weight=1.0),
                     DeckEntry(enemy="octagon", weight=1.0),
                     DeckEntry(enemy="magnet", weight=0.5),
+                    DeckEntry(enemy="regenerator", weight=0.5),
                     DeckEntry(enemy="star", weight=0.5),
                 ),
                 formations=("single", "line", "cluster"),
@@ -833,6 +931,7 @@ BALANCE = Balance(
                     DeckEntry(enemy="pentagon", weight=1.0),
                     DeckEntry(enemy="octagon", weight=1.0),
                     DeckEntry(enemy="magnet", weight=0.5),
+                    DeckEntry(enemy="regenerator", weight=0.5),
                 ),
                 formations=("ring", "line", "cluster"),
             ),
@@ -846,5 +945,6 @@ BALANCE = Balance(
     ),
     point_weapon=PointWeaponSpec(cooldown=0.6, speed=300.0, range=700.0),
     enemy_bullet=EnemyBulletSpec(speed=330.0, radius=4.0),
+    regrow=RegrowSpec(fade=0.4),
 )
 # <<< datos

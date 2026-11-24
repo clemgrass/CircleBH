@@ -144,11 +144,17 @@ class GameScene:
         if demo is not None and demo.crowd:
             spec = BALANCE.enemies[demo.crowd_enemy]
             center = Vector2(demo.crowd_center)
-            self.world.enemies += [
+            crowd = [
                 Enemy(spec, p) for p in lattice(center, demo.crowd, demo.crowd_spacing)
             ]
+            for enemy in crowd:
+                for k in demo.crowd_wounded:
+                    enemy.remove_edge(k)
+            self.world.enemies += crowd
         if demo is not None and demo.guest is not None:
             guest = Enemy(BALANCE.enemies[demo.guest], Vector2(demo.guest_at))
+            for k in demo.guest_wounded:
+                guest.remove_edge(k)
             self.world.enemies.append(guest)
         self.dead_steps = 0
         self.section = -1

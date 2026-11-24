@@ -273,6 +273,47 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
                 "threat": 2.0,
                 "actions": [],
             },
+            "regenerator": {
+                "shape": {"kind": "star_polygon", "vertices": 7, "steps": [3]},
+                "radius": 24.0,
+                "speed": 120.0,
+                "friction": 2.0,
+                "spin": 0.0,
+                "anchored": False,
+                "phantom": False,
+                "solitary": True,
+                "charge_per_line": 3.0,
+                "mass_per_line": 1.0,
+                "patterns": [
+                    {
+                        "kind": "orbit",
+                        "radius": 300.0,
+                        "stiffness": 6.0,
+                        "tangential": 0.0,
+                        "follow": False,
+                    },
+                    {"kind": "coulomb"},
+                ],
+                "threat": 3.0,
+                "actions": [
+                    {"kind": "regenerate", "interval": 2.0, "stray": "stray_line"}
+                ],
+            },
+            "stray_line": {
+                "shape": {"kind": "segment"},
+                "radius": 12.0,
+                "speed": 200.0,
+                "friction": 3.0,
+                "spin": 0.0,
+                "anchored": False,
+                "phantom": False,
+                "solitary": True,
+                "charge_per_line": 0.2,
+                "mass_per_line": 1.0,
+                "patterns": [{"kind": "coulomb"}],
+                "threat": 0.0,
+                "actions": [{"kind": "deliver", "speed": 180.0}],
+            },
             "star": {
                 "shape": {"kind": "star_polygon", "vertices": 5, "steps": [1, 2]},
                 "radius": 40.0,
@@ -352,6 +393,7 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
         },
         "point_weapon": {"cooldown": 0.6, "speed": 300.0, "range": 700.0},
         "enemy_bullet": {"speed": 330.0, "radius": 4.0},
+        "regrow": {"fade": 0.4},
     }
 
 

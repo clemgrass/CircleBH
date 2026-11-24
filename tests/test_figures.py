@@ -12,7 +12,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, CircleShape, StarPolygonShape
+from circlebh.balance import BALANCE, CircleShape, SegmentShape, StarPolygonShape
 from circlebh.world.collisions import crossing
 from circlebh.world.enemy import Enemy
 from circlebh.world.figures import check_shape, line_vertices, local_lines
@@ -75,6 +75,22 @@ def test_rechaza_menos_de_tres_vertices() -> None:
 
 def test_acepta_la_estrella() -> None:
     check_shape(ESTRELLA, "star")
+
+
+def test_segmento_tiene_una_linea_de_largo_2r() -> None:
+    # La línea suelta del regenerador (#62): un diámetro sobre el eje x.
+    [(a, b)] = local_lines(SegmentShape(), 12.0)
+    assert (a, b) == (Vector2(-12, 0), Vector2(12, 0))
+    assert SegmentShape().line_count == 1
+
+
+def test_volley_en_segmento_se_rechaza() -> None:
+    # Negativo: un segmento solo no tiene puntas desde donde disparar una salva.
+    pentagono = BALANCE.enemies["pentagon"]
+    malo = replace(pentagono, shape=SegmentShape())
+    balance = replace(BALANCE, enemies={**BALANCE.enemies, "pentagon": malo})
+    with pytest.raises(ValueError, match=r"enemies\.pentagon\.actions"):
+        World(balance, random.Random(0))
 
 
 # --- El golpe (F1 del ADR 0027) ---

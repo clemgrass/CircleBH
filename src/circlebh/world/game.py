@@ -2,11 +2,12 @@
 
 import math
 import random
+from dataclasses import replace
 
 from pygame.math import Vector2
 
-from circlebh.balance import Balance
-from circlebh.world.actions import check_actions, step_actions
+from circlebh.balance import Balance, RegenerateSpec
+from circlebh.world.actions import Deliver, check_actions, step_actions, steps_of
 from circlebh.world.clock import STEP
 from circlebh.world.critical_mass import (
     CriticalMass,
@@ -16,10 +17,11 @@ from circlebh.world.critical_mass import (
 from circlebh.world.director import Director, Purchase
 from circlebh.world.enemy import Enemy, check_masses
 from circlebh.world.enemy_bullets import EnemyBullet, bullet_hits_player, step_bullets
-from circlebh.world.events import Death, Event
+from circlebh.world.events import Death, Donate, Event
 from circlebh.world.figures import check_shapes
 from circlebh.world.merge import Merge, check_merge
 from circlebh.world.player import Player
+from circlebh.world.regrowth import absorb
 from circlebh.world.spawning import SpawnQueue, check_formations, place_formation
 from circlebh.world.swarm import step_swarm
 from circlebh.world.weapons import PointWeapon, Weapon
@@ -76,6 +78,10 @@ class World:
         cargas bien afinada, debería quedar en 0 (ADR 0021)."""
         self.events: list[Event] = []
         """Lo que pasó en el último `update` (ADR 0022). Se vacía al empezar cada uno."""
+        self.ghosts: list[tuple[tuple[Vector2, Vector2], int]] = []
+        """Las líneas sueltas absorbidas, con el paso en que las absorbieron. Ya no están
+        en el plano: quedan `regrow.fade` segundos para que el render las apague mientras
+        el hueco del herido se enciende (decisión 66)."""
         self._steps = 0
 
     @property
@@ -94,8 +100,10 @@ class World:
         El jugador se mueve primero, y las balas enemigas avanzan: si alguna lo cruzó en
         este paso, lo mató. Después, las acciones de los enemigos miran dónde quedó, y las
         balas que disparan empiezan a moverse en el paso siguiente. El enjambre da su paso
-        (`step_swarm`), y las armas golpean y disparan. Los enemigos sin líneas
-        desaparecen. Lo que compró el director entra a la cola, y de ella aparecen hasta
+        (`step_swarm`), y las armas golpean y disparan. Las líneas que donó un médico
+        pasan a ser líneas sueltas, y los heridos absorben las que tocan: después de las
+        balas, para que un herido que murió en este paso no se cure. Los enemigos sin
+        líneas desaparecen. Lo que compró el director entra a la cola, y de ella aparecen hasta
         `spawning.max_per_step`, que empiezan a moverse en el paso siguiente; mientras
         hay una fusión en curso, las estrellas de la cola se descartan. La fusión da su
         paso: puede juntar las estrellas o hacer nacer la gran estrella roja. Recién
@@ -120,7 +128,12 @@ class World:
             for b in self.enemy_bullets
         )
         self.events += step_actions(
-            self.enemies, self.player.position, self.rng, self.enemy_bullets, bullet
+            self.enemies,
+            self.player.position,
+            self.rng,
+            self.enemy_bullets,
+            bullet,
+            self._steps,
         )
         self.separations += step_swarm(
             self.enemies,
@@ -131,6 +144,10 @@ class World:
         )
         for weapon in self.weapons:
             self.events += weapon.update(self.player.position, self.enemies)
+        for event in self.events:
+            if isinstance(event, Donate):
+                self._release(event)
+        self._absorb()
         self.events += [Death(enemy) for enemy in self.enemies if not enemy.alive]
         self.enemies = [enemy for enemy in self.enemies if enemy.alive]
         for purchase in self.director.update(self._steps):
@@ -152,6 +169,37 @@ class World:
             )
         )
 
+    def _release(self, event: Donate) -> None:
+        """Convierte la línea que donó el médico en una línea suelta, donde estaba, con
+        su largo, su orientación y la velocidad del médico. Nace en este paso, sin pasar
+        por la cola, y va al paciente desde el siguiente."""
+        name = next(
+            a.stray for a in event.enemy.spec.actions if isinstance(a, RegenerateSpec)
+        )
+        a, b = event.line
+        stray = Enemy(
+            replace(self.balance.enemies[name], radius=a.distance_to(b) / 2),
+            (a + b) / 2,
+        )
+        stray.angle = stray.previous_angle = math.atan2(b.y - a.y, b.x - a.x)
+        stray.velocity = Vector2(event.enemy.velocity)
+        for action in stray.actions:
+            if isinstance(action, Deliver):
+                action.patient, action.donor = event.patient, event.enemy
+        self.enemies.append(stray)
+
+    def _absorb(self) -> None:
+        """Los heridos absorben las líneas sueltas que tocan. Las absorbidas salen del
+        plano sin morir, y quedan como fantasmas mientras se apagan."""
+        fade = steps_of(self.balance.regrow.fade)
+        self.ghosts = [g for g in self.ghosts if self._steps - g[1] < fade]
+        regrown, absorbed = absorb(self.enemies, self._steps)
+        self.events += regrown
+        for stray in absorbed:
+            self.enemies.remove(stray)
+            [line] = stray.lines()
+            self.ghosts.append((line, self._steps))
+
     def _check_critical_mass(self) -> None:
         """Si el enjambre se cargó hacia un lado, compra un círculo que lo reparta.
 
@@ -169,7 +217,7 @@ class World:
         offsets = [
             enemy.position - here
             for enemy in self.enemies
-            if not (enemy.spec.anchored or enemy.spec.phantom)
+            if not (enemy.spec.anchored or enemy.spec.phantom or enemy.stray)
         ]
         if self.critical_mass.update(self._steps, present, offsets):
             heavy = heavy_direction(offsets)

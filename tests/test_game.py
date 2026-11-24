@@ -507,3 +507,10 @@ def test_los_anclados_y_los_fantasmas_no_cuentan(campo: str) -> None:
     world = mundo_cargado(replace(HEXAGON_REAL, **{campo: True}))
     world.update(Vector2())
     assert circulos_en_la_cola(world) == 0
+
+
+def test_las_lineas_sueltas_no_cuentan_para_la_masa_critica() -> None:
+    # Negativo: lo que dona el regenerador no es enjambre (#62).
+    world = mundo_cargado(BALANCE.enemies["stray_line"])
+    world.update(Vector2())
+    assert circulos_en_la_cola(world) == 0

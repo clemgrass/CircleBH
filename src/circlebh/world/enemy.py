@@ -6,11 +6,12 @@ Cada línea es una parte del enemigo: la bala quita la que golpea, y sin líneas
 muere. Chocan por sus líneas, y el círculo envolvente es el primer descarte (ADR 0020).
 """
 
+import bisect
 from collections.abc import Mapping
 
 from pygame.math import Vector2
 
-from circlebh.balance import CircleShape, EnemySpec
+from circlebh.balance import CircleShape, EnemySpec, SegmentShape
 from circlebh.world.actions import make_action
 from circlebh.world.clock import STEP
 from circlebh.world.collisions import (
@@ -48,6 +49,9 @@ class Enemy:
         sin girar (`world/figures.py`). No cambian."""
         self.edges = list(range(spec.shape.line_count))
         """Los índices de las líneas que le quedan en `figure`, de menor a mayor."""
+        self.restored_at: dict[int, int] = {}
+        """En qué paso del mundo volvió cada línea recuperada. El render la funde desde
+        ahí (decisión 66 de la spec de la 0.2.0)."""
         self.velocity = Vector2()
         """Unidades del plano por segundo. Parte quieto."""
         self.angle = 0.0
@@ -101,6 +105,17 @@ class Enemy:
         """Vive mientras le quede alguna línea."""
         return bool(self.edges)
 
+    @property
+    def stray(self) -> bool:
+        """Si es una línea suelta, la que dona el regenerador: el único segmento del
+        balance. No es enjambre: no cuenta para la masa crítica, y no se cura."""
+        return isinstance(self.spec.shape, SegmentShape)
+
+    @property
+    def wounded(self) -> bool:
+        """Vivo y con alguna línea menos que su figura entera."""
+        return 0 < len(self.edges) < self.spec.shape.line_count
+
     def remove_edge(self, k: int) -> None:
         """Quita la línea `k`: una bala la golpeó.
 
@@ -113,8 +128,26 @@ class Enemy:
         - `velocity` pasa a la que tenía ese punto: `v + ω × (c' − c)`.
         """
         self.edges.remove(k)
+        if self.edges:
+            self._recenter()
+
+    def restore_edge(self, k: int, step: int) -> None:
+        """Devuelve la línea `k`, que volvió en el paso `step` del mundo.
+
+        Es lo inverso de `remove_edge`, con la misma cuenta: con giro, `position` pasa al
+        centro de masa de las líneas que tiene ahora. La línea que vuelve corre ese
+        centro hacia ella, así que `c' − c` sale con el signo contrario al de perderla, y
+        ninguna línea se mueve en el plano."""
+        if k in self.edges or not 0 <= k < self.spec.shape.line_count:
+            raise ValueError(f"restore_edge: la línea {k} no le falta a este enemigo")
+        bisect.insort(self.edges, k)
+        self.restored_at[k] = step
+        self._recenter()
+
+    def _recenter(self) -> None:
+        """Con giro, pasa `position` al centro de masa de las líneas que le quedan."""
         # Un anclado no gira (ver `step`), así que tampoco se recentra.
-        if self.spec.spin == 0 or self.spec.anchored or not self.edges:
+        if self.spec.spin == 0 or self.spec.anchored:
             return
         # `shift` es `c' − c` en el marco del enemigo, y `moved`, en el plano.
         shift = center_of_mass(self._local_lines())
