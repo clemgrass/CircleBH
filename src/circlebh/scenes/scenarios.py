@@ -179,6 +179,20 @@ SCENARIOS: dict[str, Scenario] = {
             lethal=False,
         ),
         Scenario(
+            "iman-junta",
+            "El piloto da vueltas, sin armas y sin morir, con 16 hexágonos y un imán"
+            " inverso detrás: el imán alcanza al grupo, lo junta a su alrededor y viaja"
+            " con su escudo, mientras los demás hexágonos siguen al piloto en fila.",
+            pilot=True,
+            crowd=16,
+            crowd_center=(-300.0, 0.0),
+            crowd_spacing=70.0,
+            guest="magnet",
+            guest_at=(-520.0, 0.0),
+            lethal=False,
+            armed=False,
+        ),
+        Scenario(
             "masa-critica",
             "30 hexágonos juntos a un lado del jugador quieto, que no muere ni dispara:"
             " la masa crítica trae un círculo, que nace fuera de la vista detrás del"

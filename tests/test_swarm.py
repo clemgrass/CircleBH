@@ -349,3 +349,68 @@ def test_sin_follow_el_cerco_se_queda_atras() -> None:
     # costados, y el cerco se aplasta detrás del jugador.
     arco, _ = cerco_corriendo(sin_follow(BALANCE.enemies["octagon"]))
     assert arco < 90
+
+
+# --- el imán inverso (decisiones 62 y 63) ---
+# Cada test lee el imán del balance por su cuenta: si falta, falla solo este bloque.
+
+
+def iman_solo_coulomb() -> EnemySpec:
+    return replace(BALANCE.enemies["magnet"], patterns=(CoulombSpec(),))
+
+
+def distancia_tras(a: EnemySpec, b: EnemySpec, separacion: float, pasos: int) -> float:
+    """Pone a `a` en el origen y a `b` a `separacion`, sin jugador, y devuelve la
+    distancia entre los dos tras `pasos` pasos."""
+    primero, segundo = Enemy(a, Vector2()), Enemy(b, Vector2(separacion, 0))
+    for _ in range(pasos):
+        paso([primero, segundo])
+    return primero.position.distance_to(segundo.position)
+
+
+def test_iman_atrae_a_un_hexagono() -> None:
+    assert distancia_tras(iman_solo_coulomb(), SOLO_COULOMB, 100, 30) < 100
+    # El mismo hexágono, frente a otro hexágono en el lugar del imán, se aleja.
+    assert distancia_tras(SOLO_COULOMB, SOLO_COULOMB, 100, 30) > 100
+
+
+def test_nucleo_duro_igual_los_separa() -> None:
+    # Borde: aunque se atraen, el núcleo duro no depende de la carga, y la red de
+    # seguridad no tiene nada que corregir.
+    iman = iman_solo_coulomb()
+    a, b = Enemy(iman, Vector2()), Enemy(SOLO_COULOMB, Vector2(100, 0))
+    for _ in range(round(10 / STEP)):
+        assert paso([a, b]) == 0
+        assert a.position.distance_to(b.position) > iman.radius + HEXAGON.radius
+
+
+def test_dos_imanes_se_repelen() -> None:
+    # Negativo: el signo es el mismo, así que entre ellos no hay atracción.
+    iman = iman_solo_coulomb()
+    assert distancia_tras(iman, iman, 80, 30) > 80
+
+
+def escudo_corriendo(centro: EnemySpec) -> float:
+    """`centro` en `(−300, 0)` con 16 hexágonos alrededor, y el jugador corriendo en
+    línea recta durante 30 s. Devuelve el promedio, desde los 20 s, de hexágonos a menos
+    de 90 de `centro`."""
+    origen = Vector2(-300, 0)
+    medio = Enemy(centro, origen)
+    hexagonos = [Enemy(HEXAGON, p) for p in lattice(origen, 17, 70)[1:]]
+    enemies = [medio, *hexagonos]
+    velocidad = Vector2(BALANCE.player.speed, 0)
+    cuentas = []
+    for k in range(round(30 / STEP)):
+        jugador = velocidad * (k * STEP)
+        step_swarm(enemies, jugador, velocidad, BALANCE.player.charge, BALANCE.charges)
+        if k * STEP >= 20:
+            cuentas.append(
+                sum(h.position.distance_to(medio.position) < 90 for h in hexagonos)
+            )
+    return sum(cuentas) / len(cuentas)
+
+
+def test_escudo_viaja_con_el_iman() -> None:
+    # Al correr, el enjambre que te sigue se estira en fila; alrededor del imán, no.
+    assert escudo_corriendo(BALANCE.enemies["magnet"]) >= 4
+    assert escudo_corriendo(HEXAGON) < 1
