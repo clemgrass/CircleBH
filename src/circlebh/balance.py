@@ -408,10 +408,12 @@ class SectionSpec:
     name: str
     """Su nombre, para el registro de la demo."""
 
-    kind: Literal["build", "wave"]
+    kind: Literal["build", "wave", "endless"]
     """`build` compra de a poco a lo largo de sus compases. `wave` es la oleada de un
     drop: compra todo su `burst` al empezar, y el tema no sigue hasta que se limpia. Una
-    `wave` no tiene tasa, y su mazo no tiene anclados."""
+    `wave` no tiene tasa, y su mazo no tiene anclados. `endless` es el modo infinito, la
+    última sección: su tasa crece como `budget_start · 2^(x/T)` (`EndlessSpec`), y no
+    usa `budget_end`, `burst` ni `bars`."""
 
     bars: float
     """Su largo, en compases. La última sección sigue después de ellos. En una `wave`
@@ -442,6 +444,30 @@ class SectionSpec:
 
 
 @dataclass(frozen=True)
+class EndlessSpec:
+    """El modo infinito: cómo crece su presupuesto y cuánto peligro compra el excedente
+    sobre el tope de cuerpos (decisiones 20 y 74).
+
+    Cada multiplicador vale `min(tope, 1 + step·ℓ)`, con `ℓ = log₂(1 + E/B₀)`: sube un
+    escalón por cada vez que se duplica el excedente `E`."""
+
+    doubling: float
+    """`T`: cada cuántos compases se duplica el presupuesto."""
+
+    step: float
+    """Cuánto sube cada multiplicador por cada duplicación del excedente."""
+
+    speed_cap: float
+    """El tope del multiplicador de velocidad de los que persiguen."""
+
+    cadence_cap: float
+    """El tope del multiplicador de la cadencia de los ataques."""
+
+    sides_cap: float
+    """El tope del multiplicador que carga el mazo hacia los de más lados."""
+
+
+@dataclass(frozen=True)
 class DirectorSpec:
     """El director: la forma del tema que sigue la partida (ADR 0025)."""
 
@@ -449,11 +475,15 @@ class DirectorSpec:
     """El tempo, en pulsos por minuto. Un compás son 4 pulsos. La música lo lee de aquí."""
 
     max_alive: int
-    """El tope de cuerpos vivos del modo infinito. Es provisorio, hasta medir con
-    `poe benchmark` cuántos cuerpos caben en 16,6 ms por paso."""
+    """El tope de cuerpos del modo infinito: los vivos y los de la cola, cada uno por los
+    cuerpos que puede llegar a ser. Sale de medir con `poe benchmark` cuántos caben en
+    16,6 ms por paso (decisión 73)."""
 
     sections: tuple[SectionSpec, ...]
     """Las secciones, en orden."""
+
+    endless: EndlessSpec
+    """Los números propios del modo infinito."""
 
 
 @dataclass(frozen=True)
@@ -907,7 +937,7 @@ BALANCE = Balance(
     ),
     director=DirectorSpec(
         bpm=124.0,
-        max_alive=300,
+        max_alive=150,
         sections=(
             SectionSpec(
                 name="intro",
@@ -1013,6 +1043,30 @@ BALANCE = Balance(
                 ),
                 formations=("ring", "line", "cluster"),
             ),
+            SectionSpec(
+                name="infinito",
+                kind="endless",
+                bars=4.0,
+                budget_start=3.0,
+                budget_end=0.0,
+                burst=0.0,
+                layers=(2, 3),
+                deck=(
+                    DeckEntry(enemy="hexagon", weight=1.0),
+                    DeckEntry(enemy="square", weight=1.0),
+                    DeckEntry(enemy="triangle", weight=1.0),
+                    DeckEntry(enemy="pentagon", weight=1.0),
+                    DeckEntry(enemy="octagon", weight=1.0),
+                    DeckEntry(enemy="magnet", weight=0.5),
+                    DeckEntry(enemy="regenerator", weight=0.5),
+                    DeckEntry(enemy="divider", weight=0.5),
+                    DeckEntry(enemy="star", weight=0.5),
+                ),
+                formations=("single", "ring", "line", "cluster"),
+            ),
+        ),
+        endless=EndlessSpec(
+            doubling=16.0, step=0.25, speed_cap=1.5, cadence_cap=2.0, sides_cap=2.0
         ),
     ),
     merge=MergeSpec(

@@ -29,6 +29,8 @@ class Scenario:
     """Si el contacto termina la partida."""
     armed: bool = True
     """Si el jugador tiene armas."""
+    section: str = ""
+    """La sección del tema en que parte, como `debug.start_section`. `""` es el comienzo."""
 
 
 SCENARIOS: dict[str, Scenario] = {
@@ -244,6 +246,14 @@ SCENARIOS: dict[str, Scenario] = {
             crowd_spacing=55.0,
             lethal=False,
             armed=False,
+        ),
+        Scenario(
+            "infinito",
+            "El piloto se mueve, armado, y la partida parte en el modo infinito: el"
+            " presupuesto crece hasta llenar el tope de cuerpos, y después sube el"
+            " peligro. Al morir, la pantalla muestra el tiempo total y el del infinito.",
+            pilot=True,
+            section="infinito",
         ),
     ]
 }

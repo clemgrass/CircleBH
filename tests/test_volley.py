@@ -18,6 +18,7 @@ from circlebh.balance import BALANCE, VolleySpec
 from circlebh.settings import load_settings
 from circlebh.world.actions import ActionContext, Volley, VolleyState, make_action
 from circlebh.world.clock import STEP
+from circlebh.world.danger import Danger
 from circlebh.world.enemy import Enemy
 from circlebh.world.enemy_bullets import EnemyBullet
 from circlebh.world.events import Telegraph
@@ -111,6 +112,20 @@ def test_etapas_en_orden_y_con_su_duracion() -> None:
         (VolleyState.FIRING, RAFAGA),
         (VolleyState.RECOVERING, recuperacion),
         # Al terminar la recuperación, ya mira en ese mismo paso.
+        (VolleyState.TELEGRAPHING, 1),
+    ]
+
+
+def test_cadencia_acorta_la_recuperacion() -> None:
+    # En el infinito, con el doble de cadencia, se recupera en la mitad. El aviso y la
+    # ráfaga no cambian.
+    recuperacion = pasos(VOLLEY.cooldown / 2)
+    enemy = Enemy(PENTAGON, Vector2(DISTANCIA, 0), Danger(cadence=2.0))
+    states = avanzar(enemy, AVISO + RAFAGA + recuperacion + 1)
+    assert tramos(states) == [
+        (VolleyState.TELEGRAPHING, AVISO),
+        (VolleyState.FIRING, RAFAGA),
+        (VolleyState.RECOVERING, recuperacion),
         (VolleyState.TELEGRAPHING, 1),
     ]
 

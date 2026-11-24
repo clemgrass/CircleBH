@@ -452,7 +452,7 @@
   },
   "director": {
     "bpm": 124.0,
-    "max_alive": 300,
+    "max_alive": 150,
     "sections": [
       {
         "name": "intro",
@@ -690,8 +690,71 @@
           "line",
           "cluster"
         ]
+      },
+      {
+        "name": "infinito",
+        "kind": "endless",
+        "bars": 4.0,
+        "budget_start": 3.0,
+        "budget_end": 0.0,
+        "burst": 0.0,
+        "layers": [
+          2,
+          3
+        ],
+        "deck": [
+          {
+            "enemy": "hexagon",
+            "weight": 1.0
+          },
+          {
+            "enemy": "square",
+            "weight": 1.0
+          },
+          {
+            "enemy": "triangle",
+            "weight": 1.0
+          },
+          {
+            "enemy": "pentagon",
+            "weight": 1.0
+          },
+          {
+            "enemy": "octagon",
+            "weight": 1.0
+          },
+          {
+            "enemy": "magnet",
+            "weight": 0.5
+          },
+          {
+            "enemy": "regenerator",
+            "weight": 0.5
+          },
+          {
+            "enemy": "divider",
+            "weight": 0.5
+          },
+          {
+            "enemy": "star",
+            "weight": 0.5
+          }
+        ],
+        "formations": [
+          "single",
+          "ring",
+          "line",
+          "cluster"
+        ]
       }
-    ]
+    ],
+    "endless": {
+      "doubling": 16.0,
+      "step": 0.25,
+      "speed_cap": 1.5,
+      "cadence_cap": 2.0,
+      "sides_cap": 2.0
+    }
   },
   "merge": {
     "enemy": "star",

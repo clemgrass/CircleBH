@@ -7,7 +7,8 @@
     "offset": [0.0, 0.0]
   },
   "debug": {
-    "show_hitboxes": false
+    "show_hitboxes": false,
+    "start_section": ""
   },
   "audio": {
     "music": true,

@@ -14,7 +14,7 @@ from circlebh.world.critical_mass import (
     check_critical_mass,
     heavy_direction,
 )
-from circlebh.world.director import Director, Purchase
+from circlebh.world.director import Director, Purchase, body_weight
 from circlebh.world.enemy import Enemy, check_masses
 from circlebh.world.enemy_bullets import EnemyBullet, bullet_hits_player, step_bullets
 from circlebh.world.events import Death, Donate, Event
@@ -53,14 +53,16 @@ class World:
         self.lethal = lethal
         self.player = Player(balance.player)
         self.enemies: list[Enemy] = []
-        self.director = Director(
-            balance.director, balance.enemies, balance.spawning, rng
-        )
-        """Decide qué aparece y cuándo, con la forma del tema (ADR 0025)."""
+        # Primero cada enemigo, después el tema que los usa: el error de un enemigo
+        # nombra el campo exacto, y el del mazo, solo al enemigo.
         check_shapes(balance.enemies)
         check_actions(balance.enemies)
         check_masses(balance.enemies)
         check_splits(balance.enemies)
+        self.director = Director(
+            balance.director, balance.enemies, balance.spawning, rng
+        )
+        """Decide qué aparece y cuándo, con la forma del tema (ADR 0025)."""
         check_merge(balance)
         self.merge = Merge(balance.merge, balance.enemies, balance.director.bpm)
         """La fusión de las estrellas en la gran estrella roja."""
@@ -90,11 +92,26 @@ class World:
         en el plano: quedan `regrow.fade` segundos para que el render las apague mientras
         el hueco del herido se enciende (decisión 66)."""
         self._steps = 0
+        self._endless_steps = 0
 
     @property
     def steps(self) -> int:
         """Pasos dados en esta partida. Se detiene al morir."""
         return self._steps
+
+    @property
+    def endless_steps(self) -> int:
+        """Pasos dados en el modo infinito: 0 si no llegaste. Se detiene al morir."""
+        return self._endless_steps
+
+    @property
+    def bodies(self) -> int:
+        """Los cuerpos que cuentan para el tope del infinito: los vivos y los de la cola,
+        cada uno por los que puede llegar a ser (`body_weight`)."""
+        enemies = self.balance.enemies
+        return sum(body_weight(enemy.spec, enemies) for enemy in self.enemies) + sum(
+            body_weight(enemies[item.enemy], enemies) for item in self.queue
+        )
 
     @property
     def elapsed(self) -> float:
@@ -112,9 +129,10 @@ class World:
         balas, para que un herido que murió en este paso no se cure. Los enemigos sin
         líneas desaparecen, y el que se parte al morir, como el divisor, deja sus
         fragmentos en su lugar, con su oleada. El director sabe si queda alguien de la
-        oleada en curso, vivo o en la cola. Lo que compró entra a la cola, y de ella
-        aparecen hasta `spawning.max_per_step`, que empiezan a moverse en el paso
-        siguiente; mientras hay una fusión en curso, las estrellas de la cola se
+        oleada en curso, vivo o en la cola, y cuántos cuerpos cuentan para el tope del
+        infinito. Lo que compró entra a la cola, y de ella aparecen hasta
+        `spawning.max_per_step`, con el peligro del director, que empiezan a moverse en
+        el paso siguiente; mientras hay una fusión en curso, las estrellas de la cola se
         descartan. La fusión da su paso: puede juntar las estrellas o hacer nacer la gran
         estrella roja. Recién entonces se revisa el contacto: matar a uno en el mismo paso
         en que te tocaría te salva. Si una bala o un enemigo lo toca, la partida termina;
@@ -164,13 +182,19 @@ class World:
             self._split(enemy)
         # Fuera de una oleada no hace falta recorrer el plano y la cola.
         alive = self.director.waiting and self._wave_alive()
-        for purchase in self.director.update(self._steps, wave_alive=alive):
+        updates = self.director.update(
+            self._steps, wave_alive=alive, bodies=self.bodies
+        )
+        for purchase in updates:
             self._enqueue(purchase)
+        if self.director.section.kind == "endless":
+            self._endless_steps += 1
+        danger = self.director.danger
         for item in self.queue.pop(self.balance.spawning.max_per_step):
             if not self.merge.allows(item.enemy):
                 continue
             position = self.player.position + item.offset
-            enemy = Enemy(self.balance.enemies[item.enemy], position)
+            enemy = Enemy(self.balance.enemies[item.enemy], position, danger)
             enemy.wave = item.wave
             self.enemies.append(enemy)
         self.enemies = self.merge.update(

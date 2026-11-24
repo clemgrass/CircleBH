@@ -27,6 +27,7 @@ from circlebh.balance import (
 )
 from circlebh.world.clock import STEP
 from circlebh.world.collisions import circles_touch
+from circlebh.world.danger import NEUTRAL, Danger
 from circlebh.world.enemy import Enemy
 from circlebh.world.events import Death
 from circlebh.world.figures import triangulation_centroids
@@ -176,12 +177,33 @@ def test_hijos_del_divisor_cuentan_en_la_oleada() -> None:
     assert all(hijo.wave == 3 for hijo in hijos)
 
 
+def test_fragmentos_heredan_el_peligro() -> None:
+    # Los hijos de un divisor del infinito son tan peligrosos como su padre.
+    world = World(BALANCE, random.Random(0), lethal=False)
+    padre = con_una_linea_de_frente(divisor(), Vector2(150, 0))
+    padre.danger = Danger(speed=1.2, cadence=1.5)
+    world.enemies = [padre]
+    hijos = [e for e in matar(world, padre) if e.spec is fragmento()]
+    assert len(hijos) == 5
+    assert all(hijo.danger == Danger(speed=1.2, cadence=1.5) for hijo in hijos)
+
+
+def test_hijos_de_un_padre_neutro_nacen_neutros() -> None:
+    # Negativo: fuera del infinito, los fragmentos no ganan peligro.
+    world = World(BALANCE, random.Random(0), lethal=False)
+    padre = con_una_linea_de_frente(divisor(), Vector2(150, 0))
+    world.enemies = [padre]
+    hijos = [e for e in matar(world, padre) if e.spec is fragmento()]
+    assert all(hijo.danger == NEUTRAL for hijo in hijos)
+
+
 def test_fragmentos_vivos_mantienen_la_oleada() -> None:
     # El drop no se limpia mientras quede un fragmento: el director sigue esperando
     # después de que muere el divisor, y deja de esperar cuando ya no queda ninguno.
     oleada = DirectorSpec(
         bpm=124.0,
         max_alive=300,
+        endless=BALANCE.director.endless,
         sections=(
             SectionSpec(
                 name="drop",

@@ -4,6 +4,7 @@ import itertools
 import math
 import random
 from dataclasses import replace
+from fractions import Fraction
 
 import pytest
 from hypothesis import given
@@ -19,11 +20,12 @@ from circlebh.balance import (
     SectionSpec,
 )
 from circlebh.world.clock import STEP
-from circlebh.world.director import bar_at
+from circlebh.world.danger import NEUTRAL
+from circlebh.world.director import bar_at, start_from
 from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
 from circlebh.world.polygon import polygon_edge
-from circlebh.world.spawning import quadrant
+from circlebh.world.spawning import Queued, quadrant
 from circlebh.world.swarm import lattice
 from circlebh.world.weapons import PointWeapon
 
@@ -191,6 +193,7 @@ RAPIDO = replace(
     director=DirectorSpec(
         bpm=124.0,
         max_alive=300,
+        endless=BALANCE.director.endless,
         sections=(
             SectionSpec(
                 name="rapida",
@@ -514,3 +517,99 @@ def test_las_lineas_sueltas_no_cuentan_para_la_masa_critica() -> None:
     world = mundo_cargado(BALANCE.enemies["stray_line"])
     world.update(Vector2())
     assert circulos_en_la_cola(world) == 0
+
+
+# --- El tope de cuerpos del infinito (#65) ---
+
+
+def test_cuerpos_cuenta_la_cola_y_los_fragmentos() -> None:
+    # Un divisor vivo cuenta por sus 5 fragmentos, y los de la cola también cuentan.
+    world = World(SIN_APARICIONES, random.Random(1), lethal=False)
+    world.enemies = [Enemy(BALANCE.enemies["divider"], Vector2(300, 0))]
+    world.queue.push(Queued("hexagon", Vector2(800, 0), None) for _ in range(2))
+    assert world.bodies == 7
+
+
+def test_sin_nadie_no_hay_cuerpos() -> None:
+    # Borde: un mundo vacío no ocupa el tope.
+    assert World(SIN_APARICIONES, random.Random(1)).bodies == 0
+
+
+# --- El peligro y el tiempo del infinito (#65) ---
+
+[INFINITO_REAL] = [s for s in BALANCE.director.sections if s.kind == "endless"]
+SOLO_INFINITO = replace(
+    BALANCE, director=replace(start_from(BALANCE.director, "infinito"), max_alive=30)
+)
+"""La partida desde el infinito, con un tope chico para llenarlo rápido."""
+INTRO_E_INFINITO = replace(
+    BALANCE,
+    director=replace(
+        BALANCE.director,
+        sections=(
+            replace(BALANCE.director.sections[0], bars=4.0, deck=()),
+            INFINITO_REAL,
+        ),
+    ),
+)
+"""4 compases sin compras y el infinito."""
+
+
+def primer_paso(bar: float) -> int:
+    """El primer paso que llega al compás `bar`, a 124 BPM, con fracciones exactas."""
+    return math.ceil(Fraction(bar) * 4 * 3600 / 124)
+
+
+def test_fuera_del_infinito_nacen_neutros() -> None:
+    # Negativo: en el tema, nadie nace con peligro.
+    world = World(BALANCE, random.Random(1), lethal=False)
+    for _ in range(600):
+        world.update(Vector2())
+    assert world.enemies
+    assert all(enemy.danger == NEUTRAL for enemy in world.enemies)
+
+
+def test_en_el_infinito_nacen_con_el_peligro_del_director() -> None:
+    # Con el tope lleno, el excedente sube el peligro. Cada vez que se abre espacio,
+    # los que salen de la cola nacen con el peligro del director en ese paso.
+    world = World(SOLO_INFINITO, random.Random(1), lethal=False, armed=False)
+    mazo = [BALANCE.enemies[entry.enemy] for entry in INFINITO_REAL.deck]
+    peligros = []
+    for paso in range(1, 3600):
+        antes = {id(enemy) for enemy in world.enemies}
+        world.update(Vector2())
+        nuevos = [e for e in world.enemies if id(e) not in antes and e.spec in mazo]
+        assert all(e.danger == world.director.danger for e in nuevos)
+        peligros += [e.danger.speed for e in nuevos]
+        if paso > 1800 and paso % 60 == 0:
+            # Tras 30 s con el tope lleno, matar a algunos abre espacio.
+            world.enemies = world.enemies[3:]
+    assert max(peligros) > 1
+
+
+def test_endless_steps_cuenta_solo_el_infinito() -> None:
+    world = World(INTRO_E_INFINITO, random.Random(1), lethal=False, armed=False)
+    for _ in range(primer_paso(8.0)):
+        world.update(Vector2())
+    assert world.endless_steps == primer_paso(8.0) - primer_paso(4.0) + 1
+
+
+def test_sin_infinito_no_cuenta() -> None:
+    # Negativo: si no llegaste, el tiempo del infinito es 0.
+    world = World(SIN_APARICIONES, random.Random(1), lethal=False)
+    for _ in range(600):
+        world.update(Vector2())
+    assert world.endless_steps == 0
+
+
+def test_sin_mejoras_en_el_infinito() -> None:
+    # Negativo: en el infinito el jugador ya no recibe mejoras (decisión 18).
+    world = World(SOLO_INFINITO, random.Random(1), lethal=False)
+    armas = list(world.weapons)
+    for _ in range(2000):
+        world.update(Vector2())
+    assert world.weapons == armas
+    assert all(
+        isinstance(w, PointWeapon) and w.spec == BALANCE.point_weapon
+        for w in world.weapons
+    )

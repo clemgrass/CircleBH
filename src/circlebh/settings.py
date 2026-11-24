@@ -64,6 +64,11 @@ class DebugSettings:
     show_hitboxes: bool
     """Dibuja el círculo de choque del jugador y el círculo envolvente de cada enemigo."""
 
+    start_section: str
+    """La sección del tema en que parte la partida, como `"infinito"`; con `""`, desde el
+    comienzo. Es solo para el desarrollo: el juego empaquetado no arranca si no está
+    vacío (`check_packaged`, decisión 75)."""
+
 
 @dataclass(frozen=True)
 class AudioSettings:
@@ -131,3 +136,15 @@ def load_settings(path: Path | None = None) -> Settings:
     else:
         text = path.read_text(encoding="utf-8")
     return load(Settings, json.loads(text))
+
+
+def check_packaged(settings: Settings, *, frozen: bool) -> None:
+    """Rechaza las ayudas de desarrollo en el juego empaquetado (`frozen`, que pone
+    PyInstaller en `sys.frozen`). El smoke del release corre el ejecutable, así que un
+    build que parte en otra sección falla antes de publicarse (decisión 75)."""
+    if frozen and settings.debug.start_section:
+        raise DataFileError(
+            "debug.start_section",
+            "es solo para el desarrollo, y en el juego empaquetado tiene que ser"
+            f' "", llegó {settings.debug.start_section!r}',
+        )

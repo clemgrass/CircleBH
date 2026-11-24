@@ -3,6 +3,7 @@
 import copy
 import json
 import math
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -15,13 +16,14 @@ from circlebh.settings import (
     ControlsSettings,
     DebugSettings,
     Settings,
+    check_packaged,
     load_settings,
 )
 
 VALIDO = {
     "controls": {"stick_deadzone": 0.2},
     "camera": {"fov": 720.0, "offset": [0.0, 0.0]},
-    "debug": {"show_hitboxes": False},
+    "debug": {"show_hitboxes": False, "start_section": ""},
     "audio": {"music": True, "volume": 0.8, "base_volume": 1.0, "game_volume": 1.0},
     "accessibility": {"invert_colors": False},
 }
@@ -58,7 +60,7 @@ def test_lee_el_valor_del_archivo(tmp_path: Path) -> None:
         {
             "controls": {"stick_deadzone": 0.3},
             "camera": {"fov": 900, "offset": [10, -20.5]},
-            "debug": {"show_hitboxes": True},
+            "debug": {"show_hitboxes": True, "start_section": "infinito"},
             "audio": {
                 "music": False,
                 "volume": 0.5,
@@ -71,10 +73,39 @@ def test_lee_el_valor_del_archivo(tmp_path: Path) -> None:
     assert load_settings(escribir(tmp_path, texto)) == Settings(
         controls=ControlsSettings(stick_deadzone=0.3),
         camera=CameraSettings(fov=900.0, offset=(10.0, -20.5)),
-        debug=DebugSettings(show_hitboxes=True),
+        debug=DebugSettings(show_hitboxes=True, start_section="infinito"),
         audio=AudioSettings(music=False, volume=0.5, base_volume=0.25, game_volume=1.0),
         accessibility=AccessibilitySettings(invert_colors=True),
     )
+
+
+# --- Empezar en una sección, solo para el desarrollo (decisión 75) ---
+
+
+def con_seccion(nombre: str) -> Settings:
+    base = load_settings()
+    return replace(base, debug=replace(base.debug, start_section=nombre))
+
+
+def test_start_section_de_fabrica_vacio() -> None:
+    # El juego de fábrica parte desde el comienzo del tema.
+    assert load_settings().debug.start_section == ""
+
+
+def test_empaquetado_rechaza_start_section() -> None:
+    # Foco: un build que parte en el infinito no arranca, y el smoke del release falla.
+    with pytest.raises(DataFileError, match=r"debug\.start_section"):
+        check_packaged(con_seccion("infinito"), frozen=True)
+
+
+def test_empaquetado_de_fabrica_arranca() -> None:
+    # Borde: empaquetado y con el campo vacío, arranca.
+    check_packaged(con_seccion(""), frozen=True)
+
+
+def test_desarrollo_acepta_start_section() -> None:
+    # Negativo: desde el código, el campo sirve para probar.
+    check_packaged(con_seccion("infinito"), frozen=False)
 
 
 # --- Accesibilidad ---

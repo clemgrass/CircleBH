@@ -19,6 +19,7 @@ from circlebh.world.collisions import (
     segment_circle_entry,
     segment_touches_circle,
 )
+from circlebh.world.danger import NEUTRAL, Danger
 from circlebh.world.figures import is_regular, local_lines
 from circlebh.world.patterns import Context, make_pattern
 from circlebh.world.polygon import ENVELOPE_SLACK, edge_sectors, first_crossing
@@ -39,8 +40,13 @@ def check_masses(enemies: Mapping[str, EnemySpec]) -> None:
 class Enemy:
     """Un enemigo, en coordenadas del plano."""
 
-    def __init__(self, spec: EnemySpec, position: Vector2) -> None:
+    def __init__(
+        self, spec: EnemySpec, position: Vector2, danger: Danger = NEUTRAL
+    ) -> None:
         self.spec = spec
+        self.danger = danger
+        """El peligro con que nació: en el infinito, más rápido y con más cadencia. Vive
+        aquí y no en una copia de `spec`, porque la fusión compara specs (decisión 74)."""
         self.position = Vector2(position)
         self.previous = Vector2(position)
         """Dónde estaba antes del último `step`. Lo usa el tramo relativo de `hit_by`."""
@@ -67,7 +73,7 @@ class Enemy:
         self._radius = spec.radius
         self.patterns = [make_pattern(pattern) for pattern in spec.patterns]
         """Su conducta: instancias propias de los patrones de su tipo (ADR 0021)."""
-        self.actions = [make_action(action) for action in spec.actions]
+        self.actions = [make_action(action, danger.cadence) for action in spec.actions]
         """Sus acciones, con su propio estado: lo que hace y no es una fuerza."""
         self.wave: int | None = None
         """La oleada a la que pertenece: el índice de su sección `wave`, o `None`. La
@@ -256,8 +262,9 @@ class Enemy:
         """Avanza un paso con Euler semi-implícito: primero la velocidad, después la
         posición con la velocidad nueva.
 
-        `v ← v + a·dt`, acotada a `speed`, y `p ← p + v·dt`. Es estable con roce, y el tope
-        hace que nadie avance más de `speed·dt` por paso, aunque una fuerza sea enorme.
+        `v ← v + a·dt`, acotada a `speed` (por el peligro, en el infinito), y
+        `p ← p + v·dt`. Es estable con roce, y el tope hace que nadie avance más de
+        `speed·dt` por paso, aunque una fuerza sea enorme.
         El giro avanza igual: `θ ← θ + ω·dt`.
 
         Si una acción fija la velocidad, como la embestida, `v` es esa, sin tope. Si fija
@@ -279,6 +286,6 @@ class Enemy:
             self.velocity = Vector2(imposed)
         else:
             self.velocity = (self.velocity + acceleration * STEP).clamp_magnitude(
-                self.spec.speed
+                self.spec.speed * self.danger.speed
             )
         self.position = self.position + self.velocity * STEP
