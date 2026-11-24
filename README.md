@@ -6,7 +6,7 @@ Un juego del género survivors hecho en Python con [pygame-ce](https://pyga.me/)
 
 `CircleBH` es un nombre provisorio.
 
-> En construcción. La 0.1.0 es la primera versión jugable: un punto que dispara solo contra hexágonos. En `main` avanza la 0.2.0, con más enemigos y una partida con la forma de un tema de house. Las curvas llegan después.
+> En construcción. La 0.2.0 trae diez enemigos y una partida con la forma de un tema de house, que termina en un modo infinito cada vez más difícil. Por ahora el punto dispara solo en línea recta: las curvas llegan después.
 
 ## Jugar
 

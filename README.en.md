@@ -6,7 +6,7 @@ A survivors-like game made in Python with [pygame-ce](https://pyga.me/). Everyth
 
 `CircleBH` is a working title.
 
-> Work in progress. Version 0.1.0 is the first playable one: a point that shoots on its own at hexagons. Version 0.2.0 is under way on `main`, with more enemies and a run shaped like a house track. The curves come later.
+> Work in progress. Version 0.2.0 brings ten enemies and a run shaped like a house track, which ends in an endless mode that keeps getting harder. For now the point shoots on its own in a straight line: the curves come later.
 
 ## Play
 
