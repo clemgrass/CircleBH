@@ -10,7 +10,7 @@ Un juego del género survivors hecho en Python con [pygame-ce](https://pyga.me/)
 
 ## Jugar
 
-Por ahora se juega desde el código. Los ejecutables para Windows, macOS y Linux llegan con la 1.0.0. Necesitas [uv](https://docs.astral.sh/uv/) 0.13.7:
+Por ahora se juega desde el código. Los ejecutables para Windows, macOS y Linux llegan con la 1.0.0. Necesitas [uv](https://docs.astral.sh/uv/) 0.13.9:
 
 ```
 git clone https://github.com/clemgrass/CircleBH.git
@@ -36,7 +36,7 @@ Página en itch.io: https://cgrassdev.itch.io/circle-bh
 
 ## Desarrollo
 
-Necesitas [uv](https://docs.astral.sh/uv/) 0.13.7. Descarga el Python correcto e instala las dependencias:
+Necesitas [uv](https://docs.astral.sh/uv/) 0.13.9. Descarga el Python correcto e instala las dependencias:
 
 ```
 uv sync

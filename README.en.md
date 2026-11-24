@@ -10,7 +10,7 @@ A survivors-like game made in Python with [pygame-ce](https://pyga.me/). Everyth
 
 ## Play
 
-For now, you play from source. Builds for Windows, macOS and Linux arrive with 1.0.0. You need [uv](https://docs.astral.sh/uv/) 0.13.7:
+For now, you play from source. Builds for Windows, macOS and Linux arrive with 1.0.0. You need [uv](https://docs.astral.sh/uv/) 0.13.9:
 
 ```
 git clone https://github.com/clemgrass/CircleBH.git
@@ -38,7 +38,7 @@ The documents are in Spanish.
 
 ## Development
 
-You need [uv](https://docs.astral.sh/uv/) 0.13.7. Download the right Python and install the dependencies:
+You need [uv](https://docs.astral.sh/uv/) 0.13.9. Download the right Python and install the dependencies:
 
 ```
 uv sync

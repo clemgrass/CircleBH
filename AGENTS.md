@@ -61,8 +61,8 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 ### Continuidad
 - Deja el estado al día en el issue en curso: qué quedó a medias y cuál es el próximo paso concreto. Actualízalo antes de quedarte sin contexto.
 
-## Stack (ADR 0001, 0002, 0015)
-- Python 3.14.10 (en `.python-version`), pygame-ce 2.5.8 y uv 0.13.7 (en `required-version`).
+## Stack (ADR 0001, 0002, 0015, 0028)
+- Python 3.14.10 (en `.python-version`), pygame-ce 2.5.8 y uv 0.13.9 (en `required-version`).
 - Python y uv se suben juntos: el release de uv tiene que agregar el parche de Python que se fija.
 - `uv.lock` fija versiones exactas, con `exclude-newer = "7 days"` y `no-build = true`.
 - Las dependencias se actualizan a mano al empezar cada milestone.
@@ -113,7 +113,7 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 - **Ramas e issues:**
   - nunca se trabaja directo en `main`;
   - un issue es una rama `tipo/descripcion-corta` y un PR;
-  - el issue lleva un título en español y un cuerpo con Qué, Por qué y Terminado cuando. Va en el tablero. Si es parte de una versión, va también en su milestone y en la columna Milestone. Los bugs y las investigaciones van sin milestone, en Todo.
+  - el issue lleva un título en español y un cuerpo con Qué, Por qué y Terminado cuando. Va en el tablero. Si es parte de una versión, va también en su milestone y en la columna Milestone. Los bugs van sin milestone, en Todo. Las investigaciones también, salvo cuando su resultado es lo que entrega el milestone.
 - **Commits:** Conventional Commits, con el tipo en inglés y la descripción en español (`feat: agregar arma seno`). El push va al final, con `poe check` en verde.
 - **PR:**
   - antes de crearlo, revisa el diff contra los ADR y este archivo, y muestra el título y el cuerpo;
