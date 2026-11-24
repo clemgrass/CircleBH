@@ -5,7 +5,9 @@ subida, drop, respiro, subida y drop. Cada sección gana presupuesto de amenaza 
 gasta comprando enemigos de su mazo, al azar por peso, con la `Random` del mundo.
 
 Los drops son oleadas: compran todo al empezar, y el tema no sigue hasta que el jugador
-las limpia (decisión 72 de la spec de la 0.2.0).
+las limpia (decisión 72 de la spec de la 0.2.0). Después del último drop viene el modo
+infinito: su presupuesto crece de forma exponencial, compra cuerpos bajo un tope y, con
+el tope lleno, sube el peligro (decisiones 20, 73 y 74).
 """
 
 import bisect
@@ -15,8 +17,15 @@ import random
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 
-from circlebh.balance import DirectorSpec, EnemySpec, SectionSpec, SpawningSpec
+from circlebh.balance import (
+    DirectorSpec,
+    EnemySpec,
+    SectionSpec,
+    SpawningSpec,
+    StarPolygonShape,
+)
 from circlebh.world.clock import STEP
+from circlebh.world.danger import NEUTRAL, Danger, danger_at
 from circlebh.world.spawning import FORMATIONS, check_spawning
 
 STEPS_PER_MINUTE = round(60 / STEP)
@@ -47,6 +56,71 @@ def earned(section: SectionSpec, bars: float) -> float:
     x = min(bars, length)
     area = start * x + (end - start) * x * x / (2 * length)
     return section.burst + area + end * max(0.0, bars - length)
+
+
+def endless_earned(bars: float, base: float, doubling: float) -> float:
+    """Lo que ganó el infinito en sus primeros `bars` compases.
+
+    La tasa es `B₀·2^(x/T)`, y lo ganado, su integral: `B₀·T/ln 2·(2^(x/T) − 1)`. Se
+    calcula desde el compás, sin sumar de a uno, igual que `earned`.
+    """
+    return base * doubling / math.log(2) * (2 ** (bars / doubling) - 1)
+
+
+def body_weight(spec: EnemySpec, enemies: Mapping[str, EnemySpec]) -> int:
+    """Cuántos cuerpos puede llegar a ser un enemigo, para el tope del infinito.
+
+    Uno que se parte al morir cuenta por lo que deja: el polígono de `n` lados suelta
+    `n − 2` fragmentos, y cada uno cuenta por lo suyo. Se detiene ante un tipo
+    desconocido o un ciclo, que `check_splits` rechaza al crear el mundo."""
+    weight = 1
+    seen: set[str] = set()
+    while (
+        spec.split_into in enemies
+        and spec.split_into not in seen
+        and isinstance(spec.shape, StarPolygonShape)
+    ):
+        seen.add(spec.split_into)
+        weight *= spec.shape.vertices - 2
+        spec = enemies[spec.split_into]
+    return weight
+
+
+def deck_weights(
+    section: SectionSpec, enemies: Mapping[str, EnemySpec], sides: float
+) -> list[float]:
+    """Los pesos del mazo de `section`, cargados hacia los de más lados.
+
+    Cada peso se multiplica por `(n/3)^(sides − 1)`, con `n` los vértices de su figura:
+    con `sides = 1` quedan tal cual, y con 2, el octágono sale `8/3` veces más que un
+    triángulo del mismo peso."""
+    if sides == 1:
+        return [entry.weight for entry in section.deck]
+    weights = []
+    for entry in section.deck:
+        vertices = _vertices(enemies[entry.enemy])
+        assert vertices is not None, "_validate lo exige en el infinito"
+        weights.append(entry.weight * (vertices / 3) ** (sides - 1))
+    return weights
+
+
+def _vertices(spec: EnemySpec) -> int | None:
+    """Los vértices de su figura, o `None` si no tiene, como el círculo."""
+    return spec.shape.vertices if isinstance(spec.shape, StarPolygonShape) else None
+
+
+def start_from(spec: DirectorSpec, section: str) -> DirectorSpec:
+    """El tema desde la sección `section`, que empieza en el compás 0. Con `""`, el
+    tema entero. Es para el desarrollo (`debug.start_section`, decisión 75)."""
+    if not section:
+        return spec
+    names = [s.name for s in spec.sections]
+    if section not in names:
+        raise ValueError(
+            f"debug.start_section: no existe la sección {section!r} en el tema"
+            f" ({', '.join(names)})"
+        )
+    return replace(spec, sections=spec.sections[names.index(section) :])
 
 
 @dataclass(frozen=True)
@@ -91,8 +165,11 @@ def _validate(
     check_spawning(spawning)
     if not spec.sections:
         raise ValueError("director.sections: el tema necesita al menos una sección")
-    for section in spec.sections:
+    _validate_endless(spec)
+    for index, section in enumerate(spec.sections):
         where = f"director.sections[{section.name}]"
+        if section.kind == "endless":
+            _validate_endless_section(section, where, index, spec, enemies, spawning)
         if section.bars <= 0:
             raise ValueError(f"{where}.bars: tiene que ser mayor que 0")
         if section.deck and not section.formations:
@@ -128,6 +205,64 @@ def _validate(
                 )
 
 
+def _validate_endless(spec: DirectorSpec) -> None:
+    """Rechaza un infinito que no crece (`doubling ≤ 0`), un peligro que bajaría
+    (`step < 0`) o un tope que lo achicaría (`< 1`)."""
+    endless = spec.endless
+    if endless.doubling <= 0:
+        raise ValueError("director.endless.doubling: tiene que ser mayor que 0")
+    if endless.step < 0:
+        raise ValueError("director.endless.step: no puede ser negativo")
+    for field in ("speed_cap", "cadence_cap", "sides_cap"):
+        if getattr(endless, field) < 1:
+            raise ValueError(f"director.endless.{field}: tiene que ser al menos 1")
+
+
+def _validate_endless_section(
+    section: SectionSpec,
+    where: str,
+    index: int,
+    spec: DirectorSpec,
+    enemies: Mapping[str, EnemySpec],
+    spawning: SpawningSpec,
+) -> None:
+    """Rechaza una sección `endless` que no se podría jugar.
+
+    El infinito sigue para siempre, así que va al final, y hay uno solo. Sin mazo o sin
+    presupuesto no compraría nada; `budget_end` y `burst` no se usarían. Cada tipo
+    necesita vértices para el peso de los lados, y su formación más grande tiene que
+    caber bajo el tope: si no, esperaría para siempre."""
+    if index != len(spec.sections) - 1:
+        raise ValueError(
+            f"{where}.kind: el infinito sigue para siempre, así que tiene que ser la"
+            " última sección, y la única de su tipo"
+        )
+    if not section.deck:
+        raise ValueError(f"{where}.deck: el infinito necesita al menos un tipo")
+    if section.budget_start <= 0:
+        raise ValueError(f"{where}.budget_start: es B₀, y tiene que ser mayor que 0")
+    for field in ("budget_end", "burst"):
+        if getattr(section, field) != 0:
+            raise ValueError(f"{where}.{field}: el infinito no lo usa, tiene que ser 0")
+    for entry in section.deck:
+        enemy = enemies.get(entry.enemy)
+        if enemy is None:
+            continue  # El chequeo de todo mazo lo nombra.
+        if _vertices(enemy) is None:
+            raise ValueError(
+                f"{where}.deck[{entry.enemy}]: el peso de los lados necesita una"
+                " figura con vértices"
+            )
+        single = section.formations == ("single",) or enemy.solitary
+        size = 1 if single else spawning.formation_size[1]
+        if size * body_weight(enemy, enemies) > spec.max_alive:
+            raise ValueError(
+                f"director.max_alive: una formación de {size} {entry.enemy} no cabe"
+                f" bajo el tope de {spec.max_alive} cuerpos, y el infinito la"
+                " esperaría para siempre"
+            )
+
+
 class Director:
     """Recorre el tema y decide qué se compra en cada paso."""
 
@@ -154,6 +289,10 @@ class Director:
         """La última sección que ya hizo lo de su primer paso: una oleada compra ahí."""
         self._waiting = False
         self._spent = 0.0
+        self._excess = 0.0
+        """Lo que el infinito ganó y no pudo gastar por el tope. Nunca baja."""
+        self._weights = {name: body_weight(e, enemies) for name, e in enemies.items()}
+        """Cuántos cuerpos cuenta cada tipo para el tope."""
         self._next = self._pick()
 
     @property
@@ -167,6 +306,20 @@ class Director:
         paso en que la oleada compra hasta el paso en que se limpia."""
         return self._waiting
 
+    @property
+    def excess(self) -> float:
+        """Lo que el infinito ganó y no pudo gastar porque el tope estaba lleno."""
+        return self._excess
+
+    @property
+    def danger(self) -> Danger:
+        """El peligro con que nacen los enemigos en este paso: el que compra el
+        excedente en el infinito, y el neutro fuera de él."""
+        section = self.section
+        if section.kind != "endless":
+            return NEUTRAL
+        return danger_at(self._excess, section.budget_start, self.spec.endless)
+
     def section_at(self, bar: float) -> SectionSpec:
         """La sección del compás `bar`. Antes del compás 0 es la primera, y después del
         final, la última, que sigue."""
@@ -176,11 +329,12 @@ class Director:
         last = len(self.spec.sections) - 1
         return max(0, min(bisect.bisect_right(self._starts, bar) - 1, last))
 
-    def update(self, steps: int, *, wave_alive: bool) -> list[Purchase]:
+    def update(self, steps: int, *, wave_alive: bool, bodies: int) -> list[Purchase]:
         """Avanza hasta el paso `steps` y devuelve lo comprado en este paso.
 
         `wave_alive` dice si queda algún enemigo de la oleada en curso, vivo o en la
-        cola. Fuera de una oleada no se usa.
+        cola. Fuera de una oleada no se usa. `bodies` son los cuerpos que cuentan para el
+        tope del infinito, y fuera de él tampoco se usa.
 
         Si en este paso empieza otra sección, la que termina gasta antes lo que le queda
         hasta su último compás, y la compra que esperaba se recorta a lo que alcance. Lo
@@ -203,8 +357,9 @@ class Director:
             self.section_index += 1
             self._spent = 0.0
             self._next = self._pick()
-        if self.section.kind == "build":
-            bought += self._buy(bar - self._starts[self.section_index], closing=False)
+        if self.section.kind != "wave":
+            bars = bar - self._starts[self.section_index]
+            bought += self._buy(bars, closing=False, bodies=bodies)
         return bought
 
     def _open_wave(self) -> list[Purchase]:
@@ -246,7 +401,7 @@ class Director:
             (s.bars for s in rest), initial=bar
         )
 
-    def _buy(self, bars: float, *, closing: bool) -> list[Purchase]:
+    def _buy(self, bars: float, *, closing: bool, bodies: int = 0) -> list[Purchase]:
         """Compra mientras lo ganado en `bars` compases de la sección alcance para la
         compra que espera. Elegirla antes de tener con qué pagarla es lo que deja
         entrar a los caros: si se eligiera solo entre lo que alcanza, el presupuesto se
@@ -254,8 +409,13 @@ class Director:
 
         Una formación se compra entera (decisión 28). Solo al cerrar la sección se
         recorta a lo que alcance, para no perder lo que queda.
+
+        En el infinito, además, la compra tiene que caber bajo `max_alive`, contando los
+        `bodies` que ya hay. Si no cabe, se guarda solo lo que cuesta, para pagarla
+        apenas haya espacio, y el resto pasa al excedente, que sube el peligro.
         """
-        available = earned(self.section, bars) - self._spent
+        endless = self.section.kind == "endless"
+        available = self._earned(bars) - self._spent - self._excess
         bought: list[Purchase] = []
         while self._next is not None:
             wanted = self._next
@@ -263,6 +423,12 @@ class Director:
             count = min(wanted.count, math.floor(available / cost))
             if count == 0 or (count < wanted.count and not closing):
                 break
+            if endless:
+                need = count * self._weights[wanted.enemy]
+                if bodies + need > self.spec.max_alive:
+                    self._excess += available - count * cost
+                    break
+                bodies += need
             bought.append(replace(wanted, count=count))
             self._spent += count * cost
             available -= count * cost
@@ -271,6 +437,14 @@ class Director:
             # de repetible con la misma semilla.
             self._next = self._pick()
         return bought
+
+    def _earned(self, bars: float) -> float:
+        """Lo que ganó la sección en curso en sus primeros `bars` compases."""
+        section = self.section
+        if section.kind == "endless":
+            doubling = self.spec.endless.doubling
+            return endless_earned(bars, section.budget_start, doubling)
+        return earned(section, bars)
 
     def _pick(self) -> Purchase | None:
         """La próxima compra: el tipo al azar por peso, la formación al azar entre las
@@ -282,7 +456,7 @@ class Director:
         if not section.deck:
             return None
         names = [entry.enemy for entry in section.deck]
-        weights = [entry.weight for entry in section.deck]
+        weights = deck_weights(section, self.enemies, self.danger.sides)
         enemy = self.rng.choices(names, weights)[0]
         formation = self.rng.choice(section.formations)
         count = (

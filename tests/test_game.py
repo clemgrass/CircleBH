@@ -23,7 +23,7 @@ from circlebh.world.director import bar_at
 from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
 from circlebh.world.polygon import polygon_edge
-from circlebh.world.spawning import quadrant
+from circlebh.world.spawning import Queued, quadrant
 from circlebh.world.swarm import lattice
 from circlebh.world.weapons import PointWeapon
 
@@ -191,6 +191,7 @@ RAPIDO = replace(
     director=DirectorSpec(
         bpm=124.0,
         max_alive=300,
+        endless=BALANCE.director.endless,
         sections=(
             SectionSpec(
                 name="rapida",
@@ -514,3 +515,19 @@ def test_las_lineas_sueltas_no_cuentan_para_la_masa_critica() -> None:
     world = mundo_cargado(BALANCE.enemies["stray_line"])
     world.update(Vector2())
     assert circulos_en_la_cola(world) == 0
+
+
+# --- El tope de cuerpos del infinito (#65) ---
+
+
+def test_cuerpos_cuenta_la_cola_y_los_fragmentos() -> None:
+    # Un divisor vivo cuenta por sus 5 fragmentos, y los de la cola también cuentan.
+    world = World(SIN_APARICIONES, random.Random(1), lethal=False)
+    world.enemies = [Enemy(BALANCE.enemies["divider"], Vector2(300, 0))]
+    world.queue.push(Queued("hexagon", Vector2(800, 0), None) for _ in range(2))
+    assert world.bodies == 7
+
+
+def test_sin_nadie_no_hay_cuerpos() -> None:
+    # Borde: un mundo vacío no ocupa el tope.
+    assert World(SIN_APARICIONES, random.Random(1)).bodies == 0

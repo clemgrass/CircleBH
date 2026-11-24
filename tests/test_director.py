@@ -4,6 +4,7 @@ import itertools
 import math
 import random
 from collections import defaultdict
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from fractions import Fraction
 from typing import Literal
@@ -17,11 +18,23 @@ from circlebh.balance import (
     BALANCE,
     DeckEntry,
     DirectorSpec,
+    EndlessSpec,
+    EnemySpec,
     SectionSpec,
+    SeekSpec,
     SpawningSpec,
 )
 from circlebh.world.clock import STEP
-from circlebh.world.director import PHRASE_BARS, Director, Purchase, bar_at
+from circlebh.world.director import (
+    PHRASE_BARS,
+    Director,
+    Purchase,
+    bar_at,
+    body_weight,
+    deck_weights,
+    endless_earned,
+    start_from,
+)
 from circlebh.world.game import World
 from circlebh.world.spawning import FORMATIONS
 
@@ -49,7 +62,7 @@ def seccion(
     deck: tuple[DeckEntry, ...],
     burst: float = 0.0,
     formations: tuple[str, ...] = ("single",),
-    kind: Literal["build", "wave"] = "build",
+    kind: Literal["build", "wave", "endless"] = "build",
 ) -> SectionSpec:
     return SectionSpec(
         name=name,
@@ -64,8 +77,21 @@ def seccion(
     )
 
 
-def tema(*secciones: SectionSpec, bpm: float = 124.0) -> DirectorSpec:
-    return DirectorSpec(bpm=bpm, max_alive=300, sections=secciones)
+ESPEC_INFINITO = EndlessSpec(
+    doubling=4.0, step=0.5, speed_cap=1.5, cadence_cap=2.0, sides_cap=2.0
+)
+"""Se duplica cada 4 compases, para que los tests del infinito sean cortos."""
+
+
+def tema(
+    *secciones: SectionSpec,
+    bpm: float = 124.0,
+    max_alive: int = 300,
+    endless: EndlessSpec = ESPEC_INFINITO,
+) -> DirectorSpec:
+    return DirectorSpec(
+        bpm=bpm, max_alive=max_alive, sections=secciones, endless=endless
+    )
 
 
 # Un tema corto, con presupuestos que suben, se mantienen y bajan, y un drop con ráfaga.
@@ -76,6 +102,27 @@ CORTO = tema(
     seccion("respiro", 2.0, 2.0, 0.5, mazo("respiro")),
     seccion("silencio", 1.0, 0.0, 0.0, ()),
 )
+
+
+def infinito(
+    start: float = 1.0,
+    deck: tuple[DeckEntry, ...] = (DeckEntry("hexagon", 1.0),),
+    formations: tuple[str, ...] = ("single",),
+) -> SectionSpec:
+    """Un infinito con `B₀ = start`."""
+    return seccion(
+        "infinito", 4.0, start, 0.0, deck, formations=formations, kind="endless"
+    )
+
+
+INFINITO = tema(
+    seccion("intro", 4.0, 1.0, 1.0, mazo("intro")), infinito(), max_alive=10
+)
+"""4 compases de intro y el infinito, con un tope de 10 cuerpos. El infinito compra
+hexágonos, y la intro, sus propios tipos: así se sabe quién compró qué."""
+
+DIVISORES = ENEMIGOS | {name: BALANCE.enemies[name] for name in ("divider", "shard")}
+"""Con el divisor y sus fragmentos."""
 
 
 def primer_paso(bar: float, bpm: float) -> int:
@@ -98,7 +145,8 @@ def correr(director: Director, pasos: int) -> list[tuple[int, list[str]]]:
     return [
         (director.section_index, [p.enemy for p in compras for _ in range(p.count)])
         for compras in (
-            director.update(paso, wave_alive=False) for paso in range(1, pasos + 1)
+            director.update(paso, wave_alive=False, bodies=0)
+            for paso in range(1, pasos + 1)
         )
     ]
 
@@ -150,7 +198,7 @@ def test_secciones_en_orden(seed: int) -> None:
 
 
 def test_la_ultima_seccion_sigue_despues_de_sus_compases() -> None:
-    # Borde: hasta que exista el modo infinito, la última sección no termina.
+    # Borde: en un tema sin infinito, la última sección no termina.
     spec = tema(seccion("unica", 2.0, 4.0, 4.0, (DeckEntry("hexagon", 1.0),)))
     director = Director(spec, ENEMIGOS, SPAWNING, random.Random(1))
     resultado = correr(director, primer_paso(6.0, spec.bpm))
@@ -239,7 +287,9 @@ def limpiar_en(
     director = Director(spec, ENEMIGOS, SPAWNING, random.Random(1))
     resultado = []
     for paso in range(1, primer_paso(hasta, spec.bpm) + 1):
-        compras = director.update(paso, wave_alive=bar_at(paso, spec.bpm) < limpia)
+        compras = director.update(
+            paso, wave_alive=bar_at(paso, spec.bpm) < limpia, bodies=0
+        )
         resultado.append((director.section_index, compras))
     return director, resultado
 
@@ -253,17 +303,17 @@ def test_oleada_compra_su_rafaga_al_empezar() -> None:
     director = Director(OLEADA, ENEMIGOS, SPAWNING, random.Random(1))
     golpe = primer_paso(4.0, OLEADA.bpm)
     for paso in range(1, golpe):
-        director.update(paso, wave_alive=False)
+        director.update(paso, wave_alive=False, bodies=0)
     # En el paso en que se compra, el mundo todavía no ve a nadie de la oleada: no
     # cuenta como limpia.
-    oleada = director.update(golpe, wave_alive=False)
+    oleada = director.update(golpe, wave_alive=False, bodies=0)
     assert director.waiting
     assert oleada
     assert all(p.wave == 1 for p in oleada)
     gastado = sum(ENEMIGOS[p.enemy].threat * p.count for p in oleada)
     assert 7.0 - PESADO < gastado <= 7.0
     despues = [
-        director.update(paso, wave_alive=True)
+        director.update(paso, wave_alive=True, bodies=0)
         for paso in range(golpe + 1, primer_paso(8.0, OLEADA.bpm))
     ]
     assert all(c == [] for c in despues)
@@ -333,7 +383,7 @@ def test_secciones_empiezan_en_una_frase_tras_la_oleada(data: st.DataObject) -> 
     director = Director(spec, BALANCE.enemies, SPAWNING, random.Random(1))
     seccion = director.section_index
     for paso in range(1, primer_paso(160.0, spec.bpm) + 1):
-        director.update(paso, wave_alive=bar_at(paso, spec.bpm) < limpia)
+        director.update(paso, wave_alive=bar_at(paso, spec.bpm) < limpia, bodies=0)
         if director.section_index != seccion:
             seccion = director.section_index
             frase = math.floor(bar_at(paso, spec.bpm) / PHRASE_BARS) * PHRASE_BARS
@@ -389,7 +439,7 @@ def test_oleadas_seguidas() -> None:
     compras = {}
     for paso in range(1, segunda + 100):
         viva = bar_at(paso, spec.bpm) < 5.0 or paso > segunda
-        compras[paso] = director.update(paso, wave_alive=viva)
+        compras[paso] = director.update(paso, wave_alive=viva, bodies=0)
     assert {p.wave for p in compras[1]} == {0}
     assert {p.wave for p in compras[segunda]} == {1}
     assert director.section_index == 1
@@ -398,7 +448,7 @@ def test_oleadas_seguidas() -> None:
 
 def test_oleada_unica_no_compra_mas_al_limpiarse() -> None:
     # Borde: una oleada que es la primera y la última sección compra en el primer
-    # paso y, limpia, ya no compra nada, hasta que exista el modo infinito.
+    # paso y, limpia, ya no compra nada: el tema no tiene infinito.
     spec = tema(seccion("unica", 4.0, 0.0, 0.0, mazo("drop"), burst=7.0, kind="wave"))
     director, resultado = limpiar_en(1.0, 40.0, spec)
     assert resultado[0][1]
@@ -417,7 +467,7 @@ def test_un_salto_se_detiene_en_la_oleada() -> None:
         seccion("respiro", 4.0, 1.0, 1.0, mazo("respiro")),
     )
     director = Director(spec, ENEMIGOS, SPAWNING, random.Random(1))
-    compras = director.update(primer_paso(100.0, spec.bpm), wave_alive=True)
+    compras = director.update(primer_paso(100.0, spec.bpm), wave_alive=True, bodies=0)
     assert director.section.name == "drop"
     assert director.waiting
     assert {p.wave for p in compras if p.enemy.startswith("drop")} == {2}
@@ -440,7 +490,7 @@ def compras_con_paso(spec: DirectorSpec, spawning: SpawningSpec, pasos: int) -> 
     return [
         (paso, p)
         for paso in range(1, pasos + 1)
-        for p in director.update(paso, wave_alive=False)
+        for p in director.update(paso, wave_alive=False, bodies=0)
     ]
 
 
@@ -478,7 +528,9 @@ def test_solitario_se_compra_siempre_single(seed: int) -> None:
     spec = tema(seccion("unica", 8.0, 6.0, 6.0, mazo, formations=formaciones))
     director = Director(spec, enemigos, ANILLOS_DE_5, random.Random(seed))
     compras = [
-        p for paso in range(1, 2000) for p in director.update(paso, wave_alive=False)
+        p
+        for paso in range(1, 2000)
+        for p in director.update(paso, wave_alive=False, bodies=0)
     ]
     estrellas = [p for p in compras if p.enemy == "estrella"]
     assert estrellas
@@ -592,6 +644,47 @@ def test_secciones_empiezan_en_una_frase() -> None:
             },
             r"deck\[padre\]",
         ),
+        # El infinito sigue para siempre: después de él no se llega a nada.
+        (
+            tema(infinito(), seccion("x", 4.0, 1.0, 1.0, mazo("intro"))),
+            ENEMIGOS,
+            "kind",
+        ),
+        (tema(infinito(), infinito()), ENEMIGOS, "kind"),
+        (tema(infinito(deck=())), ENEMIGOS, "deck"),
+        (tema(infinito(start=0.0)), ENEMIGOS, "budget_start"),
+        (tema(replace(infinito(), budget_end=1.0)), ENEMIGOS, "budget_end"),
+        (tema(replace(infinito(), burst=1.0)), ENEMIGOS, "burst"),
+        # El peso de los lados necesita vértices.
+        (
+            tema(infinito(deck=(DeckEntry("circulo", 1.0),))),
+            {"circulo": replace(BALANCE.enemies["circle"], threat=1.0)},
+            r"deck\[circulo\]",
+        ),
+        (
+            tema(infinito(), endless=replace(ESPEC_INFINITO, doubling=0.0)),
+            ENEMIGOS,
+            "endless.doubling",
+        ),
+        (
+            tema(infinito(), endless=replace(ESPEC_INFINITO, step=-1.0)),
+            ENEMIGOS,
+            "endless.step",
+        ),
+        (
+            tema(infinito(), endless=replace(ESPEC_INFINITO, speed_cap=0.5)),
+            ENEMIGOS,
+            "endless.speed_cap",
+        ),
+        # Una formación que nunca cabe bajo el tope dejaría al infinito sin comprar.
+        (
+            tema(
+                infinito(deck=(DeckEntry("divider", 1.0),), formations=("ring",)),
+                max_alive=4,
+            ),
+            DIVISORES,
+            "max_alive",
+        ),
     ],
 )
 def test_tema_invalido_se_rechaza_al_crear_el_director(
@@ -616,6 +709,136 @@ def test_no_usa_otro_azar() -> None:
     director = Director(CORTO, ENEMIGOS, SPAWNING, random.Random(1))
     correr(director, primer_paso(7.0, CORTO.bpm))
     assert random.getstate() == global_antes
+
+
+# --- El modo infinito ---
+
+
+def infinito_con(
+    spec: DirectorSpec,
+    cuerpos: Callable[[int], int],
+    hasta: float,
+    *,
+    enemigos: Mapping[str, EnemySpec] = ENEMIGOS,
+    spawning: SpawningSpec = SPAWNING,
+) -> tuple[Director, dict[int, list[Purchase]]]:
+    """Avanza hasta el compás `hasta` con `cuerpos(paso)` cuerpos, y devuelve por paso
+    lo que compró el infinito."""
+    director = Director(spec, enemigos, spawning, random.Random(1))
+    compras = {}
+    for paso in range(1, primer_paso(hasta, spec.bpm) + 1):
+        hechas = director.update(paso, wave_alive=False, bodies=cuerpos(paso))
+        # La intro compra sus propios tipos: lo que queda es del infinito.
+        compras[paso] = [p for p in hechas if not p.enemy.startswith("intro")]
+    return director, compras
+
+
+def test_infinito_compra_bajo_el_tope() -> None:
+    _, compras = infinito_con(INFINITO, lambda _: 0, 12.0)
+    total = sum(p.count for c in compras.values() for p in c)
+    ganado = endless_earned(bar_at(primer_paso(12.0, 124.0), 124.0) - 4, 1.0, 4.0)
+    # Cada hexágono cuesta 1: compra todo lo ganado, salvo lo que no alcanza para uno.
+    assert ganado - 1 < total <= ganado
+
+
+def test_tope_de_cuerpos() -> None:
+    # Negativo: con el tope lleno no compra cuerpos, y lo ganado sube el peligro.
+    director, compras = infinito_con(INFINITO, lambda _: 10, 12.0)
+    assert not any(compras.values())
+    assert director.excess > 0
+    assert director.danger.speed > 1
+
+
+def test_peligro_no_baja() -> None:
+    # Matar abre espacio, pero no devuelve el peligro.
+    spec = INFINITO
+    director = Director(spec, ENEMIGOS, SPAWNING, random.Random(1))
+    antes = director.danger.speed
+    for paso in range(1, primer_paso(30.0, spec.bpm) + 1):
+        lleno = math.floor(bar_at(paso, spec.bpm)) % 2 == 0
+        director.update(paso, wave_alive=False, bodies=10 if lleno else 0)
+        assert director.danger.speed >= antes
+        antes = director.danger.speed
+    assert antes > 1
+
+
+def test_compra_que_espera_se_paga_al_abrir_espacio() -> None:
+    abre = primer_paso(12.0, INFINITO.bpm) + 1
+    _, compras = infinito_con(INFINITO, lambda paso: 0 if paso >= abre else 10, 12.1)
+    assert not any(compras[p] for p in range(1, abre))
+    assert compras[abre]
+
+
+def test_formacion_que_no_cabe_espera() -> None:
+    # Borde: un anillo de 3 no cabe en 2 lugares. Una formación se compra entera
+    # (decisión 28), así que espera, y lo ganado va al peligro.
+    spec = tema(
+        seccion("intro", 4.0, 1.0, 1.0, mazo("intro")),
+        infinito(formations=("ring",)),
+        max_alive=10,
+    )
+    spawning = replace(SPAWNING, formation_size=(3, 3))
+    director, compras = infinito_con(spec, lambda _: 8, 12.0, spawning=spawning)
+    assert not any(compras.values())
+    assert director.excess > 0
+
+
+@pytest.mark.parametrize(("cuerpos", "compra"), [(6, False), (5, True)])
+def test_divisor_cuenta_por_sus_fragmentos(cuerpos: int, compra: bool) -> None:
+    # Borde (Foco): un divisor deja 5 fragmentos. Si contara como 1, con el tope lleno
+    # cada divisor que muere lo pasaría en 4.
+    assert body_weight(DIVISORES["divider"], DIVISORES) == 5
+    spec = tema(
+        seccion("intro", 4.0, 1.0, 1.0, mazo("intro")),
+        infinito(start=4.0, deck=(DeckEntry("divider", 1.0),)),
+        max_alive=10,
+    )
+    _, compras = infinito_con(spec, lambda _: cuerpos, 12.0, enemigos=DIVISORES)
+    assert any(compras.values()) == compra
+
+
+def test_lados_cargan_el_mazo() -> None:
+    seccion_ = infinito(deck=(DeckEntry("triangle", 1.0), DeckEntry("octagon", 1.0)))
+    enemigos = BALANCE.enemies
+    triangulo, octagono = deck_weights(seccion_, enemigos, 2.0)
+    assert octagono / triangulo == pytest.approx(8 / 3)
+    # Negativo: con el multiplicador en 1, los pesos quedan tal cual.
+    assert deck_weights(seccion_, enemigos, 1.0) == [1.0, 1.0]
+
+
+def test_infinito_empieza_al_limpiar_el_drop_2() -> None:
+    spec = BALANCE.director
+    director = Director(spec, BALANCE.enemies, SPAWNING, random.Random(1))
+    drop_2 = [s.name for s in spec.sections].index("drop_2")
+    paso = 0
+    while director.section.kind != "endless":
+        paso += 1
+        assert bar_at(paso, spec.bpm) < 200
+        director.update(paso, wave_alive=False, bodies=0)
+    assert director.section_index == drop_2 + 1
+    assert director.section.name == "infinito"
+    # Foco 6: empieza en una frase.
+    frase = math.floor(bar_at(paso, spec.bpm) / PHRASE_BARS) * PHRASE_BARS
+    assert frase > bar_at(paso - 1, spec.bpm)
+
+
+def test_tope_de_velocidad_deja_a_los_que_persiguen_mas_lentos() -> None:
+    # Foco: en su tope, nadie que te persigue corre más que tú.
+    [infinito_] = [s for s in BALANCE.director.sections if s.kind == "endless"]
+    tope = BALANCE.director.endless.speed_cap
+    for entry in infinito_.deck:
+        spec = BALANCE.enemies[entry.enemy]
+        if any(isinstance(p, SeekSpec) for p in spec.patterns):
+            assert spec.speed * tope < BALANCE.player.speed, entry.enemy
+
+
+def test_start_from() -> None:
+    spec = BALANCE.director
+    assert start_from(spec, "") == spec
+    assert start_from(spec, "infinito").sections[0].name == "infinito"
+    # Negativo: una sección que no está en el tema.
+    with pytest.raises(ValueError, match="start_section"):
+        start_from(spec, "nadie")
 
 
 # --- El director en el mundo ---

@@ -182,6 +182,7 @@ def test_fragmentos_vivos_mantienen_la_oleada() -> None:
     oleada = DirectorSpec(
         bpm=124.0,
         max_alive=300,
+        endless=BALANCE.director.endless,
         sections=(
             SectionSpec(
                 name="drop",

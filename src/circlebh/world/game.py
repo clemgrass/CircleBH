@@ -14,7 +14,7 @@ from circlebh.world.critical_mass import (
     check_critical_mass,
     heavy_direction,
 )
-from circlebh.world.director import Director, Purchase
+from circlebh.world.director import Director, Purchase, body_weight
 from circlebh.world.enemy import Enemy, check_masses
 from circlebh.world.enemy_bullets import EnemyBullet, bullet_hits_player, step_bullets
 from circlebh.world.events import Death, Donate, Event
@@ -53,14 +53,16 @@ class World:
         self.lethal = lethal
         self.player = Player(balance.player)
         self.enemies: list[Enemy] = []
-        self.director = Director(
-            balance.director, balance.enemies, balance.spawning, rng
-        )
-        """Decide qué aparece y cuándo, con la forma del tema (ADR 0025)."""
+        # Primero cada enemigo, después el tema que los usa: el error de un enemigo
+        # nombra el campo exacto, y el del mazo, solo al enemigo.
         check_shapes(balance.enemies)
         check_actions(balance.enemies)
         check_masses(balance.enemies)
         check_splits(balance.enemies)
+        self.director = Director(
+            balance.director, balance.enemies, balance.spawning, rng
+        )
+        """Decide qué aparece y cuándo, con la forma del tema (ADR 0025)."""
         check_merge(balance)
         self.merge = Merge(balance.merge, balance.enemies, balance.director.bpm)
         """La fusión de las estrellas en la gran estrella roja."""
@@ -95,6 +97,15 @@ class World:
     def steps(self) -> int:
         """Pasos dados en esta partida. Se detiene al morir."""
         return self._steps
+
+    @property
+    def bodies(self) -> int:
+        """Los cuerpos que cuentan para el tope del infinito: los vivos y los de la cola,
+        cada uno por los que puede llegar a ser (`body_weight`)."""
+        enemies = self.balance.enemies
+        return sum(body_weight(enemy.spec, enemies) for enemy in self.enemies) + sum(
+            body_weight(enemies[item.enemy], enemies) for item in self.queue
+        )
 
     @property
     def elapsed(self) -> float:
@@ -164,7 +175,10 @@ class World:
             self._split(enemy)
         # Fuera de una oleada no hace falta recorrer el plano y la cola.
         alive = self.director.waiting and self._wave_alive()
-        for purchase in self.director.update(self._steps, wave_alive=alive):
+        updates = self.director.update(
+            self._steps, wave_alive=alive, bodies=self.bodies
+        )
+        for purchase in updates:
             self._enqueue(purchase)
         for item in self.queue.pop(self.balance.spawning.max_per_step):
             if not self.merge.allows(item.enemy):
