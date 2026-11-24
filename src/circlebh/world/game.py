@@ -100,8 +100,10 @@ class World:
         El jugador se mueve primero, y las balas enemigas avanzan: si alguna lo cruzó en
         este paso, lo mató. Después, las acciones de los enemigos miran dónde quedó, y las
         balas que disparan empiezan a moverse en el paso siguiente. El enjambre da su paso
-        (`step_swarm`), y las armas golpean y disparan. Los enemigos sin líneas
-        desaparecen. Lo que compró el director entra a la cola, y de ella aparecen hasta
+        (`step_swarm`), y las armas golpean y disparan. Las líneas que donó un médico
+        pasan a ser líneas sueltas, y los heridos absorben las que tocan: después de las
+        balas, para que un herido que murió en este paso no se cure. Los enemigos sin
+        líneas desaparecen. Lo que compró el director entra a la cola, y de ella aparecen hasta
         `spawning.max_per_step`, que empiezan a moverse en el paso siguiente; mientras
         hay una fusión en curso, las estrellas de la cola se descartan. La fusión da su
         paso: puede juntar las estrellas o hacer nacer la gran estrella roja. Recién
