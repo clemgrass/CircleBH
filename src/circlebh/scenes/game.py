@@ -1,5 +1,6 @@
 """La partida en pantalla: lee la entrada, avanza `world` paso a paso y lo dibuja."""
 
+import math
 import random
 from dataclasses import replace
 
@@ -18,6 +19,7 @@ from circlebh.controls import (
     stick_intent,
 )
 from circlebh.pilot import pilot_intent
+from circlebh.render.hud import draw_experience_border, ease_toward
 from circlebh.render.palette import DARK
 from circlebh.render.plane import draw_axes, draw_letterbox
 from circlebh.render.world_view import draw_world
@@ -30,6 +32,7 @@ from circlebh.viewport import Viewport, camera_center
 from circlebh.world.clock import STEP
 from circlebh.world.director import bar_at, start_from
 from circlebh.world.enemy import Enemy
+from circlebh.world.experience import Orb, level_cost
 from circlebh.world.game import World
 from circlebh.world.swarm import lattice
 
@@ -112,8 +115,12 @@ class GameScene:
             SCENARIOS[options.scenario] if options.demo else None
         )
         self.gamepads = Gamepads() if self.demo is None else None
-        # ADR 0023: el fondo negro de fábrica, o su negativo si el jugador lo pide.
-        self.palette = DARK.inverted() if settings.accessibility.invert_colors else DARK
+        # ADR 0023: el fondo negro de fábrica, o su negativo si el jugador lo pide. Un
+        # escenario puede pedirlo, para capturar las dos versiones.
+        inverted = settings.accessibility.invert_colors or (
+            self.demo is not None and self.demo.inverted
+        )
+        self.palette = DARK.inverted() if inverted else DARK
         self.death_screen = DeathScreen(self.palette)
         self.music: Sequencer | None = None
         self.music_player: MusicPlayer | None = None
@@ -160,6 +167,11 @@ class GameScene:
             for k in demo.guest_wounded:
                 guest.remove_edge(k)
             self.world.enemies.append(guest)
+        if demo is not None:
+            self.world.orbs += [Orb(Vector2(x, y), value) for x, y, value in demo.orbs]
+        self.shown_levels = 0.0
+        """Los niveles que muestra el borde, con su parte de la vuelta: sigue a la
+        experiencia del mundo con una transición suave (decisión 12)."""
         self.dead_steps = 0
         self.section = -1
         """La última sección anotada en la consola."""
@@ -210,6 +222,10 @@ class GameScene:
             self.dead_steps += 1
             if self.demo is not None and self.dead_steps >= DEMO_RESTART_STEPS:
                 self.restart()
+        world = self.world
+        cost = level_cost(world.level, world.balance.experience)
+        target = world.level - 1 + world.experience / cost
+        self.shown_levels = ease_toward(self.shown_levels, target, STEP)
         if self.music is not None:
             self.music.step(self.world)
 
@@ -245,6 +261,8 @@ class GameScene:
             self.palette,
             self.settings.debug.show_hitboxes,
         )
+        lap = self.shown_levels - math.floor(self.shown_levels)
+        draw_experience_border(screen, viewport, lap, self.palette)
         if self.world.game_over:
             player = self.world.player
             self.death_screen.draw(

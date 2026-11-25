@@ -4,6 +4,7 @@ import pygame
 from pygame.math import Vector2
 
 from circlebh.balance import CircleShape
+from circlebh.render.glow import draw_glow
 from circlebh.render.palette import Palette
 from circlebh.viewport import Viewport
 from circlebh.world.clock import STEP
@@ -16,6 +17,11 @@ BULLET_DRAW_RADIUS = 3.0
 la bala es un punto."""
 ENEMY_LINE_WIDTH = 2.0
 """Grosor de las líneas del enemigo, en unidades del plano: escala con la cámara."""
+ORB_RADIUS = 2.5
+"""Radio del punto de experiencia, relleno con el trazo, en unidades del plano: más chico
+que la bala del jugador."""
+ORB_GLOW = (10.0, 22.0)
+"""Radio del halo del punto, en unidades del plano: del que menos vale al que más vale."""
 HITBOX_COLOR = pygame.Color("magenta")
 HITBOX_WIDTH = 1.0
 """Grosor del círculo de choque, en unidades del plano: escala con la cámara."""
@@ -34,7 +40,11 @@ def draw_world(
     encima del jugador, y al irse se apaga hacia el fondo.
 
     Con `show_hitboxes`, encima va el círculo de cada cuerpo.
+
+    Los puntos de experiencia van abajo de todo: un punto relleno con el trazo y, detrás,
+    su luz, que va de verde azulado a azul y crece con lo que vale (ADR 0031).
     """
+    draw_orbs(screen, world, viewport, palette)
     for weapon in world.weapons:
         if isinstance(weapon, ProjectileWeapon):
             for bullet in weapon.bullets:
@@ -118,6 +128,28 @@ def draw_world(
         bodies += [(enemy.position, enemy.radius) for enemy in world.enemies]
         for position, radius in bodies:
             draw_hitbox(screen, viewport, position, radius)
+
+
+def draw_orbs(
+    screen: pygame.Surface, world: World, viewport: Viewport, palette: Palette
+) -> None:
+    """Cada punto con su halo. El valor se lee dos veces, por el color y por el tamaño
+    (decisión 4), entre el menor y el mayor `threat` del balance."""
+    if not world.orbs:
+        return
+    threats = [e.threat for e in world.balance.enemies.values() if e.threat > 0]
+    lowest, highest = min(threats), max(threats)
+    span = highest - lowest
+    small, big = ORB_GLOW
+    for orb in world.orbs:
+        t = (orb.value - lowest) / span if span > 0 else 1.0
+        t = min(1.0, max(0.0, t))
+        center = viewport.to_screen(orb.position)
+        glow = (small + (big - small) * t) * viewport.scale
+        draw_glow(screen, center, glow, palette.light.at(t))
+        pygame.draw.circle(
+            screen, palette.foreground, center, ORB_RADIUS * viewport.scale
+        )
 
 
 def draw_lines(
