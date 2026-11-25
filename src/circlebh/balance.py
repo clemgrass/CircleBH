@@ -664,6 +664,29 @@ class RegrowSpec:
 
 
 @dataclass(frozen=True)
+class ExperienceSpec:
+    """La experiencia: el punto que deja cada enemigo al morir y lo que cuesta cada nivel
+    (spec de la 0.3.0, decisiones 3 y 13).
+
+    El punto es un cuerpo del plano sin choque, de masa 1. Siente la carga del jugador
+    con la ley de cargas (ADR 0021), y no a los enemigos."""
+
+    charge: float
+    """La carga de cada punto, del signo de la de los enemigos: la del jugador lo atrae."""
+
+    friction: float
+    """`γ`: el roce del punto, en 1/s. Sin roce, un punto que pasa de largo orbitaría al
+    jugador sin llegar nunca."""
+
+    base: float
+    """`a` en `a·nᵇ`: la experiencia que pide subir del nivel 1. Tiene que ser mayor que
+    0."""
+
+    exponent: float
+    """`b` en `a·nᵇ`: cuánto más cuesta cada nivel que el anterior."""
+
+
+@dataclass(frozen=True)
 class Balance:
     """Todas las entidades del juego."""
 
@@ -696,6 +719,9 @@ class Balance:
 
     regrow: RegrowSpec
     """Cómo vuelven las líneas."""
+
+    experience: ExperienceSpec
+    """La experiencia y los niveles."""
 
 
 # >>> datos (lo genera poe balance-importar)
@@ -1187,5 +1213,6 @@ BALANCE = Balance(
     },
     enemy_bullet=EnemyBulletSpec(speed=330.0, radius=4.0),
     regrow=RegrowSpec(fade=0.4),
+    experience=ExperienceSpec(charge=3.0, friction=3.0, base=6.0, exponent=1.5),
 )
 # <<< datos

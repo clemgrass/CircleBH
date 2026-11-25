@@ -804,5 +804,11 @@
   },
   "regrow": {
     "fade": 0.4
+  },
+  "experience": {
+    "charge": 3.0,
+    "friction": 3.0,
+    "base": 6.0,
+    "exponent": 1.5
   }
 }
