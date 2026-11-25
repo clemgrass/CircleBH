@@ -78,7 +78,7 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 | `uv run poe benchmark` | medir el paso con muchos enemigos, a mano |
 | `uv run poe musica` | escuchar la música de la demo (WAV en `.capturas/`) y medir su mezcla, a mano |
 
-## Arquitectura (ADR 0003 a 0006, 0016, 0020 a 0023, 0025 a 0027 y 0029)
+## Arquitectura (ADR 0003 a 0006, 0016, 0020 a 0023, 0025 a 0027, 0029 y 0031)
 - Las armas se arman con tres términos (avance, armónico y giro) y mejoran con tarjetas: un parámetro, un término sumado o un operador en orden fijo. Los trazos dañan por barrido. Armas, tarjetas y precios son datos del balance, sin topes de mejora (ADR 0029).
 - Cada enemigo muerto deja experiencia según su `threat`. Al subir de nivel, el mundo sortea la mano con su `Random` y no avanza hasta `World.choose`, así que la misma semilla y las mismas elecciones dan la misma partida. La demo y los pilotos eligen con una `Random` propia (spec de la 0.3.0).
 - En `src/circlebh/`, las importaciones van en una sola dirección: `scenes` → `render | audio` → `world` → `balance`. `render` y `audio` son hermanas y no se importan entre sí. `lint-imports` lo verifica.
@@ -92,7 +92,7 @@ Es un repo público de portafolio: el código y el README se leen como ejemplo d
 - Los enemigos se mueven por los patrones de su tipo en el balance. Sus aceleraciones se suman, con inercia y roce, y entre ellos actúa una sola ley de cargas (ADR 0021).
 - Algunos enemigos giran como cuerpos rígidos, según el `spin` del balance. El golpe de una bala se mide en el marco del enemigo, y al perder una línea, el enemigo conserva su `ω` y gira en torno a su nuevo centro de masa (ADR 0027).
 - La configuración del juego (cámara, controles, audio, accesibilidad y depuración) vive solo en `settings.json`, dentro del paquete, y se valida al arrancar contra una dataclass (ADR 0018). Si describe a una entidad, va al balance; si describe cómo se juega o se ve, a la configuración.
-- El fondo es negro y el trazo, blanco. `accessibility.invert_colors` los invierte (ADR 0023). El acento rojo `#ff3b30` es solo para el peligro, como las balas enemigas, y no se invierte. Los colores viven solo en `render/palette.py`, y las funciones de dibujo reciben la paleta como parámetro.
+- El fondo es negro y el trazo, blanco. `accessibility.invert_colors` los invierte (ADR 0023). El acento rojo `#ff3b30` es solo para el peligro, como las balas enemigas, y no se invierte. La luz, de verde azulado a azul, es solo para lo que es del jugador: la experiencia, el borde que se carga y la tarjeta elegida. Tampoco se invierte: cada fondo tiene la suya (ADR 0031). Los colores viven solo en `render/palette.py`, y las funciones de dibujo reciben la paleta como parámetro.
 - La lógica avanza en pasos fijos de 1/60 s con acumulador. El azar sale solo de la `random.Random(seed)` inyectada.
 - La partida sigue la forma de un tema. Un director en `world/` cuenta compases con el tempo fijo del balance (`director.bpm`) y compra enemigos por secciones con presupuesto (ADR 0025). Cada sección acota las capas de la música, y una partida nueva espera el compás (ADR 0026).
 - En las colisiones, el jugador es un círculo y cada enemigo choca por sus líneas, con su círculo envolvente como primer descarte (ADR 0020). Se usa una grilla espacial y funciones propias en `world/`.
