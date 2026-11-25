@@ -2,7 +2,8 @@
   "player": {
     "speed": 240.0,
     "radius": 12.0,
-    "charge": -14.0
+    "charge": -14.0,
+    "start_weapon": "point"
   },
   "charges": {
     "k": 171000.0,
@@ -770,10 +771,32 @@
     "imbalance": 0.5,
     "cooldown_bars": 8.0
   },
-  "point_weapon": {
-    "cooldown": 0.6,
-    "speed": 300.0,
-    "range": 700.0
+  "weapons": {
+    "point": {
+      "title": "Punto",
+      "kind": "projectile",
+      "frame": "cartesian",
+      "aim": "nearest",
+      "advance": {
+        "coefficient": 300.0,
+        "degree": 1
+      },
+      "harmonics": [],
+      "spin": 0.0,
+      "copies": 1,
+      "mirror": false,
+      "parallel": 0.0,
+      "payload": {
+        "size": 0.0,
+        "lines": 1,
+        "pierce": 0,
+        "duration": 0.0,
+        "width": 0.0
+      },
+      "cooldown": 0.6,
+      "reach": 700.0,
+      "tau": 0.5
+    }
   },
   "enemy_bullet": {
     "speed": 330.0,

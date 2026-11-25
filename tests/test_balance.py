@@ -85,24 +85,44 @@ class Roster:
 
 
 def test_una_entrada_que_solo_esta_en_un_lado() -> None:
-    hexagono = PlayerSpec(speed=60.0, radius=20.0, charge=0.0)
-    pentagono = PlayerSpec(speed=80.0, radius=16.0, charge=0.0)
+    hexagono = PlayerSpec(speed=60.0, radius=20.0, charge=0.0, start_weapon="point")
+    pentagono = PlayerSpec(speed=80.0, radius=16.0, charge=0.0, start_weapon="point")
     en_python = Roster(enemies={"hexagon": hexagono})
     en_json = Roster(enemies={"hexagon": hexagono, "pentagon": pentagono})
     assert differences(en_python, en_json) == [
-        'enemies.pentagon: balance.py=(no está), balance.json={"speed": 80.0, "radius": 16.0, "charge": 0.0}'
+        'enemies.pentagon: balance.py=(no está), balance.json={"speed": 80.0, "radius": 16.0, "charge": 0.0, "start_weapon": "point"}'
     ]
 
 
 def test_chequeo_nombra_el_campo_de_un_json_invalido(tmp_path: Path) -> None:
     roto = tmp_path / "balance.json"
     roto.write_text(
-        json_con_jugador({"speed": True, "radius": 12.0, "charge": -14.0}),
+        json_con_jugador(
+            {"speed": True, "radius": 12.0, "charge": -14.0, "start_weapon": "point"}
+        ),
         encoding="utf-8",
     )
     assert check(roto) == [
         "balance.json: player.speed: se esperaba un número, llegó true"
     ]
+
+
+def test_rechaza_kind_desconocido(tmp_path: Path) -> None:
+    # Negativo: un arma que no es proyectil ni trazo se rechaza al cargar, por su campo.
+    data = dump(BALANCE)
+    assert isinstance(data, dict)
+    weapons = data["weapons"]
+    assert isinstance(weapons, dict)
+    point = weapons["point"]
+    assert isinstance(point, dict)
+    point["kind"] = "laser"
+    roto = tmp_path / "balance.json"
+    roto.write_text(json.dumps(data), encoding="utf-8")
+    [linea] = check(roto)
+    assert linea == (
+        "balance.json: weapons.point.kind: se esperaba uno de: projectile, trace,"
+        ' llegó "laser"'
+    )
 
 
 def test_chequeo_con_un_json_que_no_es_json(tmp_path: Path) -> None:
@@ -119,7 +139,12 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
     destino = tmp_path / "balance.json"
     export_json(destino)
     assert json.loads(destino.read_text(encoding="utf-8")) == {
-        "player": {"speed": 240.0, "radius": 12.0, "charge": -14.0},
+        "player": {
+            "speed": 240.0,
+            "radius": 12.0,
+            "charge": -14.0,
+            "start_weapon": "point",
+        },
         "charges": {
             "k": 171000.0,
             "cutoff": 150.0,
@@ -456,7 +481,30 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
             "imbalance": 0.5,
             "cooldown_bars": 8.0,
         },
-        "point_weapon": {"cooldown": 0.6, "speed": 300.0, "range": 700.0},
+        "weapons": {
+            "point": {
+                "title": "Punto",
+                "kind": "projectile",
+                "frame": "cartesian",
+                "aim": "nearest",
+                "advance": {"coefficient": 300.0, "degree": 1},
+                "harmonics": [],
+                "spin": 0.0,
+                "copies": 1,
+                "mirror": False,
+                "parallel": 0.0,
+                "payload": {
+                    "size": 0.0,
+                    "lines": 1,
+                    "pierce": 0,
+                    "duration": 0.0,
+                    "width": 0.0,
+                },
+                "cooldown": 0.6,
+                "reach": 700.0,
+                "tau": 0.5,
+            }
+        },
         "enemy_bullet": {"speed": 330.0, "radius": 4.0},
         "regrow": {"fade": 0.4},
     }
@@ -473,7 +521,9 @@ def test_exportar_e_importar_ida_y_vuelta(tmp_path: Path) -> None:
 def test_importar_cambia_solo_el_bloque_de_datos(tmp_path: Path) -> None:
     json_path = tmp_path / "balance.json"
     json_path.write_text(
-        json_con_jugador({"speed": 300, "radius": 12.0, "charge": -14.0}),
+        json_con_jugador(
+            {"speed": 300, "radius": 12.0, "charge": -14.0, "start_weapon": "point"}
+        ),
         encoding="utf-8",
     )
     py_path = copia_de_balance_py(tmp_path)
@@ -491,7 +541,13 @@ def test_importar_rechaza_un_campo_desconocido(tmp_path: Path) -> None:
     json_path = tmp_path / "balance.json"
     json_path.write_text(
         json_con_jugador(
-            {"speed": 240.0, "radius": 12.0, "charge": -14.0, "color": "rojo"}
+            {
+                "speed": 240.0,
+                "radius": 12.0,
+                "charge": -14.0,
+                "start_weapon": "point",
+                "color": "rojo",
+            }
         ),
         encoding="utf-8",
     )

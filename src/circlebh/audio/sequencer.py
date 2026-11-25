@@ -40,8 +40,8 @@ from circlebh.audio.voices import (
     Note,
     enemy_notes,
     nearest_views,
-    voice_for,
     weapon_note,
+    weapon_pattern,
 )
 from circlebh.balance import BALANCE
 from circlebh.world.clock import STEP
@@ -387,7 +387,7 @@ class Sequencer:
         self._armed |= {id(e.weapon) for e in self._pending if isinstance(e, Shot)}
         hits = 0
         for weapon in self._snapshot.weapons:
-            pattern = voice_for(weapon).pattern(weapon, self.grid.bar_seconds)
+            pattern = weapon_pattern(weapon.spec, self.grid.bar_seconds)
             if pattern[s] and id(weapon) in self._armed:
                 note = sounds.blip(hz(weapon_note(s, voicing), A3))
                 self._add(swung, note, 0.22, game=True, send=0.45)

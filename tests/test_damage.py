@@ -9,13 +9,18 @@ from dataclasses import replace
 
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, EnemySpec, PointWeaponSpec, StarPolygonShape
+from circlebh.balance import BALANCE, AdvanceSpec, EnemySpec, StarPolygonShape
 from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
 from circlebh.world.polygon import vertex
-from circlebh.world.weapons import PointWeapon
+from circlebh.world.weapons import ProjectileWeapon
 
-SPEC = PointWeaponSpec(cooldown=0.5, speed=600.0, range=700.0)
+SPEC = replace(
+    BALANCE.weapons["point"],
+    cooldown=0.5,
+    advance=AdvanceSpec(coefficient=600.0, degree=1),
+    reach=700.0,
+)
 # Sin patrones ni carga: aquí solo importa dónde está.
 HEXAGON = EnemySpec(
     shape=StarPolygonShape(vertices=6, steps=(1,)),
@@ -36,9 +41,9 @@ HEXAGON = EnemySpec(
 ORIGEN = Vector2(0, 0)
 
 
-def disparar(enemy: Enemy, pasos: int) -> PointWeapon:
+def disparar(enemy: Enemy, pasos: int) -> ProjectileWeapon:
     """Un arma en el origen que dispara `pasos` veces al enemigo, que no se mueve."""
-    weapon = PointWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC)
     for _ in range(pasos):
         weapon.update(ORIGEN, [enemy])
     return weapon
@@ -109,7 +114,7 @@ def test_enemigo_que_avanza_no_deja_pasar_la_bala() -> None:
     enemy = Enemy(rapido, Vector2(300, 0))
     # Sin roce ni patrones, avanza a velocidad fija hacia el origen.
     enemy.velocity = Vector2(-3000, 0)
-    weapon = PointWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC)
     for _ in range(10):
         enemy.step(Vector2())
         weapon.update(ORIGEN, [enemy])

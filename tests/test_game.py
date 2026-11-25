@@ -27,7 +27,7 @@ from circlebh.world.game import World
 from circlebh.world.polygon import polygon_edge
 from circlebh.world.spawning import Queued, quadrant
 from circlebh.world.swarm import lattice
-from circlebh.world.weapons import PointWeapon
+from circlebh.world.weapons import ProjectileWeapon
 
 SIN_APARICIONES = replace(
     BALANCE,
@@ -65,15 +65,15 @@ def test_world_empieza_sin_enemigos() -> None:
 def test_mundo_parte_con_el_arma_punto() -> None:
     world = World(BALANCE, random.Random(1))
     [weapon] = world.weapons
-    assert isinstance(weapon, PointWeapon)
-    assert weapon.spec == BALANCE.point_weapon
+    assert isinstance(weapon, ProjectileWeapon)
+    assert weapon.spec == BALANCE.weapons["point"]
 
 
 def test_la_bala_nace_donde_quedo_el_jugador() -> None:
     world = mundo_con_hexagono(Vector2(BALANCE.spawning.distance, 0))
     world.update(Vector2(1, 0))
     [weapon] = world.weapons
-    assert isinstance(weapon, PointWeapon)
+    assert isinstance(weapon, ProjectileWeapon)
     [bullet] = weapon.bullets
     assert bullet.position == world.player.position
 
@@ -610,6 +610,6 @@ def test_sin_mejoras_en_el_infinito() -> None:
         world.update(Vector2())
     assert world.weapons == armas
     assert all(
-        isinstance(w, PointWeapon) and w.spec == BALANCE.point_weapon
+        isinstance(w, ProjectileWeapon) and w.spec == BALANCE.weapons["point"]
         for w in world.weapons
     )

@@ -9,7 +9,7 @@ from circlebh.viewport import Viewport
 from circlebh.world.clock import STEP
 from circlebh.world.figures import local_lines
 from circlebh.world.game import World
-from circlebh.world.weapons import PointWeapon
+from circlebh.world.weapons import ProjectileWeapon
 
 BULLET_DRAW_RADIUS = 3.0
 """Radio con que se dibuja la bala, en unidades del plano. Solo es visual: para chocar,
@@ -36,7 +36,7 @@ def draw_world(
     Con `show_hitboxes`, encima va el círculo de cada cuerpo.
     """
     for weapon in world.weapons:
-        if isinstance(weapon, PointWeapon):
+        if isinstance(weapon, ProjectileWeapon):
             for bullet in weapon.bullets:
                 pygame.draw.circle(
                     screen,
