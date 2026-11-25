@@ -14,6 +14,7 @@ La restricción de no usar sprites ni imágenes es el tema del juego, no un lím
 
 - **El escenario es un plano cartesiano.** Los ejes X e Y van bien marcados y el resto es una cuadrícula muy suave que no distrae. Los ejes están fijos en el mundo: la cámara sigue al jugador, que puede alejarse del origen. En una esquina se muestran sus coordenadas, por ejemplo `(x: 142, y: −37)`.
 - **Es blanco y negro con un solo color de acento**, reservado para el peligro: las balas enemigas y el destello cuando el jugador recibe daño. El fondo es negro, y una opción de la configuración lo invierte a blanco *(decisión del autor, 2026-11-20; ADR 0023)*. El acento es el rojo `#ff3b30`, el mismo sobre los dos fondos *(decisión del autor, 2026-11-21, al comparar capturas)*.
+- **La experiencia trae un segundo color, que no es de peligro:** una luz azul detrás de cada punto *(decisión del autor, 2026-11-25; spec de la 0.3.0, decisiones 4 y 5)*. El rojo dice "esto te mata", y la luz azul, "esto es tuyo". Sus valores sobre cada fondo los decide un ADR que amplía el 0023.
 - **Todo se lee por su forma y su movimiento:**
 
 | Qué es | Cómo se ve |
@@ -22,7 +23,8 @@ La restricción de no usar sprites ni imágenes es el tema del juego, no un lím
 | Sus ataques | solo el trazo, sin relleno |
 | Los enemigos | polígonos hechos de líneas, sin relleno *(decisión del autor, 2026-11-19)* |
 | Las balas enemigas | puntos rellenos en el color de acento |
-| La experiencia | puntos pequeños sin relleno |
+| La experiencia | un punto relleno chico, con una luz detrás que va de verde azulado a azul y crece con lo que vale *(decisión del autor, 2026-11-25; antes, puntos sin relleno, que se confundían con el círculo enemigo)* |
+| Cuánto falta para subir de nivel | una línea fina en el borde de la pantalla, que se carga dando la vuelta completa, sin número *(decisión del autor, 2026-11-25)* |
 
 La tabla es el punto de partida. El prototipo puede ajustarla si algo no se lee bien cuando la pantalla se llena.
 
@@ -46,19 +48,24 @@ La tabla es el punto de partida. El prototipo puede ajustarla si algo no se lee 
     - **Lo que importa es que las partidas lleguen a formas distintas.** Un test lo mide.
     - **Las armas y las tarjetas son datos del balance y cambian al jugar,** como los enemigos. No hay topes de mejora.
   - **Rosa** (`r = cos(kθ)`): pétalos que orbitan alrededor del jugador.
-- **Al subir de nivel aparecen tres tarjetas.** Cada una muestra la fórmula del arma y el parámetro que cambia, por ejemplo "`y = A·sin(ωx)`: ω sube a 3". Una tarjeta puede dar un arma nueva o mejorar una que ya tienes. No hace falta entender la fórmula para elegir, porque la diferencia se ve en el ataque.
+- **La experiencia la deja cada enemigo que matas, según su amenaza** (`threat`), y tu carga la atrae *(decisión del autor, 2026-11-25)*.
+- **Al subir de nivel, el juego frena hasta quedar quieto y aparecen tres tarjetas** *(decisiones del autor, 2026-11-25; spec de la 0.3.0, decisiones 8, 9 y 11)*. Una tarjeta puede dar un arma nueva o mejorar una que ya tienes. No hace falta entender la fórmula para elegir, porque la diferencia se ve en el ataque:
+  - **el frente** muestra el tipo de idea, su símbolo (`d/dt`, `C₃`, `+ A·sin(kθ)`), un verbo ("Derivar el círculo") y tu arma en movimiento, como la tienes ahora y con la tarjeta puesta;
+  - **el reverso** muestra la fórmula, con lo nuevo subrayado, y el precio. La tarjeta se da vuelta con ↑ y ↓;
+  - las tarjetas usan la fuente Tektur, y lo que el repo incluye de terceros se anota en `CREDITS.md`.
 - **Los enemigos son polígonos hechos de líneas, y sus líneas son su vida** *(decisión del autor, 2026-11-19; antes, un golpe convertía el hexágono en pentágono)*. Cada golpe quita la línea exacta que golpea, así que la forma que queda cuenta dónde le pegaste. Sin líneas, desaparece. Una figura abierta deja pasar las balas por sus huecos: el jugador tiene que moverse para encontrar el ángulo. Los polígonos con más lados llegan más tarde en la partida.
 - **Cada arma hace daño a su manera:**
   - La **recta** y el **círculo** dañan en todo su trazo: el rayo y el anillo. Un trazo daña **por barrido** *(decisión del autor, 2026-11-24; ADR 0029)*: cada punto de la curva actúa como una bala, y la línea que la curva barre primero se pierde, con un tope de líneas por pasada. El anillo rompe la cara que te mira, y un escudo quieto daña a quien choca contra él.
   - El **seno** y la **espiral** son proyectiles que recorren la curva. Dejan una estela corta que se ve pero no hace daño.
   - La **rosa** daña con sus pétalos completos mientras orbitan.
 - **Es un bullet hell:** hay enemigos que disparan, además de los que persiguen al jugador.
-- **El jugador es un círculo y muere de un golpe.** Si recoge una protección, se le suma un anillo concéntrico por fuera, y los anillos se acumulan sin límite. Cada anillo es una vida más, pero agranda al jugador: el anillo de afuera es más grande que el de adentro, así que tener más vidas hace más fácil que algo te golpee. Cada golpe rompe el anillo de afuera. *(Lo propuso Claude: que se rompa el de afuera es lo que hace que el jugador se achique al perder una vida.)*
-- **Fuera del ataque hay cinco mejoras** *(decisión del autor, 2026-11-24; ADR 0029)*:
+- **El jugador es un círculo y muere de un golpe.** Cada tarjeta de anillo extra le suma un anillo concéntrico por fuera, y los anillos se acumulan sin límite *(decisión del autor, 2026-11-24; ADR 0029. Antes, el anillo se recogía como una protección)*. Al perder un anillo, queda invulnerable un rato corto *(decisión del autor, 2026-11-25)*. Cada anillo es una vida más, pero agranda al jugador: el anillo de afuera es más grande que el de adentro, así que tener más vidas hace más fácil que algo te golpee. Cada golpe rompe el anillo de afuera. *(Lo propuso Claude: que se rompa el de afuera es lo que hace que el jugador se achique al perder una vida.)*
+- **Fuera del ataque hay seis mejoras** *(decisión del autor, 2026-11-24; ADR 0029. La sexta, el 2026-11-25)*:
   - **velocidad;**
   - **radio menor:** los anillos quedan a `r₀ + i·Δ`, así que achicar el núcleo achica a todos;
   - **carga:** la experiencia siente tu carga como los enemigos, así que subirla atrae la experiencia y al enjambre a la vez;
   - **anillo extra;**
+  - **el anillo revienta:** al romperse, se expande, empuja a los enemigos y borra las balas enemigas que cruza;
   - **reroll y banish.**
 - **Hay diez tipos de enemigo además del jefe**, cada uno con su idea matemática y una reacción distinta del jugador: triángulo, cuadrado, pentágono, estrella, hexágono, octágono, imán inverso, regenerador, divisor y círculo *(decisión del autor, 2026-11-20; detalle en la spec `docs/specs/2026-11-20-version-0-2-0.md`)*. Todos son justos: ningún ataque llega sin aviso, ninguno queda encima de otro y siempre hay enemigos por todos lados.
 - **La partida sigue la forma de un tema de house o techno** *(decisión del autor, 2026-11-20)*: intro, subida, drop 1, respiro, subida y drop 2, en unos 5 minutos. La forma es fija y lo que entra, dónde y cuándo varía con la semilla.
@@ -135,5 +142,5 @@ Sobre el color: el blanco y negro estricto es lo más fiel a la idea, pero cuest
 ## Preguntas abiertas
 
 - El nombre del juego. `circlebh` es provisorio.
-- Los números de equilibrio: los lados de cada polígono y del jefe, la velocidad, la frecuencia de las oleadas y de las protecciones, y la curva de experiencia. Cómo se miden lo decide el [ADR 0030](decisiones/0030-balance-medido-por-tema.md): una meta por tema, con lo que llega a cada jefe y la forma del riesgo por sección *(decisiones del autor, 2026-11-24)*.
+- Los números de equilibrio: los lados de cada polígono y del jefe, la velocidad, la frecuencia de las oleadas y la curva de experiencia. Cómo se miden lo decide el [ADR 0030](decisiones/0030-balance-medido-por-tema.md): una meta por tema, con lo que llega a cada jefe y la forma del riesgo por sección *(decisiones del autor, 2026-11-24)*.
 - Qué tarjetas hay, con qué valores y qué precios. La estructura la decide el ADR 0029; el contenido vive en el balance y se afina jugando (#90).
