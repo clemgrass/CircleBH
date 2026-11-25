@@ -17,7 +17,14 @@ from circlebh.world.critical_mass import (
 from circlebh.world.director import Director, Purchase, body_weight
 from circlebh.world.enemy import Enemy, check_masses
 from circlebh.world.enemy_bullets import EnemyBullet, bullet_hits_player, step_bullets
-from circlebh.world.events import Death, Donate, Event
+from circlebh.world.events import (
+    Death,
+    Donate,
+    Event,
+    PlayerDeath,
+    SectionStart,
+    Spawn,
+)
 from circlebh.world.figures import check_shapes
 from circlebh.world.merge import Merge, check_merge
 from circlebh.world.player import Player
@@ -81,7 +88,7 @@ class World:
         """Las balas de los enemigos. Atraviesan a los demás enemigos y matan al jugador."""
         self.game_over = False
         """Pasa a `True` cuando un enemigo o una bala enemiga toca al jugador, y no vuelve
-        atrás."""
+        atrás. En ese paso, `events` trae el `PlayerDeath`."""
         self.separations = 0
         """Cuántos pares corrigió la red de seguridad en toda la partida. Con la ley de
         cargas bien afinada, debería quedar en 0 (ADR 0021)."""
@@ -93,6 +100,8 @@ class World:
         el hueco del herido se enciende (decisión 66)."""
         self._steps = 0
         self._endless_steps = 0
+        self._announced = -1
+        """La última sección que ya emitió su `SectionStart`."""
 
     @property
     def steps(self) -> int:
@@ -139,7 +148,9 @@ class World:
         desde ahí, `update` no hace nada.
 
         `events` queda con lo que pasó en este paso: los avisos de ataque, los disparos
-        y golpes de las armas, y una muerte por cada enemigo que perdió su última línea.
+        y golpes de las armas, una muerte por cada enemigo que perdió su última línea,
+        el inicio de cada sección, una aparición por cada enemigo que entró al plano y,
+        si la partida terminó, la muerte del jugador con lo que lo tocó (ADR 0030).
         """
         self.events = []
         if self.game_over:
@@ -150,9 +161,13 @@ class World:
         self.enemy_bullets = step_bullets(
             self.enemy_bullets, self.player.position, self.balance.spawning.distance
         )
-        shot = any(
-            bullet_hits_player(b, self.player, bullet.radius)
-            for b in self.enemy_bullets
+        shot = next(
+            (
+                b
+                for b in self.enemy_bullets
+                if bullet_hits_player(b, self.player, bullet.radius)
+            ),
+            None,
         )
         self.events += step_actions(
             self.enemies,
@@ -187,6 +202,10 @@ class World:
         )
         for purchase in updates:
             self._enqueue(purchase)
+        sections = self.balance.director.sections
+        for index in range(self._announced + 1, self.director.section_index + 1):
+            self.events.append(SectionStart(index, sections[index]))
+        self._announced = self.director.section_index
         if self.director.section.kind == "endless":
             self._endless_steps += 1
         danger = self.director.danger
@@ -197,17 +216,30 @@ class World:
             enemy = Enemy(self.balance.enemies[item.enemy], position, danger)
             enemy.wave = item.wave
             self.enemies.append(enemy)
+            self.events.append(Spawn(enemy))
+        merged = self.merge.present
         self.enemies = self.merge.update(
             self._steps, self.enemies, self.player.position
         )
+        if self.merge.present is not None and self.merge.present is not merged:
+            self.events.append(Spawn(self.merge.present))
         self._check_critical_mass()
-        self.game_over = self.lethal and (
-            shot
-            or any(
-                enemy.touches(self.player.position, self.player.radius)
-                for enemy in self.enemies
+        if not self.lethal:
+            return
+        # La bala mató al empezar el paso. El contacto se revisa recién ahora.
+        cause: Enemy | EnemyBullet | None = shot
+        if cause is None:
+            cause = next(
+                (
+                    enemy
+                    for enemy in self.enemies
+                    if enemy.touches(self.player.position, self.player.radius)
+                ),
+                None,
             )
-        )
+        if cause is not None:
+            self.game_over = True
+            self.events.append(PlayerDeath(cause))
 
     def _release(self, event: Donate) -> None:
         """Convierte la línea que donó el médico en una línea suelta, donde estaba, con
@@ -227,6 +259,7 @@ class World:
             if isinstance(action, Deliver):
                 action.patient, action.donor = event.patient, event.enemy
         self.enemies.append(stray)
+        self.events.append(Spawn(stray))
 
     def _split(self, enemy: Enemy) -> None:
         """Si `enemy` se parte al morir, suma sus fragmentos. Nacen en este paso, sin
@@ -240,6 +273,7 @@ class World:
             # Los fragmentos de una oleada son parte de ella: no se limpia sin ellos.
             child.wave = enemy.wave
         self.enemies += children
+        self.events += [Spawn(child) for child in children]
 
     def _wave_alive(self) -> bool:
         """Si queda algún enemigo de la oleada en curso, vivo o esperando en la cola."""

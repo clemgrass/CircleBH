@@ -1,7 +1,8 @@
 """Los eventos del mundo: lo que pasó en un paso (ADR 0022).
 
 `World.events` guarda los del último `update`. Son datos puros: el mundo no sabe quién
-los lee. Hoy los lee la música, para sonar con lo que pasa en el plano.
+los lee. Los lee la música, para sonar con lo que pasa en el plano, y la medición del
+balance, que sale solo de ellos y del reloj (ADR 0030).
 """
 
 from dataclasses import dataclass
@@ -10,7 +11,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pygame.math import Vector2
 
+    from circlebh.balance import SectionSpec
     from circlebh.world.enemy import Enemy
+    from circlebh.world.enemy_bullets import EnemyBullet
     from circlebh.world.weapons import Weapon
 
 
@@ -62,4 +65,39 @@ class Donate:
     patient: Enemy
 
 
-type Event = Shot | Hit | Death | Telegraph | Regrow | Donate
+@dataclass(frozen=True)
+class Spawn:
+    """`enemy` entró al plano en este paso: de la cola, como fragmento, como línea suelta
+    o de la fusión."""
+
+    enemy: Enemy
+
+
+@dataclass(frozen=True)
+class SectionStart:
+    """Empezó la sección `index` del tema, que es `section`. La primera, en el primer
+    paso."""
+
+    index: int
+    section: SectionSpec
+
+
+@dataclass(frozen=True)
+class PlayerDeath:
+    """El jugador murió en este paso, tocado por `cause`. Si una bala y un enemigo lo
+    tocan a la vez, es la bala."""
+
+    cause: Enemy | EnemyBullet
+
+
+type Event = (
+    Shot
+    | Hit
+    | Death
+    | Telegraph
+    | Regrow
+    | Donate
+    | Spawn
+    | SectionStart
+    | PlayerDeath
+)
