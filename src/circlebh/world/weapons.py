@@ -1,7 +1,8 @@
 """Las armas: disparan solas desde el jugador.
 
 Toda arma hereda de `Weapon` y avanza con `update`, un paso de `STEP` a la vez (ADR 0005).
-Cada arma lee su `spec` en cada paso, así que mejorarla es reemplazar su `spec`.
+Cada arma lee su `spec` en cada paso, así que mejorarla es reemplazar su `spec`. Dónde
+está lo que dispara sale de sus términos, en `world/terms.py` (ADR 0029).
 """
 
 import math
@@ -9,14 +10,18 @@ from abc import ABC, abstractmethod
 
 from pygame.math import Vector2
 
-from circlebh.balance import PointWeaponSpec
+from circlebh.balance import Balance, WeaponSpec
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
 from circlebh.world.events import Event, Hit, Shot
+from circlebh.world.terms import advance_at, projectile_offset
 
 
 class Weapon(ABC):
     """La base de toda arma."""
+
+    def __init__(self, spec: WeaponSpec) -> None:
+        self.spec = spec
 
     @abstractmethod
     def update(self, origin: Vector2, enemies: list[Enemy]) -> list[Event]:
@@ -24,20 +29,49 @@ class Weapon(ABC):
         los enemigos vivos. Devuelve los eventos del paso: disparos y golpes."""
 
 
-class Bullet:
-    """Una bala del arma punto: avanza en línea recta, `p(t) = p₀ + v·t`, y desaparece
-    al recorrer `range`.
+def check_weapons(balance: Balance) -> None:
+    """Rechaza al crear el mundo un arma que el código todavía no sabe armar, nombrando
+    el campo, para que un dato del balance no quede ignorado en silencio.
 
-    No persigue: su dirección queda fija al nacer.
+    Lo que se rechaza aquí llega con su tarea del plan de la 0.3.0: los trazos, el marco
+    polar, apuntar hacia donde te mueves, `d/dt` y `∫dt`, los operadores y lo que viaja.
+    """
+    start = balance.player.start_weapon
+    if start not in balance.weapons:
+        raise ValueError(f"player.start_weapon: no existe el arma {start}")
+    for name, spec in balance.weapons.items():
+        unsupported = {
+            "kind": spec.kind != "projectile",
+            "frame": spec.frame != "cartesian",
+            "aim": spec.aim != "nearest",
+            "advance.degree": spec.advance.degree != 1,
+            "copies": spec.copies != 1,
+            "mirror": spec.mirror,
+            "parallel": spec.parallel != 0,
+            "payload.size": spec.payload.size != 0,
+            "payload.lines": spec.payload.lines != 1,
+            "payload.pierce": spec.payload.pierce != 0,
+        }
+        for field, rejected in unsupported.items():
+            if rejected:
+                raise ValueError(
+                    f"weapons.{name}.{field}: el código todavía no sabe armarlo"
+                )
+
+
+class Bullet:
+    """Un proyectil: sigue los términos de su arma desde donde nació, `p(t) = p₀ +
+    x(t)·û + y(t)·n̂`, y desaparece cuando su avance llega a `reach`.
+
+    `(x(t), y(t))` es `projectile_offset`, en el marco local, y `n̂` es `û` girado un
+    cuarto de vuelta antihorario. No persigue: su `û` queda fijo al nacer.
     """
 
-    def __init__(
-        self, origin: Vector2, velocity: Vector2, spec: PointWeaponSpec
-    ) -> None:
+    def __init__(self, origin: Vector2, direction: Vector2, spec: WeaponSpec) -> None:
         # Copias: `Player.position` cambia en el lugar, y la bala no debe seguirlo.
         self.origin = Vector2(origin)
-        self.velocity = Vector2(velocity)
-        """Unidades del plano por segundo."""
+        self.direction = Vector2(direction)
+        """`û`, de largo 1: hacia dónde se disparó."""
         self.spec = spec
         """El `spec` del arma cuando nació. Una mejora posterior no lo cambia."""
         self._steps = 0
@@ -47,20 +81,26 @@ class Bullet:
         """Segundos desde que nació, contados en pasos enteros como `World.elapsed`."""
         return self._steps * STEP
 
+    def _at(self, t: float) -> Vector2:
+        """`p(t) = p₀ + x(t)·û + y(t)·n̂`."""
+        offset = projectile_offset(self.spec, t)
+        normal = Vector2(-self.direction.y, self.direction.x)
+        return self.origin + self.direction * offset.x + normal * offset.y
+
     @property
     def position(self) -> Vector2:
-        """`p(t) = p₀ + v·t`."""
-        return self.origin + self.velocity * self.age
+        """Dónde está ahora."""
+        return self._at(self.age)
 
     @property
     def previous(self) -> Vector2:
         """Dónde estaba un paso antes. Al nacer, en `origin`."""
-        return self.origin + self.velocity * max(0, self._steps - 1) * STEP
+        return self._at(max(0, self._steps - 1) * STEP)
 
     @property
     def expired(self) -> bool:
-        """Desaparece al recorrer `range`."""
-        return self.spec.speed * self.age >= self.spec.range
+        """Desaparece cuando su avance llega a `reach`."""
+        return advance_at(self.spec, self.age) >= self.spec.reach
 
     def step(self) -> None:
         """Avanza un paso."""
@@ -125,11 +165,12 @@ def nearest(origin: Vector2, enemies: list[Enemy]) -> Enemy | None:
     )
 
 
-class PointWeapon(Weapon):
-    """El arma punto: una bala cada `cooldown` segundos hacia el enemigo más cercano."""
+class ProjectileWeapon(Weapon):
+    """Un arma de proyectiles: uno cada `cooldown` segundos hacia el enemigo más
+    cercano, que sigue los términos de su `spec`."""
 
-    def __init__(self, spec: PointWeaponSpec) -> None:
-        self.spec = spec
+    def __init__(self, spec: WeaponSpec) -> None:
+        super().__init__(spec)
         self.bullets: list[Bullet] = []
         self._steps_to_next = 0
         """Pasos que faltan para el próximo disparo. Parte en 0: dispara en el primer
@@ -141,7 +182,7 @@ class PointWeapon(Weapon):
 
         Cada bala quita una sola línea y desaparece. Si su tramo cruza líneas de dos
         enemigos, golpea la primera que cruza; si empatan, la del primero de la lista.
-        Una bala que llega a `range` en este paso todavía golpea con su último tramo.
+        Una bala que llega a `reach` en este paso todavía golpea con su último tramo.
 
         La bala nueva nace en `origin` y empieza a moverse en el paso siguiente. Sin
         objetivo, o con su centro justo en `origin`, no dispara y queda lista.
@@ -184,11 +225,13 @@ class PointWeapon(Weapon):
         target = nearest(origin, enemies)
         if target is None:
             return False
-        aim = intercept(origin, target.position, target.velocity, self.spec.speed)
+        # El punto avanza con grado 1: su rapidez es el coeficiente del avance.
+        speed = self.spec.advance.coefficient
+        aim = intercept(origin, target.position, target.velocity, speed)
         if aim.distance_squared_to(origin) == 0:
             # `nearest` garantiza que el objetivo mismo da una dirección.
             aim = target.position
-        velocity = (aim - origin).normalize() * self.spec.speed
-        self.bullets.append(Bullet(origin, velocity, self.spec))
+        direction = (aim - origin).normalize()
+        self.bullets.append(Bullet(origin, direction, self.spec))
         self._steps_to_next = round(self.spec.cooldown / STEP)
         return True

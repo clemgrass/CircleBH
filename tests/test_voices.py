@@ -5,6 +5,7 @@ golpe i del loop es la arista i: si la arista no está, ese golpe calla.
 """
 
 import math
+from dataclasses import replace
 
 import pytest
 from hypothesis import given
@@ -14,18 +15,15 @@ from pygame.math import Vector2
 from circlebh.audio.harmony import CHORDS, Variation, chord_at
 from circlebh.audio.rhythm import SIXTEENTHS, euclid
 from circlebh.audio.voices import (
-    VOICES,
     EnemyView,
     enemy_notes,
-    has_voice,
     nearest_views,
     rotation,
-    voice_for,
     weapon_note,
+    weapon_pattern,
 )
-from circlebh.balance import BALANCE, PointWeaponSpec, StarPolygonShape
+from circlebh.balance import BALANCE, StarPolygonShape, WeaponSpec
 from circlebh.world.enemy import Enemy
-from circlebh.world.weapons import PointWeapon, Weapon
 
 VOICING = CHORDS[0][1]
 COMPAS = 60 / 124 * 4
@@ -151,47 +149,21 @@ def test_toda_nota_de_un_enemigo_esta_en_el_acorde(
 # --- La voz del arma ---
 
 
-def arma(cooldown: float) -> PointWeapon:
-    return PointWeapon(PointWeaponSpec(cooldown=cooldown, speed=300.0, range=700.0))
+def arma(cooldown: float) -> WeaponSpec:
+    return replace(BALANCE.weapons["point"], cooldown=cooldown)
 
 
 def test_arma_punto_con_cooldown_06_es_e_3_16() -> None:
-    weapon = arma(0.6)
-    assert voice_for(weapon).pattern(weapon, COMPAS) == euclid(3, 16)
+    assert weapon_pattern(arma(0.6), COMPAS) == euclid(3, 16)
 
 
 @pytest.mark.parametrize(
     ("cooldown", "golpes"), [(0.3, 6), (0.1, 16), (0.01, 16), (10.0, 1)]
 )
 def test_el_loop_del_arma_sigue_su_cooldown(cooldown: float, golpes: int) -> None:
-    weapon = arma(cooldown)
-    assert sum(voice_for(weapon).pattern(weapon, COMPAS)) == golpes
+    assert sum(weapon_pattern(arma(cooldown), COMPAS)) == golpes
 
 
 @pytest.mark.parametrize("s", range(16))
 def test_la_nota_del_arma_esta_en_el_acorde(s: int) -> None:
     assert weapon_note(s, VOICING) - 12 in VOICING
-
-
-def todas_las_subclases(cls: type) -> list[type]:
-    """Las subclases de `cls` a cualquier profundidad, no solo las directas."""
-    out = []
-    for sub in cls.__subclasses__():
-        out += [sub, *todas_las_subclases(sub)]
-    return out
-
-
-class PuntoDoble(PointWeapon):
-    """Una mejora hecha como subclase: hereda la voz del arma punto."""
-
-
-def test_toda_arma_tiene_voz() -> None:
-    clases = todas_las_subclases(Weapon)
-    assert PuntoDoble in clases
-    for cls in clases:
-        assert has_voice(cls), f"{cls.__name__} no tiene voz en audio/voices.py"
-
-
-def test_una_subclase_hereda_la_voz_de_su_arma() -> None:
-    weapon = PuntoDoble(PointWeaponSpec(cooldown=0.6, speed=300.0, range=700.0))
-    assert voice_for(weapon) is VOICES[PointWeapon]

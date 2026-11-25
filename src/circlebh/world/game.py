@@ -30,7 +30,7 @@ from circlebh.world.spawning import (
 )
 from circlebh.world.split import check_splits, fragments
 from circlebh.world.swarm import step_swarm
-from circlebh.world.weapons import PointWeapon, Weapon
+from circlebh.world.weapons import ProjectileWeapon, Weapon, check_weapons
 
 
 class World:
@@ -73,10 +73,10 @@ class World:
         self.queue = SpawnQueue()
         """Lo comprado que espera aparecer, con su lugar relativo al jugador. Sale de a
         `spawning.max_per_step` por paso."""
-        self.weapons: list[Weapon] = (
-            [PointWeapon(balance.point_weapon)] if armed else []
-        )
-        """Las armas del jugador. Por ahora, solo el arma punto."""
+        check_weapons(balance)
+        start = balance.weapons[balance.player.start_weapon]
+        self.weapons: list[Weapon] = [ProjectileWeapon(start)] if armed else []
+        """Las armas del jugador. Por ahora, solo la inicial."""
         self.enemy_bullets: list[EnemyBullet] = []
         """Las balas de los enemigos. Atraviesan a los demás enemigos y matan al jugador."""
         self.game_over = False

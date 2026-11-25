@@ -5,20 +5,17 @@ del jugador rota el loop, y el golpe i es la línea i: si la línea no está, es
 calla. La nota del golpe i es la nota i del acorde que suena, así que nunca desafina.
 
 Un arma es un loop E(k, 16) con k calculado desde su `spec` actual: una mejora se oye.
-Cada clase de arma declara su voz en `VOICES`.
 """
 
 import math
-from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from pygame.math import Vector2
 
 from circlebh.audio.rhythm import SIXTEENTHS, euclid
-from circlebh.balance import Shape
+from circlebh.balance import Shape, WeaponSpec
 from circlebh.world.enemy import Enemy
-from circlebh.world.weapons import PointWeapon, Weapon
 
 MAX_LOOPS = 3
 """Cuántos enemigos tienen loop: los más cercanos. Los demás solo suben la intensidad."""
@@ -126,45 +123,12 @@ def weapon_note(s: int, voicing: tuple[int, ...]) -> int:
     return voicing[1 if (s // 2) % 2 == 0 else 3] + 12
 
 
-class WeaponVoice(ABC):
-    """El ritmo de una clase de arma."""
+def weapon_pattern(spec: WeaponSpec, bar_seconds: float) -> list[bool]:
+    """El loop de un arma en un compás de `bar_seconds`, desde su `spec` actual:
+    E(k, 16), con k = los disparos que caben en un compás, entre 1 y 16.
 
-    @abstractmethod
-    def pattern(self, weapon: Weapon, bar_seconds: float) -> list[bool]:
-        """El loop del arma en un compás de `bar_seconds`, desde su `spec` actual."""
-
-
-class PointVoice(WeaponVoice):
-    """El arma punto: E(k, 16), con k = los disparos que caben en un compás."""
-
-    def pattern(self, weapon: Weapon, bar_seconds: float) -> list[bool]:
-        if not isinstance(weapon, PointWeapon):
-            raise TypeError(
-                f"PointVoice espera un PointWeapon, llegó {type(weapon).__name__}"
-            )
-        k = round(bar_seconds / weapon.spec.cooldown)
-        return euclid(max(1, min(SIXTEENTHS, k)), SIXTEENTHS)
-
-
-VOICES: dict[type[Weapon], WeaponVoice] = {PointWeapon: PointVoice()}
-"""La voz de cada clase de arma. Un arma nueva suma aquí su voz."""
-
-
-def _voice_of_type(cls: type) -> WeaponVoice | None:
-    """La voz de la clase o, si no tiene, la de la clase más cercana de la que hereda:
-    una subclase de un arma suena como su arma."""
-    for base in cls.__mro__:
-        if base in VOICES:
-            return VOICES[base]
-    return None
-
-
-def has_voice(cls: type) -> bool:
-    return _voice_of_type(cls) is not None
-
-
-def voice_for(weapon: Weapon) -> WeaponVoice:
-    voice = _voice_of_type(type(weapon))
-    if voice is None:
-        raise KeyError(f"{type(weapon).__name__} no tiene voz en audio/voices.py")
-    return voice
+    La voz sale del `spec` y no de la clase del arma, así que dos armas con el mismo
+    `spec` suenan igual (ADR 0029).
+    """
+    k = round(bar_seconds / spec.cooldown)
+    return euclid(max(1, min(SIXTEENTHS, k)), SIXTEENTHS)

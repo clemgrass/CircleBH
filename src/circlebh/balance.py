@@ -29,6 +29,9 @@ class PlayerSpec:
     """Su carga eléctrica, de signo contrario a la de los enemigos: los atrae. Es una
     carga fija, como de masa infinita: ninguna fuerza lo mueve (ADR 0021)."""
 
+    start_weapon: str
+    """El arma con que empieza la partida, una clave de `weapons`."""
+
 
 @dataclass(frozen=True)
 class ChargesSpec:
@@ -532,18 +535,107 @@ class CriticalMassSpec:
 
 
 @dataclass(frozen=True)
-class PointWeaponSpec:
-    """El arma punto: balas que salen del jugador hacia el centro del enemigo más cercano
-    y avanzan en línea recta, `p(t) = p₀ + v·t`."""
+class AdvanceSpec:
+    """El avance de un arma, `a(t)`, a lo largo de `û` o del radio (ADR 0029).
+
+    Según el grado: `v·τ` con 0, `v·t` con 1 y `v·t²/(2τ)` con 2. `d/dt` baja un grado
+    y `∫dt` lo sube.
+    """
+
+    coefficient: float
+    """`v`, en unidades del plano por segundo. Con 0 no hay avance."""
+
+    degree: int
+    """0, 1 o 2."""
+
+
+@dataclass(frozen=True)
+class HarmonicSpec:
+    """Un armónico, `A·sin(k·t + φ)`: desvía de lado en el marco cartesiano, y suma al
+    radio en el polar (ADR 0029)."""
+
+    amplitude: float
+    """`A`, en unidades del plano."""
+
+    k: float
+    """`k`, en radianes por segundo."""
+
+    phase: float
+    """`φ`, en radianes."""
+
+
+@dataclass(frozen=True)
+class PayloadSpec:
+    """Lo que viaja (ADR 0029). Un proyectil usa `size`, `lines` y `pierce`; un trazo,
+    `lines`, `duration` y `width`."""
+
+    size: float
+    """El radio del proyectil, en unidades del plano. Con 0, es un punto."""
+
+    lines: int
+    """Cuántas líneas quita un golpe, o una pasada de un trazo."""
+
+    pierce: int
+    """A cuántos enemigos atraviesa un proyectil antes de desaparecer."""
+
+    duration: float
+    """Cuántos segundos dura un trazo."""
+
+    width: float
+    """El grosor de un trazo, en unidades del plano."""
+
+
+@dataclass(frozen=True)
+class WeaponSpec:
+    """Un arma: tres términos en un marco, con sus operadores (ADR 0029).
+
+    La posición de lo que dispara es una función pura de este `spec` y del tiempo
+    (`world/terms.py`). Mejorar el arma es reemplazar su `spec`.
+    """
+
+    title: str
+    """Su nombre, como se muestra al jugador."""
+
+    kind: Literal["projectile", "trace"]
+    """Si dispara proyectiles o dibuja un trazo."""
+
+    frame: Literal["cartesian", "polar"]
+    """El marco: cartesiano, fijo donde se disparó, o polar, centrado en el jugador."""
+
+    aim: Literal["nearest", "motion"]
+    """Hacia dónde apunta `û`: al enemigo más cercano, con anticipación, o hacia donde
+    se mueve el jugador."""
+
+    advance: AdvanceSpec
+    """El avance, `a(t)`."""
+
+    harmonics: tuple[HarmonicSpec, ...]
+    """Los armónicos, sumados."""
+
+    spin: float
+    """`Ω`, el giro en el marco polar, en radianes por segundo. 0 si no gira."""
+
+    copies: int
+    """`Cₙ`: cuántas copias rotadas `2π/n`. 1 es solo el arma."""
+
+    mirror: bool
+    """Si suma una copia reflejada respecto de `û`."""
+
+    parallel: float
+    """La paralela: dos copias a `±d` por la normal. 0 si no hay."""
+
+    payload: PayloadSpec
+    """Lo que viaja."""
 
     cooldown: float
     """Segundos entre un disparo y el siguiente."""
 
-    speed: float
-    """Rapidez de la bala, en unidades del plano por segundo."""
+    reach: float
+    """El alcance de un proyectil, el `R` de un trazo polar o el `L` de la recta, en
+    unidades del plano."""
 
-    range: float
-    """Distancia que recorre la bala antes de desaparecer, en unidades del plano."""
+    tau: float
+    """`τ`, en segundos: la constante de `d/dt` y `∫dt`, que deja las unidades en largo."""
 
 
 @dataclass(frozen=True)
@@ -596,8 +688,8 @@ class Balance:
     critical_mass: CriticalMassSpec
     """Cuándo aparece el círculo que reparte al enjambre."""
 
-    point_weapon: PointWeaponSpec
-    """El arma punto."""
+    weapons: dict[str, WeaponSpec]
+    """Las armas, por nombre."""
 
     enemy_bullet: EnemyBulletSpec
     """Las balas que disparan los enemigos."""
@@ -608,7 +700,7 @@ class Balance:
 
 # >>> datos (lo genera poe balance-importar)
 BALANCE = Balance(
-    player=PlayerSpec(speed=240.0, radius=12.0, charge=-14.0),
+    player=PlayerSpec(speed=240.0, radius=12.0, charge=-14.0, start_weapon="point"),
     charges=ChargesSpec(
         k=171000.0,
         cutoff=150.0,
@@ -1075,7 +1167,24 @@ BALANCE = Balance(
     critical_mass=CriticalMassSpec(
         enemy="circle", count=30, imbalance=0.5, cooldown_bars=8.0
     ),
-    point_weapon=PointWeaponSpec(cooldown=0.6, speed=300.0, range=700.0),
+    weapons={
+        "point": WeaponSpec(
+            title="Punto",
+            kind="projectile",
+            frame="cartesian",
+            aim="nearest",
+            advance=AdvanceSpec(coefficient=300.0, degree=1),
+            harmonics=(),
+            spin=0.0,
+            copies=1,
+            mirror=False,
+            parallel=0.0,
+            payload=PayloadSpec(size=0.0, lines=1, pierce=0, duration=0.0, width=0.0),
+            cooldown=0.6,
+            reach=700.0,
+            tau=0.5,
+        )
+    },
     enemy_bullet=EnemyBulletSpec(speed=330.0, radius=4.0),
     regrow=RegrowSpec(fade=0.4),
 )
