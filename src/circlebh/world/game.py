@@ -8,6 +8,7 @@ from pygame.math import Vector2
 
 from circlebh.balance import Balance, RegenerateSpec
 from circlebh.world.actions import Deliver, check_actions, step_actions, steps_of
+from circlebh.world.cards import Loadout, Offer, apply, check_cards, deal
 from circlebh.world.clock import STEP
 from circlebh.world.critical_mass import (
     CriticalMass,
@@ -18,6 +19,7 @@ from circlebh.world.director import Director, Purchase, body_weight
 from circlebh.world.enemy import Enemy, check_masses
 from circlebh.world.enemy_bullets import EnemyBullet, bullet_hits_player, step_bullets
 from circlebh.world.events import (
+    CardChosen,
     Death,
     Donate,
     Event,
@@ -85,9 +87,12 @@ class World:
         `spawning.max_per_step` por paso."""
         check_experience(balance.experience)
         check_weapons(balance)
-        start = balance.weapons[balance.player.start_weapon]
-        self.weapons: list[Weapon] = [ProjectileWeapon(start)] if armed else []
-        """Las armas del jugador. Por ahora, solo la inicial."""
+        check_cards(balance)
+        start = balance.player.start_weapon
+        self.arsenal: dict[str, Weapon] = (
+            {start: ProjectileWeapon(balance.weapons[start])} if armed else {}
+        )
+        """Las armas del jugador, por nombre, en el orden en que llegaron."""
         self.enemy_bullets: list[EnemyBullet] = []
         """Las balas de los enemigos. Atraviesan a los demás enemigos y matan al jugador."""
         self.game_over = False
@@ -110,6 +115,18 @@ class World:
         """El nivel del jugador. Parte en 1."""
         self.pending_levels = 0
         """Los niveles subidos que todavía no se eligieron."""
+        self.freezing = 0
+        """Los pasos del frenado que quedan antes de repartir la mano."""
+        self.hand: tuple[Offer, ...] = ()
+        """Las tarjetas que esperan tu elección. Mientras haya, `update` no avanza."""
+        self.rerolls = balance.level_up.rerolls
+        """Cuántas veces puedes cambiar la mano entera."""
+        self.banishes = balance.level_up.banishes
+        """Cuántas tarjetas puedes sacar todavía de esta partida."""
+        self.banished: set[str] = set()
+        """Las tarjetas sacadas con banish: no vuelven en esta partida."""
+        self._chosen: list[Event] = []
+        """El `CardChosen` de la última elección, que sale en el `update` siguiente."""
         self._steps = 0
         self._endless_steps = 0
         self._announced = -1
@@ -132,6 +149,21 @@ class World:
         enemies = self.balance.enemies
         return sum(body_weight(enemy.spec, enemies) for enemy in self.enemies) + sum(
             body_weight(enemies[item.enemy], enemies) for item in self.queue
+        )
+
+    @property
+    def weapons(self) -> list[Weapon]:
+        """Las armas del jugador, en el orden en que llegaron."""
+        return list(self.arsenal.values())
+
+    @property
+    def loadout(self) -> Loadout:
+        """Lo que tiene el jugador, lo que una tarjeta puede cambiar."""
+        return Loadout(
+            {name: weapon.spec for name, weapon in self.arsenal.items()},
+            self.player.spec,
+            self.rerolls,
+            self.banishes,
         )
 
     @property
@@ -166,9 +198,14 @@ class World:
         el punto de experiencia que dejó, cada nivel que subió el jugador, el inicio de
         cada sección, una aparición por cada enemigo que entró al plano y,
         si la partida terminó, la muerte del jugador con lo que lo tocó (ADR 0030).
+
+        Al llenarse un nivel, el mundo da todavía `level_up.freeze_steps` pasos, y en el
+        último reparte la mano con su `Random`. Desde ahí, `update` no avanza hasta
+        `choose`, y no emite nada salvo el `CardChosen` de la elección anterior. Si
+        mueres durante el frenado, la mano no sale.
         """
-        self.events = []
-        if self.game_over:
+        self.events, self._chosen = self._chosen, []
+        if self.game_over or self.hand:
             return
         self._steps += 1
         self.player.step(intent)
@@ -196,7 +233,7 @@ class World:
             self.enemies,
             self.player.position,
             self.player.velocity,
-            self.balance.player.charge,
+            self.player.spec.charge,
             self.balance.charges,
         )
         for weapon in self.weapons:
@@ -244,9 +281,90 @@ class World:
         if self.merge.present is not None and self.merge.present is not merged:
             self.events.append(Spawn(self.merge.present))
         self._check_critical_mass()
-        if not self.lethal:
+        if self.lethal:
+            self._check_death(shot)
+        if not self.game_over:
+            self._freeze()
+
+    def choose(self, index: int) -> None:
+        """Elige la tarjeta `index` de la mano: aplica su cambio y cierra la mano. Si
+        quedan niveles por elegir, reparte la siguiente al tiro, sin otro frenado.
+
+        Lanza `IndexError` si no hay mano o si `index` no está en ella."""
+        if not 0 <= index < len(self.hand):
+            raise IndexError(f"no hay tarjeta {index} en una mano de {len(self.hand)}")
+        offer = self.hand[index]
+        state = apply(offer, self.loadout, self.balance.cards, self.balance.weapons)
+        self._equip(state)
+        self._chosen.append(CardChosen(offer))
+        self._close_hand()
+
+    def reroll(self) -> None:
+        """Cambia la mano entera por otra, si hay mano y te quedan usos."""
+        if not self.hand or self.rerolls <= 0:
             return
-        # La bala mató al empezar el paso. El contacto se revisa recién ahora.
+        self.rerolls -= 1
+        self._deal()
+
+    def banish(self, index: int) -> None:
+        """Saca de la partida la tarjeta `index` de la mano, si te quedan usos: deja la
+        mano y no vuelve a salir. Si la mano queda vacía, ese nivel se pierde."""
+        if not self.hand or self.banishes <= 0:
+            return
+        card = self.hand[index].card
+        self.banishes -= 1
+        self.banished.add(card)
+        self.hand = tuple(offer for offer in self.hand if offer.card != card)
+        if not self.hand:
+            self._close_hand()
+
+    def _freeze(self) -> None:
+        """Cuenta el frenado: empieza en el paso en que se llena un nivel, y en su
+        último paso reparte la mano."""
+        if self.freezing > 0:
+            self.freezing -= 1
+        elif self.pending_levels > 0:
+            self.freezing = self.balance.level_up.freeze_steps
+        else:
+            return
+        if self.freezing == 0:
+            self._deal()
+
+    def _deal(self) -> None:
+        """Reparte la mano con la `Random` del mundo. Sin ninguna tarjeta con efecto,
+        los niveles pendientes se pierden y el mundo sigue."""
+        self.hand = deal(
+            self.loadout,
+            self.balance.cards,
+            self.balance.level_up,
+            self.banished,
+            self.rng,
+        )
+        if not self.hand:
+            self.pending_levels = 0
+
+    def _close_hand(self) -> None:
+        """Cierra la mano de un nivel. Si quedan otros, reparte la siguiente."""
+        self.hand = ()
+        self.pending_levels -= 1
+        if self.pending_levels > 0:
+            self._deal()
+
+    def _equip(self, state: Loadout) -> None:
+        """Deja al jugador y sus armas como dice `state`. Un arma que ya tenías cambia
+        su `spec`; una nueva empieza sin balas."""
+        for name, spec in state.weapons.items():
+            if name in self.arsenal:
+                self.arsenal[name].spec = spec
+            else:
+                self.arsenal[name] = ProjectileWeapon(spec)
+        self.player.spec = state.player
+        self.rerolls = state.rerolls
+        self.banishes = state.banishes
+
+    def _check_death(self, shot: EnemyBullet | None) -> None:
+        """Termina la partida si una bala lo tocó al empezar el paso o si un enemigo lo
+        toca ahora."""
         cause: Enemy | EnemyBullet | None = shot
         if cause is None:
             cause = next(
@@ -312,7 +430,7 @@ class World:
         self.orbs, collected = step_orbs(
             self.orbs,
             self.player,
-            self.balance.player.charge,
+            self.player.spec.charge,
             self.balance.experience,
             self.balance.charges,
         )

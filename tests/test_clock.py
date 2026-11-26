@@ -1,6 +1,17 @@
 """Tests del reloj de pasos fijos y de los pasos de captura (ADR 0005)."""
 
-from circlebh.world.clock import FixedStepClock, capture_steps
+import itertools
+
+import pytest
+from hypothesis import given
+from hypothesis import strategies as st
+
+from circlebh.world.clock import (
+    FixedStepClock,
+    capture_steps,
+    slowdown_rate,
+    slowdown_steps,
+)
 
 
 def test_advance_un_paso() -> None:
@@ -48,3 +59,67 @@ def test_capture_steps_redondea_al_paso_mas_cercano() -> None:
 
 def test_capture_steps_vacio() -> None:
     assert capture_steps([]) == []
+
+
+# --- El frenado antes de la mano ---
+
+
+def test_frenado_da_sus_pasos_en_el_doble_de_tiempo() -> None:
+    # Con 12 pasos del mundo, frena hasta quedar quieto en 24 pasos de escena (0,4 s).
+    assert slowdown_steps(0, 12) == 0
+    assert slowdown_steps(23, 12) < 12
+    assert slowdown_steps(24, 12) == 12
+
+
+def test_frenado_no_pasa_de_sus_pasos() -> None:
+    # Negativo: después del frenado, el mundo ya no avanza.
+    assert slowdown_steps(1000, 12) == 12
+
+
+def test_sin_frenado_no_avanza() -> None:
+    # Borde: con 0 pasos, la mano sale al tiro.
+    assert slowdown_steps(0, 0) == 0
+    assert slowdown_steps(5, 0) == 0
+
+
+@given(n=st.integers(min_value=1, max_value=120))
+def test_frenado_nunca_da_mas_de_un_paso_por_escena(n: int) -> None:
+    hechos = [slowdown_steps(j, n) for j in range(2 * n + 1)]
+    assert all(0 <= b - a <= 1 for a, b in itertools.pairwise(hechos))
+
+
+@given(n=st.integers(min_value=3, max_value=120))
+def test_frenado_espacia_cada_vez_mas_sus_pasos(n: int) -> None:
+    # Los pasos de escena en que avanza el mundo quedan cada vez más separados. Caen en
+    # pasos enteros, así que un hueco puede quedar uno más corto que el anterior por
+    # redondeo, nunca más.
+    cuando = [
+        j
+        for j in range(1, 2 * n + 1)
+        if slowdown_steps(j, n) > slowdown_steps(j - 1, n)
+    ]
+    assert len(cuando) == n
+    huecos = [b - a for a, b in itertools.pairwise(cuando)]
+    assert all(b >= a - 1 for a, b in itertools.pairwise(huecos))
+    assert huecos[-1] > huecos[0]
+
+
+def test_velocidad_del_frenado() -> None:
+    # La derivada de lo recorrido: baja en línea recta de 1 a 0 en 2N pasos.
+    assert slowdown_rate(0, 12) == 1
+    assert slowdown_rate(12, 12) == pytest.approx(0.5)
+    assert slowdown_rate(24, 12) == 0
+    assert slowdown_rate(100, 12) == 0
+
+
+def test_sin_frenado_la_velocidad_es_cero() -> None:
+    # Borde: con 0 pasos, la mano sale al tiro y el mundo ya está quieto.
+    assert slowdown_rate(0, 0) == 0
+
+
+@given(n=st.integers(min_value=1, max_value=120))
+def test_lo_recorrido_es_la_suma_de_la_velocidad(n: int) -> None:
+    # Sumar la velocidad paso a paso da lo que recorre `slowdown_steps`, a menos de un
+    # paso.
+    recorrido = sum(slowdown_rate(j, n) for j in range(2 * n))
+    assert abs(recorrido - slowdown_steps(2 * n, n)) <= 1

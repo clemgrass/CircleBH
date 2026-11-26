@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from pygame.math import Vector2
 
     from circlebh.balance import SectionSpec
+    from circlebh.world.cards import Offer
     from circlebh.world.enemy import Enemy
     from circlebh.world.enemy_bullets import EnemyBullet
     from circlebh.world.experience import Orb
@@ -106,6 +107,14 @@ class LevelUp:
     level: int
 
 
+@dataclass(frozen=True)
+class CardChosen:
+    """El jugador eligió `offer` de la mano. Sale en el `update` que sigue a la
+    elección, porque elegir pasa entre dos pasos."""
+
+    offer: Offer
+
+
 type Event = (
     Shot
     | Hit
@@ -118,4 +127,5 @@ type Event = (
     | PlayerDeath
     | ExperienceDrop
     | LevelUp
+    | CardChosen
 )

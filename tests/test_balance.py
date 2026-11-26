@@ -513,6 +513,80 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
             "base": 6.0,
             "exponent": 1.5,
         },
+        "level_up": {
+            "freeze_steps": 12,
+            "hand_size": 3,
+            "max_weapons": 4,
+            "rerolls": 1,
+            "banishes": 1,
+        },
+        "cards": {
+            "point_speed": {
+                "title": "Acelerar el punto",
+                "symbol": "v × 1,25",
+                "family": "knob",
+                "weapons": ["point"],
+                "change": {
+                    "kind": "knob",
+                    "field": "advance.coefficient",
+                    "op": "mul",
+                    "values": [1.25],
+                },
+                "shape": False,
+            },
+            "point_cooldown": {
+                "title": "Disparar más seguido",
+                "symbol": "cooldown × 0,8",
+                "family": "knob",
+                "weapons": ["point"],
+                "change": {
+                    "kind": "knob",
+                    "field": "cooldown",
+                    "op": "mul",
+                    "values": [0.8],
+                },
+                "shape": False,
+            },
+            "player_speed": {
+                "title": "Moverte más rápido",
+                "symbol": "speed × 1,1",
+                "family": "player",
+                "weapons": [],
+                "change": {
+                    "kind": "player",
+                    "field": "speed",
+                    "op": "mul",
+                    "values": [1.1],
+                },
+                "shape": False,
+            },
+            "player_radius": {
+                "title": "Achicar tu círculo",
+                "symbol": "r × 0,9",
+                "family": "player",
+                "weapons": [],
+                "change": {
+                    "kind": "player",
+                    "field": "radius",
+                    "op": "mul",
+                    "values": [0.9],
+                },
+                "shape": False,
+            },
+            "player_charge": {
+                "title": "Cargarte más",
+                "symbol": "q × 1,25",
+                "family": "player",
+                "weapons": [],
+                "change": {
+                    "kind": "player",
+                    "field": "charge",
+                    "op": "mul",
+                    "values": [1.25],
+                },
+                "shape": False,
+            },
+        },
     }
 
 

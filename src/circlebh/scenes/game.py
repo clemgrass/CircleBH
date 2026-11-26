@@ -8,6 +8,7 @@ import pygame
 import pygame._sdl2.controller as sdl_controller
 from pygame.math import Vector2
 
+from circlebh.audio.deck import Deck
 from circlebh.audio.sequencer import Sequencer
 from circlebh.balance import BALANCE
 from circlebh.cli import RunOptions
@@ -24,6 +25,7 @@ from circlebh.render.palette import DARK
 from circlebh.render.plane import draw_axes, draw_letterbox
 from circlebh.render.world_view import draw_world
 from circlebh.scenes.death import EFFECT_STEPS, DeathScreen
+from circlebh.scenes.hand import HandScene
 from circlebh.scenes.music import MusicPlayer, music_enabled
 from circlebh.scenes.scenarios import SCENARIOS, Scenario
 from circlebh.seeds import next_seed
@@ -124,6 +126,9 @@ class GameScene:
         self.death_screen = DeathScreen(self.palette)
         self.music: Sequencer | None = None
         self.music_player: MusicPlayer | None = None
+        self.deck: Deck | None = None
+        """Lo que se oye: el tema a la velocidad del mundo, cruzado con la música de la
+        mano (decisión 16 de la spec)."""
         if music_enabled(options, settings):
             audio = settings.audio
             player = MusicPlayer(audio.volume)
@@ -134,6 +139,7 @@ class GameScene:
                     base_volume=audio.base_volume,
                     game_volume=audio.game_volume,
                 )
+                self.deck = Deck()
         self.game = 0
         """Cuántas veces se reinició: la primera partida es la 0."""
         self.start(options.seed)
@@ -169,6 +175,13 @@ class GameScene:
             self.world.enemies.append(guest)
         if demo is not None:
             self.world.orbs += [Orb(Vector2(x, y), value) for x, y, value in demo.orbs]
+        self.hand = HandScene(
+            demo=demo is not None,
+            # La demo elige con una `Random` propia, sembrada con la semilla de la
+            # partida, como la simulación: nunca con la del mundo (decisión 13).
+            chooser=random.Random(seed),
+            moves=demo.hand_moves if demo is not None else (),
+        )
         self.shown_levels = 0.0
         """Los niveles que muestra el borde, con su parte de la vuelta: sigue a la
         experiencia del mundo con una transición suave (decisión 12)."""
@@ -202,6 +215,7 @@ class GameScene:
         if self.gamepads is None:
             return
         self.gamepads.handle_event(event)
+        self.hand.handle_event(self.world, event)
         # Solo con el texto ya a la vista: R o X a mitad de partida, o justo al morir,
         # no hacen nada. Así nadie se salta el tiempo que duró sin verlo.
         if self.dead_steps >= EFFECT_STEPS and is_restart(event):
@@ -210,14 +224,15 @@ class GameScene:
     def step(self) -> None:
         """Avanza `world` un paso con la intención de este momento, o cuenta la muerte.
 
-        La música avanza en todos los pasos, también con el jugador muerto.
+        El tema avanza en todos los pasos, también con el jugador muerto, salvo en los
+        que la mano detiene al mundo: en el frenado avanza con él, y con la mano
+        abierta, no. Lo que se oye pasa por `deck`, que lee el tema a la velocidad del
+        mundo y lo cruza con la música de la mano (decisión 16).
         """
+        paused = False
         if not self.world.game_over:
-            # R1 (ADR 0026): una partida nueva espera el compás de la música, para que
-            # cada drop caiga en el golpe. Sin música, no espera.
-            if self.music is None or not self.music.waiting_for_bar:
-                self.world.update(self.intent())
-                self.log_section()
+            advanced = self.hand.step(self.world, self.advance)
+            paused = not advanced and (bool(self.world.hand) or self.world.freezing > 0)
         else:
             self.dead_steps += 1
             if self.demo is not None and self.dead_steps >= DEMO_RESTART_STEPS:
@@ -226,13 +241,30 @@ class GameScene:
         cost = level_cost(world.level, world.balance.experience)
         target = world.level - 1 + world.experience / cost
         self.shown_levels = ease_toward(self.shown_levels, target, STEP)
-        if self.music is not None:
+        if self.music is not None and not paused:
             self.music.step(self.world)
+        if self.music is not None and self.deck is not None:
+            self.deck.feed(self.music.ready)
+            if world.game_over:
+                rate, toward_hand = 1.0, False
+            else:
+                rate = self.hand.music_rate(world)
+                toward_hand = bool(world.hand) or world.freezing > 0
+            self.deck.step(rate, toward_hand, self.music.harmony)
+
+    def advance(self) -> None:
+        """Un paso del mundo con la intención de este momento.
+
+        R1 (ADR 0026): una partida nueva espera el compás de la música, para que cada
+        drop caiga en el golpe. Sin música, no espera."""
+        if self.music is None or not self.music.waiting_for_bar:
+            self.world.update(self.intent())
+            self.log_section()
 
     def play_music(self) -> None:
-        """Pasa al canal de audio los bloques que el secuenciador dejó listos."""
-        if self.music is not None and self.music_player is not None:
-            self.music_player.update(self.music.ready)
+        """Pasa al canal de audio los bloques que la mezcla dejó listos."""
+        if self.deck is not None and self.music_player is not None:
+            self.music_player.update(self.deck.ready)
 
     def intent(self) -> Vector2:
         if self.demo is not None:
@@ -263,6 +295,7 @@ class GameScene:
         )
         lap = self.shown_levels - math.floor(self.shown_levels)
         draw_experience_border(screen, viewport, lap, self.palette)
+        self.hand.draw(screen, viewport, self.world, self.palette)
         if self.world.game_over:
             player = self.world.player
             self.death_screen.draw(

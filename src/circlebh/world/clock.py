@@ -36,6 +36,33 @@ class FixedStepClock:
         return steps
 
 
+def slowdown_steps(scene_steps: int, freeze_steps: int) -> int:
+    """Cuántos pasos del frenado lleva dados el mundo tras `scene_steps` pasos de la
+    escena (spec de la 0.3.0, decisión 11).
+
+    La velocidad del mundo baja en línea recta de 1 a 0 en `T = 2N` pasos de escena,
+    con `N = freeze_steps`. Lo recorrido es la integral, `d(j) = j − j²/(2T)`, que llega
+    a `N` justo en `T`: cada paso del mundo queda más separado que el anterior. Se
+    cuenta con enteros, `⌊(4N·j − j²) / 4N⌋`, sin error de redondeo.
+    """
+    if freeze_steps <= 0:
+        return 0
+    span = 4 * freeze_steps
+    j = min(scene_steps, 2 * freeze_steps)
+    return (span * j - j * j) // span
+
+
+def slowdown_rate(scene_steps: int, freeze_steps: int) -> float:
+    """La velocidad del mundo en el frenado, tras `scene_steps` pasos de escena: baja en
+    línea recta de 1 a 0 en `2N` pasos, con `N = freeze_steps`. Es la derivada de lo
+    que recorre `slowdown_steps`. Con `N = 0` no hay frenado: el mundo ya está quieto.
+
+    La usa la música, que suena a la velocidad del mundo (decisión 16 de la spec)."""
+    if freeze_steps <= 0:
+        return 0.0
+    return max(0.0, 1 - scene_steps / (2 * freeze_steps))
+
+
 def capture_steps(times: Iterable[float]) -> list[int]:
     """Convierte tiempos en segundos al número del paso más cercano, en el mismo orden.
 

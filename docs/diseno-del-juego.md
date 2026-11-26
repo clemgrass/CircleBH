@@ -52,6 +52,7 @@ La tabla es el punto de partida. El prototipo puede ajustarla si algo no se lee 
 - **Al subir de nivel, el juego frena hasta quedar quieto y aparecen tres tarjetas** *(decisiones del autor, 2026-11-25; spec de la 0.3.0, decisiones 8, 9 y 11)*. Una tarjeta puede dar un arma nueva o mejorar una que ya tienes. No hace falta entender la fórmula para elegir, porque la diferencia se ve en el ataque:
   - **el frente** muestra el tipo de idea, su símbolo (`d/dt`, `C₃`, `+ A·sin(kθ)`), un verbo ("Derivar el círculo") y tu arma en movimiento, como la tienes ahora y con la tarjeta puesta;
   - **el reverso** muestra la fórmula, con lo nuevo subrayado, y el precio. La tarjeta se da vuelta con ↑ y ↓;
+  - **R** (Y en el control) cambia la mano entera y **B** (X en el control) saca la tarjeta elegida de la partida, mientras queden usos;
   - las tarjetas usan la fuente Tektur, y lo que el repo incluye de terceros se anota en `CREDITS.md`.
 - **Los enemigos son polígonos hechos de líneas, y sus líneas son su vida** *(decisión del autor, 2026-11-19; antes, un golpe convertía el hexágono en pentágono)*. Cada golpe quita la línea exacta que golpea, así que la forma que queda cuenta dónde le pegaste. Sin líneas, desaparece. Una figura abierta deja pasar las balas por sus huecos: el jugador tiene que moverse para encontrar el ángulo. Los polígonos con más lados llegan más tarde en la partida.
 - **Cada arma hace daño a su manera:**

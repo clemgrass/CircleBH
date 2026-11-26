@@ -9,8 +9,10 @@ from hypothesis import strategies as st
 from pygame.math import Vector2
 
 from circlebh.controls import (
+    StickSteps,
     axis_to_unit,
     combine,
+    hand_command,
     is_restart,
     keyboard_intent,
     stick_intent,
@@ -162,3 +164,104 @@ def test_soltar_r_no_reinicia() -> None:
 )
 def test_otras_entradas_no_reinician(evento: pygame.event.Event) -> None:
     assert not is_restart(evento)
+
+
+# --- La mano ---
+
+
+@pytest.mark.parametrize(
+    ("key", "orden"),
+    [
+        (pygame.K_LEFT, "left"),
+        (pygame.K_a, "left"),
+        (pygame.K_RIGHT, "right"),
+        (pygame.K_d, "right"),
+        (pygame.K_UP, "flip_up"),
+        (pygame.K_w, "flip_up"),
+        (pygame.K_DOWN, "flip_down"),
+        (pygame.K_s, "flip_down"),
+        (pygame.K_RETURN, "choose"),
+        (pygame.K_KP_ENTER, "choose"),
+        (pygame.K_r, "reroll"),
+        (pygame.K_b, "banish"),
+    ],
+)
+def test_teclas_de_la_mano(key: int, orden: str) -> None:
+    assert hand_command(tecla(pygame.KEYDOWN, key)) == orden
+
+
+@pytest.mark.parametrize(
+    ("button", "orden"),
+    [
+        (pygame.CONTROLLER_BUTTON_DPAD_LEFT, "left"),
+        (pygame.CONTROLLER_BUTTON_DPAD_RIGHT, "right"),
+        (pygame.CONTROLLER_BUTTON_DPAD_UP, "flip_up"),
+        (pygame.CONTROLLER_BUTTON_DPAD_DOWN, "flip_down"),
+        (pygame.CONTROLLER_BUTTON_A, "choose"),
+        (pygame.CONTROLLER_BUTTON_Y, "reroll"),
+        (pygame.CONTROLLER_BUTTON_X, "banish"),
+    ],
+)
+def test_botones_de_la_mano(button: int, orden: str) -> None:
+    assert hand_command(boton(button)) == orden
+
+
+@pytest.mark.parametrize(
+    "evento",
+    [
+        tecla(pygame.KEYUP, pygame.K_RETURN),
+        tecla(pygame.KEYDOWN, pygame.K_1),
+        boton(pygame.CONTROLLER_BUTTON_B),
+        pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(0, 0)),
+    ],
+)
+def test_otras_entradas_no_son_de_la_mano(evento: pygame.event.Event) -> None:
+    # Negativo: soltar no cuenta, y no hay atajos 1, 2 y 3 (decisión 8).
+    assert hand_command(evento) is None
+
+
+def eje(axis: int, value: int) -> pygame.event.Event:
+    return pygame.event.Event(
+        pygame.CONTROLLERAXISMOTION, instance_id=0, axis=axis, value=value
+    )
+
+
+X, Y = pygame.CONTROLLER_AXIS_LEFTX, pygame.CONTROLLER_AXIS_LEFTY
+
+
+def test_stick_mueve_una_vez_al_cruzar_la_mitad() -> None:
+    stick = StickSteps()
+    assert stick.command(eje(X, 10000)) is None
+    assert stick.command(eje(X, 20000)) == "right"
+    # Sigue inclinado: no repite.
+    assert stick.command(eje(X, 32767)) is None
+
+
+def test_stick_vuelve_y_mueve_otra_vez() -> None:
+    stick = StickSteps()
+    stick.command(eje(X, 30000))
+    assert stick.command(eje(X, 0)) is None
+    assert stick.command(eje(X, 30000)) == "right"
+
+
+def test_stick_hacia_la_izquierda_y_en_vertical() -> None:
+    stick = StickSteps()
+    assert stick.command(eje(X, -30000)) == "left"
+    # SDL da la Y positiva hacia abajo.
+    assert stick.command(eje(Y, -30000)) == "flip_up"
+    assert stick.command(eje(Y, 0)) is None
+    assert stick.command(eje(Y, 30000)) == "flip_down"
+
+
+def test_stick_de_lado_a_lado_mueve_en_cada_cruce() -> None:
+    # Borde: pasar de un extremo al otro sin volver al centro también cuenta.
+    stick = StickSteps()
+    assert stick.command(eje(X, 30000)) == "right"
+    assert stick.command(eje(X, -30000)) == "left"
+
+
+def test_otros_ejes_no_mueven() -> None:
+    # Negativo: el stick derecho y los gatillos no son de la mano.
+    stick = StickSteps()
+    assert stick.command(eje(pygame.CONTROLLER_AXIS_RIGHTX, 30000)) is None
+    assert stick.command(tecla(pygame.KEYDOWN, pygame.K_d)) is None

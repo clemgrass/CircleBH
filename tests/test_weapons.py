@@ -296,8 +296,12 @@ GOLPES_DE_LA_DEMO = [
 
 
 def golpes_de_la_demo(seed: int, seconds: float) -> list[tuple[int, int, int]]:
-    """Los golpes de la demo, sin morir, como `(paso, enemigo, línea)`."""
-    world = World(BALANCE, random.Random(seed), lethal=False)
+    """Los golpes de la demo, sin morir, como `(paso, enemigo, línea)`.
+
+    Sin subir de nivel: la lista se grabó antes de que hubiera mano, y la mano detiene
+    al mundo hasta que alguien elige."""
+    sin_niveles = replace(BALANCE, experience=replace(BALANCE.experience, base=1e9))
+    world = World(sin_niveles, random.Random(seed), lethal=False)
     # Guardar a los enemigos, y no solo su `id`, evita que un muerto le preste su `id`
     # a uno nuevo.
     orden: dict[int, int] = {}
