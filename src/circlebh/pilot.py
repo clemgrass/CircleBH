@@ -35,12 +35,25 @@ def simulate_worlds(balance: Balance, seconds: float, seed: int) -> list[World]:
 
     Al morir, empieza otra al tiro, con la semilla que usaría la demo (`seed + n` en la
     partida `n`). La demo además muestra la muerte unos segundos; aquí no hace falta.
+    Cada mano se elige al azar con una `Random` propia, sembrada con la semilla de la
+    partida, como en la demo.
     """
     worlds = [World(balance, random.Random(seed))]
+    chooser = random.Random(seed)
     for _ in range(round(seconds / STEP)):
         if worlds[-1].game_over:
             next_game = next_seed(seed, len(worlds), demo=True, fixed=True)
             worlds.append(World(balance, random.Random(next_game)))
+            chooser = random.Random(next_game)
         world = worlds[-1]
+        choose_at_random(world, chooser)
         world.update(pilot_intent(world.steps))
     return worlds
+
+
+def choose_at_random(world: World, rng: random.Random) -> None:
+    """Si hay mano, elige una tarjeta al azar con `rng`, no con la `Random` del mundo
+    (spec de la 0.3.0, decisión 13): así, elegir no cambia lo que el mundo sortea
+    después. Sin mano, no hace nada ni saca números."""
+    if world.hand:
+        world.choose(rng.randrange(len(world.hand)))

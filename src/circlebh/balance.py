@@ -687,6 +687,97 @@ class ExperienceSpec:
 
 
 @dataclass(frozen=True)
+class KnobChange:
+    """Una perilla: cambia un número del arma (ADR 0029, M1)."""
+
+    kind: Literal["knob"]
+
+    field: str
+    """La ruta del campo en `WeaponSpec`, como `"cooldown"` o `"advance.coefficient"`."""
+
+    op: Literal["add", "mul"]
+    """Si el valor se suma o multiplica. Un campo entero queda entero, redondeado."""
+
+    values: tuple[float, ...]
+    """Los valores posibles. La mano elige uno con la `Random` del mundo."""
+
+
+@dataclass(frozen=True)
+class NewWeaponChange:
+    """Un arma nueva."""
+
+    kind: Literal["weapon"]
+
+    weapon: str
+    """El arma que da, una clave de `weapons`."""
+
+
+@dataclass(frozen=True)
+class PlayerChange:
+    """Una mejora fuera del ataque: cambia al jugador o sus usos de reroll y banish."""
+
+    kind: Literal["player"]
+
+    field: Literal["speed", "radius", "charge", "rerolls", "banishes"]
+    """Lo que cambia: un campo de `PlayerSpec`, o los usos que quedan."""
+
+    op: Literal["add", "mul"]
+    """Si el valor se suma o multiplica. Los usos quedan enteros, redondeados."""
+
+    values: tuple[float, ...]
+    """Los valores posibles. La mano elige uno con la `Random` del mundo."""
+
+
+type CardChange = KnobChange | NewWeaponChange | PlayerChange
+"""Lo que cambia una tarjeta, elegido por su `kind`."""
+
+
+@dataclass(frozen=True)
+class CardSpec:
+    """Una tarjeta de la mano (spec de la 0.3.0, "La mano"). Solo entra a la mano si
+    tiene efecto sobre lo que tienes."""
+
+    title: str
+    """El verbo del frente: la idea matemática, como "Acelerar el punto"."""
+
+    symbol: str
+    """El símbolo grande del frente, como `v × 1,25`."""
+
+    family: Literal["knob", "term", "operator", "weapon", "player"]
+    """El tipo que muestra el frente: perilla, suma, operador, arma nueva o jugador."""
+
+    weapons: tuple[str, ...]
+    """Las armas a las que sirve. Vacío: a toda arma que tengas."""
+
+    change: CardChange
+    """Lo que cambia."""
+
+    shape: bool
+    """Si cambia la clase de forma del arma. La mano favorece a estas."""
+
+
+@dataclass(frozen=True)
+class LevelUpSpec:
+    """Lo que pasa al subir de nivel (spec de la 0.3.0, "La mano")."""
+
+    freeze_steps: int
+    """Cuántos pasos más da el mundo después de llenar el nivel, antes de repartir. La
+    escena los reparte en unos 0,4 s para que el juego frene."""
+
+    hand_size: int
+    """Cuántas tarjetas trae la mano."""
+
+    max_weapons: int
+    """Cuántas armas puedes tener a la vez."""
+
+    rerolls: int
+    """Cuántas veces puedes cambiar la mano entera, al empezar la partida."""
+
+    banishes: int
+    """Cuántas tarjetas puedes sacar de la partida, al empezar."""
+
+
+@dataclass(frozen=True)
 class Balance:
     """Todas las entidades del juego."""
 
@@ -722,6 +813,12 @@ class Balance:
 
     experience: ExperienceSpec
     """La experiencia y los niveles."""
+
+    level_up: LevelUpSpec
+    """La mano al subir de nivel."""
+
+    cards: dict[str, CardSpec]
+    """Las tarjetas, por nombre."""
 
 
 # >>> datos (lo genera poe balance-importar)
@@ -1214,5 +1311,54 @@ BALANCE = Balance(
     enemy_bullet=EnemyBulletSpec(speed=330.0, radius=4.0),
     regrow=RegrowSpec(fade=0.4),
     experience=ExperienceSpec(charge=3.0, friction=3.0, base=6.0, exponent=1.5),
+    level_up=LevelUpSpec(
+        freeze_steps=12, hand_size=3, max_weapons=4, rerolls=1, banishes=1
+    ),
+    cards={
+        "point_speed": CardSpec(
+            title="Acelerar el punto",
+            symbol="v × 1,25",
+            family="knob",
+            weapons=("point",),
+            change=KnobChange(
+                kind="knob", field="advance.coefficient", op="mul", values=(1.25,)
+            ),
+            shape=False,
+        ),
+        "point_cooldown": CardSpec(
+            title="Disparar más seguido",
+            symbol="cooldown × 0,8",
+            family="knob",
+            weapons=("point",),
+            change=KnobChange(kind="knob", field="cooldown", op="mul", values=(0.8,)),
+            shape=False,
+        ),
+        "player_speed": CardSpec(
+            title="Moverte más rápido",
+            symbol="speed × 1,1",
+            family="player",
+            weapons=(),
+            change=PlayerChange(kind="player", field="speed", op="mul", values=(1.1,)),
+            shape=False,
+        ),
+        "player_radius": CardSpec(
+            title="Achicar tu círculo",
+            symbol="r × 0,9",
+            family="player",
+            weapons=(),
+            change=PlayerChange(kind="player", field="radius", op="mul", values=(0.9,)),
+            shape=False,
+        ),
+        "player_charge": CardSpec(
+            title="Cargarte más",
+            symbol="q × 1,25",
+            family="player",
+            weapons=(),
+            change=PlayerChange(
+                kind="player", field="charge", op="mul", values=(1.25,)
+            ),
+            shape=False,
+        ),
+    },
 )
 # <<< datos
