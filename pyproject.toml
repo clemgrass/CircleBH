@@ -135,6 +135,13 @@ layers = [
     "circlebh.balance",
 ]
 
+[[tool.importlinter.contracts]]
+name = "world no importa los pilotos ni la herramienta (ADR 0030)"
+type = "forbidden"
+source_modules = ["circlebh.world"]
+# Cada herramienta se suma al crearla: un módulo que no existe rompe el contrato.
+forbidden_modules = ["circlebh.pilot"]
+
 # --- Tests (ADR 0007) ---
 
 [tool.pytest]
