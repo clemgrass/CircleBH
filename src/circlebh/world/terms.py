@@ -49,3 +49,47 @@ def projectile_offset(spec: WeaponSpec, t: float) -> Vector2:
     r = along + wave
     angle = spec.spin * t
     return Vector2(r * math.cos(angle), r * math.sin(angle))
+
+
+def samples_for(spec: WeaponSpec, t: float, spacing: float) -> int:
+    """Cuántos puntos tomar de un trazo polar en `t` para que dos seguidos queden a lo
+    más `spacing`.
+
+    La rapidez con que el punto recorre la curva al girar θ cumple
+    `|dp/dθ| = √(ρ² + ρ'²) ≤ |ρ| + |ρ'|`, y cada armónico aporta a lo más `|A|` a `ρ`
+    y `|A·k|` a `ρ'`. Con esa cota `B`, la vuelta mide a lo más `2π·B`, y `⌈2π·B /
+    spacing⌉` puntos parejos en θ quedan a lo más `spacing`. Sin tope: la cantidad sale
+    del largo de la curva (ADR 0029). Al menos uno, aunque el radio sea 0.
+    """
+    if spacing <= 0:
+        raise ValueError(f"spacing: tiene que ser positivo, llegó {spacing}")
+    bound = abs(_polar_base(spec, t)) + sum(
+        abs(h.amplitude) * (1 + abs(h.k)) for h in spec.harmonics
+    )
+    return max(1, math.ceil(math.tau * bound / spacing))
+
+
+def trace_points(spec: WeaponSpec, t: float, samples: int) -> list[Vector2]:
+    """`samples` puntos del trazo polar `t` segundos después de lanzarlo, en el marco
+    local centrado en el jugador, con θ parejo desde `û = (1, 0)`.
+
+    `ρ(θ, t) = min(a(t), R) + Σ A·sin(k(θ − Ωt) + φ)`: el avance crece hasta `R`, y
+    los armónicos ondulan la curva y giran con `Ω`. El punto `i` va en
+    `θᵢ = 2π·i / samples`, así que el mismo `i` es el mismo punto de la curva en otro
+    `t`: así se arma el tramo del barrido.
+    """
+    base = _polar_base(spec, t)
+    points = []
+    for i in range(samples):
+        theta = math.tau * i / samples
+        rho = base + sum(
+            h.amplitude * math.sin(h.k * (theta - spec.spin * t) + h.phase)
+            for h in spec.harmonics
+        )
+        points.append(Vector2(rho * math.cos(theta), rho * math.sin(theta)))
+    return points
+
+
+def _polar_base(spec: WeaponSpec, t: float) -> float:
+    """El radio sin armónicos de un trazo polar: `min(a(t), R)`."""
+    return min(advance_at(spec, t), spec.reach)

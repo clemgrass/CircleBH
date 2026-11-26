@@ -10,7 +10,7 @@ from circlebh.viewport import Viewport
 from circlebh.world.clock import STEP
 from circlebh.world.figures import local_lines
 from circlebh.world.game import World
-from circlebh.world.weapons import ProjectileWeapon
+from circlebh.world.weapons import ProjectileWeapon, TraceWeapon
 
 BULLET_DRAW_RADIUS = 3.0
 """Radio con que se dibuja la bala, en unidades del plano. Solo es visual: para chocar,
@@ -54,6 +54,18 @@ def draw_world(
                     viewport.to_screen(bullet.position),
                     BULLET_DRAW_RADIUS * viewport.scale,
                 )
+        elif isinstance(weapon, TraceWeapon):
+            # La curva cerrada, con su grosor: el mismo que cuenta para tocar.
+            width = viewport.width(weapon.spec.payload.width)
+            for curve in weapon.curves():
+                if len(curve) > 1:
+                    pygame.draw.lines(
+                        screen,
+                        palette.foreground,
+                        True,
+                        [viewport.to_screen(p) for p in curve],
+                        width,
+                    )
 
     player = world.player
     pygame.draw.circle(

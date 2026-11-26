@@ -14,7 +14,13 @@ from circlebh.balance import Balance, WeaponSpec
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
 from circlebh.world.events import Event, Hit, Shot
-from circlebh.world.terms import advance_at, projectile_offset
+from circlebh.world.sweep import Pass
+from circlebh.world.terms import (
+    advance_at,
+    projectile_offset,
+    samples_for,
+    trace_points,
+)
 
 
 class Weapon(ABC):
@@ -33,24 +39,31 @@ def check_weapons(balance: Balance) -> None:
     """Rechaza al crear el mundo un arma que el código todavía no sabe armar, nombrando
     el campo, para que un dato del balance no quede ignorado en silencio.
 
-    Lo que se rechaza aquí llega con su tarea del plan de la 0.3.0: los trazos, el marco
-    polar, apuntar hacia donde te mueves, `d/dt` y `∫dt`, los operadores y lo que viaja.
+    Lo que se rechaza aquí llega con su tarea del plan de la 0.3.0: la recta, la espiral,
+    apuntar hacia donde te mueves, `d/dt` y `∫dt`, los operadores y lo que viaja.
     """
     start = balance.player.start_weapon
     if start not in balance.weapons:
         raise ValueError(f"player.start_weapon: no existe el arma {start}")
+    if balance.sampling.spacing <= 0:
+        raise ValueError(
+            f"sampling.spacing: tiene que ser positivo, llegó {balance.sampling.spacing}"
+        )
     for name, spec in balance.weapons.items():
+        # Se arman el proyectil cartesiano (el punto) y el trazo polar (el círculo).
+        expected_frame = "cartesian" if spec.kind == "projectile" else "polar"
         unsupported = {
-            "kind": spec.kind != "projectile",
-            "frame": spec.frame != "cartesian",
+            "frame": spec.frame != expected_frame,
             "aim": spec.aim != "nearest",
             "advance.degree": spec.advance.degree != 1,
             "copies": spec.copies != 1,
             "mirror": spec.mirror,
             "parallel": spec.parallel != 0,
             "payload.size": spec.payload.size != 0,
-            "payload.lines": spec.payload.lines != 1,
+            # Un trazo ya quita las que diga por pasada; un proyectil, todavía una.
+            "payload.lines": spec.kind == "projectile" and spec.payload.lines != 1,
             "payload.pierce": spec.payload.pierce != 0,
+            "payload.duration": spec.payload.duration != 0,
         }
         for field, rejected in unsupported.items():
             if rejected:
@@ -235,3 +248,97 @@ class ProjectileWeapon(Weapon):
         self.bullets.append(Bullet(origin, direction, self.spec))
         self._steps_to_next = round(self.spec.cooldown / STEP)
         return True
+
+
+class Trace:
+    """Un trazo polar lanzado: la curva `ρ(θ, t)` de `trace_points`, centrada en el
+    jugador de ahora, que revienta cuando su avance llega a `R` (`reach`)."""
+
+    def __init__(self, center: Vector2, spec: WeaponSpec) -> None:
+        self.spec = spec
+        """El `spec` del arma cuando nació. Una mejora posterior no lo cambia."""
+        self.center = Vector2(center)
+        """Dónde estaba el jugador en el último paso: el centro de la curva."""
+        self.sweep = Pass()
+        """Sus pasadas, por enemigo."""
+        self._steps = 0
+
+    @property
+    def age(self) -> float:
+        """Segundos desde que nació, contados en pasos enteros."""
+        return self._steps * STEP
+
+    @property
+    def expired(self) -> bool:
+        """Revienta cuando su avance llega a `R`."""
+        return advance_at(self.spec, self.age) >= self.spec.reach
+
+    def points(self, samples: int) -> list[Vector2]:
+        """La curva ahora, en el plano, con `samples` puntos."""
+        return [self.center + p for p in trace_points(self.spec, self.age, samples)]
+
+    def step(self, center: Vector2, enemies: list[Enemy], spacing: float) -> list[Hit]:
+        """Avanza un paso hacia el jugador en `center` y barre: cada punto va de donde
+        estaba en el paso anterior a donde está ahora."""
+        before = self.age
+        old_center = self.center
+        self._steps += 1
+        self.center = Vector2(center)
+        # La misma cantidad de puntos en los dos tiempos: así el punto `i` es el mismo
+        # punto de la curva. Se toma la mayor, para que ninguno quede a más de `spacing`.
+        samples = max(
+            samples_for(self.spec, before, spacing),
+            samples_for(self.spec, self.age, spacing),
+        )
+        previous = [old_center + p for p in trace_points(self.spec, before, samples)]
+        return self.sweep.strike(
+            previous,
+            self.points(samples),
+            enemies,
+            self.spec.payload.lines,
+            self.spec.payload.width,
+        )
+
+
+class TraceWeapon(Weapon):
+    """Un arma de trazos polares: lanza uno cada `cooldown` segundos, haya enemigos o
+    no, y cada uno daña por barrido (`world/sweep.py`)."""
+
+    def __init__(self, spec: WeaponSpec, spacing: float) -> None:
+        super().__init__(spec)
+        self.spacing = spacing
+        """`sampling.spacing`: la distancia máxima entre dos puntos de muestra."""
+        self.traces: list[Trace] = []
+        self._steps_to_next = 0
+
+    def update(self, origin: Vector2, enemies: list[Enemy]) -> list[Event]:
+        """Avanza los trazos hacia el jugador en `origin`, aplica sus golpes y quita los
+        que reventaron. Un trazo que llega a `R` en este paso todavía golpea en `R`.
+
+        El trazo nuevo nace en `origin`, con radio 0, y empieza a crecer en el paso
+        siguiente. Devuelve un `Hit` por cada línea quitada y un `Shot` si lanzó.
+        """
+        events: list[Event] = []
+        for trace in self.traces:
+            events += trace.step(origin, enemies, self.spacing)
+        self.traces = [trace for trace in self.traces if not trace.expired]
+        self._steps_to_next -= 1
+        if self._steps_to_next <= 0:
+            self.traces.append(Trace(origin, self.spec))
+            self._steps_to_next = round(self.spec.cooldown / STEP)
+            events.append(Shot(self))
+        return events
+
+    def curves(self) -> list[list[Vector2]]:
+        """Las curvas de los trazos vivos, en el plano, para el dibujo."""
+        return [
+            trace.points(samples_for(trace.spec, trace.age, self.spacing))
+            for trace in self.traces
+        ]
+
+
+def make_weapon(spec: WeaponSpec, spacing: float) -> Weapon:
+    """El arma que corresponde al `kind` de `spec`. `spacing` es `sampling.spacing`."""
+    if spec.kind == "trace":
+        return TraceWeapon(spec, spacing)
+    return ProjectileWeapon(spec)

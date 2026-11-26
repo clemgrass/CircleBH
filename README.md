@@ -6,7 +6,7 @@ Un juego del género survivors hecho en Python con [pygame-ce](https://pyga.me/)
 
 `CircleBH` es un nombre provisorio.
 
-> En construcción. La 0.2.0 trae diez enemigos y una partida con la forma de un tema de house, que termina en un modo infinito cada vez más difícil. Por ahora el punto dispara solo en línea recta: las curvas llegan después.
+> En construcción. La 0.2.0 trae diez enemigos y una partida con la forma de un tema de house, que termina en un modo infinito cada vez más difícil. El punto dispara solo en línea recta, y al subir de nivel puedes sumar el círculo. Las demás curvas llegan después.
 
 ## Jugar
 
@@ -26,6 +26,16 @@ uv run circlebh
 | Salir | Escape | |
 
 Página en itch.io: https://cgrassdev.itch.io/circle-bh
+
+## Las armas
+
+Cada arma es una fórmula. El **círculo** es una curva polar centrada en el jugador, que crece a `v` unidades por segundo hasta su alcance `R`, donde revienta:
+
+```
+ρ(θ, t) = min(v·t, R)
+```
+
+Daña por barrido. En cada paso, la curva se muestrea en puntos, y cada punto actúa como una bala que va de donde estaba a donde está. En cada pasada por un enemigo, el anillo le quita a lo más una línea: la primera que barre, que es la que mira al jugador. El círculo se toma como arma nueva al subir de nivel.
 
 ## Documentos
 

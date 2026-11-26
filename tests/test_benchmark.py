@@ -3,11 +3,13 @@
 El tiempo no se testea: en la CI sería inestable. Se corre a mano con `tools/benchmark.py`.
 """
 
-from benchmark import boss_world, endless_world, swarm_world
+from benchmark import boss_world, endless_world, swarm_world, trace_world
 from pygame.math import Vector2
 
 from circlebh.balance import BALANCE
 from circlebh.world.danger import NEUTRAL, Danger
+from circlebh.world.enemy import Enemy
+from circlebh.world.weapons import TraceWeapon
 
 
 def test_el_infinito_tiene_el_tope_de_cuerpos_del_mazo() -> None:
@@ -31,6 +33,21 @@ def test_el_enjambre_tiene_300_hexagonos() -> None:
     world = swarm_world()
     assert len(world.enemies) == 300
     assert {enemy.spec.shape.vertices for enemy in world.enemies} == {6}
+
+
+def lineas(world_enemies: list[Enemy]) -> int:
+    return sum(len(enemy.edges) for enemy in world_enemies)
+
+
+def test_los_anillos_barren_el_enjambre() -> None:
+    # El caso de trazos mide el barrido de verdad: los anillos le quitan líneas al
+    # enjambre, más de las que quita el punto solo.
+    con_anillos, solo_punto = trace_world(), swarm_world()
+    for _ in range(150):
+        con_anillos.update(Vector2())
+        solo_punto.update(Vector2())
+    assert isinstance(con_anillos.arsenal["circle"], TraceWeapon)
+    assert lineas(con_anillos.enemies) < lineas(solo_punto.enemies)
 
 
 def test_las_balas_le_pegan_al_jefe() -> None:

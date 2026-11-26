@@ -28,7 +28,7 @@ from circlebh.world.enemy import Enemy
 from circlebh.world.events import CardChosen, Shot
 from circlebh.world.experience import Orb, level_cost
 from circlebh.world.game import World
-from circlebh.world.weapons import ProjectileWeapon
+from circlebh.world.weapons import ProjectileWeapon, TraceWeapon
 
 PUNTO = BALANCE.weapons["point"]
 MANO = LevelUpSpec(freeze_steps=12, hand_size=3, max_weapons=4, rerolls=1, banishes=1)
@@ -343,6 +343,16 @@ def test_elegir_cambia_el_arma() -> None:
     assert arma.spec.cooldown == pytest.approx(PUNTO.cooldown * 0.8)
 
 
+def test_elegir_el_circulo_lo_arma_como_trazo() -> None:
+    # La tarjeta de arma nueva del balance da el círculo, que daña por barrido.
+    world = con_mano()
+    world.hand = (Offer("circle_weapon", "circle", 0.0),)
+    world.choose(0)
+    assert list(world.arsenal) == ["point", "circle"]
+    assert isinstance(world.arsenal["circle"], TraceWeapon)
+    assert world.arsenal["circle"].spec == BALANCE.weapons["circle"]
+
+
 def test_elegir_emite_card_chosen_en_el_paso_siguiente() -> None:
     world = con_mano()
     oferta = world.hand[0]
@@ -413,8 +423,11 @@ def test_sin_tarjetas_no_se_detiene() -> None:
 
 
 def test_mano_corta_en_el_mundo() -> None:
-    # Borde: sin armas quedan las tres del jugador.
-    world = con_mano(armed=False)
+    # Borde: sin armas, y con el círculo sacado de la partida, quedan solo las tres del
+    # jugador.
+    world = mundo_que_sube(armed=False)
+    world.banished.add("circle_weapon")
+    avanzar(world, 1 + FRENADO)
     assert {o.card for o in world.hand} == {
         "player_speed",
         "player_radius",
