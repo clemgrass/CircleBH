@@ -21,10 +21,13 @@ from circlebh.world.events import (
     Death,
     Donate,
     Event,
+    ExperienceDrop,
+    LevelUp,
     PlayerDeath,
     SectionStart,
     Spawn,
 )
+from circlebh.world.experience import Orb, check_experience, level_cost, step_orbs
 from circlebh.world.figures import check_shapes
 from circlebh.world.merge import Merge, check_merge
 from circlebh.world.player import Player
@@ -80,6 +83,7 @@ class World:
         self.queue = SpawnQueue()
         """Lo comprado que espera aparecer, con su lugar relativo al jugador. Sale de a
         `spawning.max_per_step` por paso."""
+        check_experience(balance.experience)
         check_weapons(balance)
         start = balance.weapons[balance.player.start_weapon]
         self.weapons: list[Weapon] = [ProjectileWeapon(start)] if armed else []
@@ -98,6 +102,14 @@ class World:
         """Las líneas sueltas absorbidas, con el paso en que las absorbieron. Ya no están
         en el plano: quedan `regrow.fade` segundos para que el render las apague mientras
         el hueco del herido se enciende (decisión 66)."""
+        self.orbs: list[Orb] = []
+        """Los puntos de experiencia que esperan en el plano."""
+        self.experience = 0.0
+        """Lo que llevas del nivel en curso."""
+        self.level = 1
+        """El nivel del jugador. Parte en 1."""
+        self.pending_levels = 0
+        """Los niveles subidos que todavía no se eligieron."""
         self._steps = 0
         self._endless_steps = 0
         self._announced = -1
@@ -137,9 +149,11 @@ class World:
         pasan a ser líneas sueltas, y los heridos absorben las que tocan: después de las
         balas, para que un herido que murió en este paso no se cure. Los enemigos sin
         líneas desaparecen, y el que se parte al morir, como el divisor, deja sus
-        fragmentos en su lugar, con su oleada. El director sabe si queda alguien de la
-        oleada en curso, vivo o en la cola, y cuántos cuerpos cuentan para el tope del
-        infinito. Lo que compró entra a la cola, y de ella aparecen hasta
+        fragmentos en su lugar, con su oleada. El que vale algo deja un punto de
+        experiencia. El director sabe si queda alguien de la oleada en curso, vivo o en
+        la cola, y cuántos cuerpos cuentan para el tope del infinito. Fuera del
+        infinito, los puntos van hacia el jugador, y los que lo tocan suben su
+        experiencia; en el infinito, se van sin recogerse. Lo que compró entra a la cola, y de ella aparecen hasta
         `spawning.max_per_step`, con el peligro del director, que empiezan a moverse en
         el paso siguiente; mientras hay una fusión en curso, las estrellas de la cola se
         descartan. La fusión da su paso: puede juntar las estrellas o hacer nacer la gran
@@ -149,7 +163,8 @@ class World:
 
         `events` queda con lo que pasó en este paso: los avisos de ataque, los disparos
         y golpes de las armas, una muerte por cada enemigo que perdió su última línea,
-        el inicio de cada sección, una aparición por cada enemigo que entró al plano y,
+        el punto de experiencia que dejó, cada nivel que subió el jugador, el inicio de
+        cada sección, una aparición por cada enemigo que entró al plano y,
         si la partida terminó, la muerte del jugador con lo que lo tocó (ADR 0030).
         """
         self.events = []
@@ -195,6 +210,7 @@ class World:
         self.enemies = [enemy for enemy in self.enemies if enemy.alive]
         for enemy in dead:
             self._split(enemy)
+            self._drop(enemy)
         # Fuera de una oleada no hace falta recorrer el plano y la cola.
         alive = self.director.waiting and self._wave_alive()
         updates = self.director.update(
@@ -208,6 +224,10 @@ class World:
         self._announced = self.director.section_index
         if self.director.section.kind == "endless":
             self._endless_steps += 1
+            # En el infinito no hay mejoras (ADR 0029): el borde queda quieto.
+            self.orbs = []
+        else:
+            self._collect()
         danger = self.director.danger
         for item in self.queue.pop(self.balance.spawning.max_per_step):
             if not self.merge.allows(item.enemy):
@@ -274,6 +294,36 @@ class World:
             child.wave = enemy.wave
         self.enemies += children
         self.events += [Spawn(child) for child in children]
+
+    def _drop(self, enemy: Enemy) -> None:
+        """Si `enemy` vale algo, deja un punto de experiencia con su `threat` donde
+        murió. El círculo, los fragmentos y las líneas sueltas valen 0. En el infinito no
+        cae nada."""
+        if enemy.spec.threat <= 0 or self.director.section.kind == "endless":
+            return
+        orb = Orb(enemy.position, enemy.spec.threat)
+        self.orbs.append(orb)
+        self.events.append(ExperienceDrop(orb))
+
+    def _collect(self) -> None:
+        """Los puntos dan su paso hacia el jugador, y los que lo tocan suben su
+        experiencia. Cada nivel lleno emite un `LevelUp`, y lo que sobra pasa al
+        siguiente."""
+        self.orbs, collected = step_orbs(
+            self.orbs,
+            self.player,
+            self.balance.player.charge,
+            self.balance.experience,
+            self.balance.charges,
+        )
+        self.experience += collected
+        while self.experience >= (
+            cost := level_cost(self.level, self.balance.experience)
+        ):
+            self.experience -= cost
+            self.level += 1
+            self.pending_levels += 1
+            self.events.append(LevelUp(self.level))
 
     def _wave_alive(self) -> bool:
         """Si queda algún enemigo de la oleada en curso, vivo o esperando en la cola."""

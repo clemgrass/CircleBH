@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from circlebh.balance import SectionSpec
     from circlebh.world.enemy import Enemy
     from circlebh.world.enemy_bullets import EnemyBullet
+    from circlebh.world.experience import Orb
     from circlebh.world.weapons import Weapon
 
 
@@ -90,6 +91,21 @@ class PlayerDeath:
     cause: Enemy | EnemyBullet
 
 
+@dataclass(frozen=True)
+class ExperienceDrop:
+    """Un enemigo que mató el jugador dejó `orb` en este paso (spec de la 0.3.0)."""
+
+    orb: Orb
+
+
+@dataclass(frozen=True)
+class LevelUp:
+    """El jugador llegó al nivel `level` en este paso. Si la experiencia alcanza para
+    dos niveles, salen dos, en orden."""
+
+    level: int
+
+
 type Event = (
     Shot
     | Hit
@@ -100,4 +116,6 @@ type Event = (
     | Spawn
     | SectionStart
     | PlayerDeath
+    | ExperienceDrop
+    | LevelUp
 )

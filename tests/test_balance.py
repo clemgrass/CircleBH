@@ -507,6 +507,12 @@ def test_exportar_escribe_el_balance(tmp_path: Path) -> None:
         },
         "enemy_bullet": {"speed": 330.0, "radius": 4.0},
         "regrow": {"fade": 0.4},
+        "experience": {
+            "charge": 3.0,
+            "friction": 3.0,
+            "base": 6.0,
+            "exponent": 1.5,
+        },
     }
 
 

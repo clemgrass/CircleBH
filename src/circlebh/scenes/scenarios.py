@@ -31,6 +31,15 @@ class Scenario:
     """Si el jugador tiene armas."""
     section: str = ""
     """La sección del tema en que parte, como `debug.start_section`. `""` es el comienzo."""
+    orbs: tuple[tuple[float, float, float], ...] = ()
+    """Puntos de experiencia al empezar, como `(x, y, valor)` relativos al jugador."""
+    inverted: bool = False
+    """Si se ve con los colores invertidos, como `accessibility.invert_colors`."""
+
+
+ORB_ROW = tuple((-120.0 + 60.0 * k, 90.0, 1.0 + 0.5 * k) for k in range(5))
+"""Una fila de puntos que valen de 1 a 3, sobre el jugador: alcanzan para un nivel y un
+poco más."""
 
 
 SCENARIOS: dict[str, Scenario] = {
@@ -254,6 +263,26 @@ SCENARIOS: dict[str, Scenario] = {
             " peligro. Al morir, la pantalla muestra el tiempo total y el del infinito.",
             pilot=True,
             section="infinito",
+        ),
+        Scenario(
+            "experiencia",
+            "El jugador quieto, sin arma, y cinco puntos de experiencia que valen de 1 a"
+            " 3: la luz va de verde azulado a azul y crece con el valor. Su carga los"
+            " atrae, y el borde se carga con una transición suave hasta dar la vuelta.",
+            pilot=False,
+            lethal=False,
+            armed=False,
+            orbs=ORB_ROW,
+        ),
+        Scenario(
+            "experiencia-invertida",
+            "Lo mismo que `experiencia`, con los colores invertidos: la luz pasa a su"
+            " versión para el fondo blanco (ADR 0031).",
+            pilot=False,
+            lethal=False,
+            armed=False,
+            orbs=ORB_ROW,
+            inverted=True,
         ),
     ]
 }
