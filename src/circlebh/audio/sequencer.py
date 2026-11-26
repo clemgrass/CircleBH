@@ -318,6 +318,14 @@ class Sequencer:
         return world.director.section_at(bar).layers
 
     @property
+    def harmony(self) -> tuple[Variation, int]:
+        """La variación y el compás de la progresión que suena: `chord_at(bar,
+        variation)` es el acorde de la última semicorchea decidida. La música de la
+        mano sigue desde ahí (decisión 16 de la spec)."""
+        bar = max(0, self._g) // SIXTEENTHS - self._first_bar
+        return self._variation, bar
+
+    @property
     def waiting_for_bar(self) -> bool:
         """Si hay una partida nueva esperando su compás (R1, ADR 0026). Mientras tanto,
         la escena no avanza el mundo: así la partida, la tonalidad y el impacto parten

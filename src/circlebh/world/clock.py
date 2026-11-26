@@ -52,6 +52,17 @@ def slowdown_steps(scene_steps: int, freeze_steps: int) -> int:
     return (span * j - j * j) // span
 
 
+def slowdown_rate(scene_steps: int, freeze_steps: int) -> float:
+    """La velocidad del mundo en el frenado, tras `scene_steps` pasos de escena: baja en
+    línea recta de 1 a 0 en `2N` pasos, con `N = freeze_steps`. Es la derivada de lo
+    que recorre `slowdown_steps`. Con `N = 0` no hay frenado: el mundo ya está quieto.
+
+    La usa la música, que suena a la velocidad del mundo (decisión 16 de la spec)."""
+    if freeze_steps <= 0:
+        return 0.0
+    return max(0.0, 1 - scene_steps / (2 * freeze_steps))
+
+
 def capture_steps(times: Iterable[float]) -> list[int]:
     """Convierte tiempos en segundos al número del paso más cercano, en el mismo orden.
 

@@ -436,3 +436,22 @@ def test_un_mundo_nuevo_vuelve_a_la_calma_con_un_impacto() -> None:
     tocar(sequencer, mundo(armed=False), 30)
     impactos = [d for d in sequencer.decisions if "impact" in d.cues]
     assert len(impactos) == 1
+
+
+# --- La armonía que suena, para la música de la mano ---
+
+
+@pytest.mark.parametrize("pasos", [1, 200, 700])
+def test_la_armonia_es_la_del_acorde_que_suena(pasos: int) -> None:
+    # 700 pasos son unos 6 compases: pasa por más de un acorde.
+    sequencer = Sequencer(4)
+    tocar(sequencer, mundo(armed=False), pasos)
+    variation, bar = sequencer.harmony
+    assert variation == variation_for(4)
+    assert chord_at(bar, variation) == sequencer.decisions[-1].chord
+
+
+def test_sin_tocar_la_armonia_parte_en_el_primer_compas() -> None:
+    # Borde: antes del primer paso no hay acorde decidido.
+    variation, bar = Sequencer(4).harmony
+    assert (variation, bar) == (variation_for(4), 0)

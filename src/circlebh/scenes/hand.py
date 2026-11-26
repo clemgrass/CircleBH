@@ -9,8 +9,9 @@ El mundo decide cuándo hay mano y qué trae; aquí solo se reparte el tiempo y 
   y el stick hacen lo mismo, y el botón de abajo elige.
 - **Al elegir,** bajan, y el juego retoma su velocidad.
 
-Mientras la mano está abierta, la escena no avanza ni el mundo ni la música
-(decisión 7): vuelven juntos, en sincronía.
+Mientras la mano está abierta, la escena no avanza ni el mundo ni el tema: vuelven
+juntos, en sincronía. Lo que se oye es la música de la mano, y el tema se escucha a la
+velocidad del mundo (`music_rate`, decisión 16 de la spec).
 """
 
 import random
@@ -25,7 +26,7 @@ from circlebh.render.cards import CardPose, CardView, HandPose, card_views, draw
 from circlebh.render.palette import Palette
 from circlebh.viewport import Viewport
 from circlebh.world.cards import Offer
-from circlebh.world.clock import STEP, slowdown_steps
+from circlebh.world.clock import STEP, slowdown_rate, slowdown_steps
 from circlebh.world.game import World
 
 RISE_STEPS = round(0.3 / STEP)
@@ -95,6 +96,17 @@ class HandScene:
         self._freeze_steps = 0
         advance()
         return True
+
+    def music_rate(self, world: World) -> float:
+        """A qué velocidad se escucha el tema: la del mundo (decisión 16). 1 jugando, la
+        del frenado mientras frena, y 0 con la mano abierta."""
+        if world.hand:
+            return 0.0
+        if world.freezing > 0:
+            return slowdown_rate(
+                self._freeze_steps, world.balance.level_up.freeze_steps
+            )
+        return 1.0
 
     def handle_event(self, world: World, event: pygame.event.Event) -> None:
         """Las teclas, los botones y el stick, si la mano está abierta."""

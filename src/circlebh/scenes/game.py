@@ -8,6 +8,7 @@ import pygame
 import pygame._sdl2.controller as sdl_controller
 from pygame.math import Vector2
 
+from circlebh.audio.deck import Deck
 from circlebh.audio.sequencer import Sequencer
 from circlebh.balance import BALANCE
 from circlebh.cli import RunOptions
@@ -125,6 +126,9 @@ class GameScene:
         self.death_screen = DeathScreen(self.palette)
         self.music: Sequencer | None = None
         self.music_player: MusicPlayer | None = None
+        self.deck: Deck | None = None
+        """Lo que se oye: el tema a la velocidad del mundo, cruzado con la música de la
+        mano (decisión 16 de la spec)."""
         if music_enabled(options, settings):
             audio = settings.audio
             player = MusicPlayer(audio.volume)
@@ -135,6 +139,7 @@ class GameScene:
                     base_volume=audio.base_volume,
                     game_volume=audio.game_volume,
                 )
+                self.deck = Deck()
         self.game = 0
         """Cuántas veces se reinició: la primera partida es la 0."""
         self.start(options.seed)
@@ -219,9 +224,10 @@ class GameScene:
     def step(self) -> None:
         """Avanza `world` un paso con la intención de este momento, o cuenta la muerte.
 
-        La música avanza en todos los pasos, también con el jugador muerto, salvo en los
+        El tema avanza en todos los pasos, también con el jugador muerto, salvo en los
         que la mano detiene al mundo: en el frenado avanza con él, y con la mano
-        abierta, no (decisión 7).
+        abierta, no. Lo que se oye pasa por `deck`, que lee el tema a la velocidad del
+        mundo y lo cruza con la música de la mano (decisión 16).
         """
         paused = False
         if not self.world.game_over:
@@ -237,6 +243,14 @@ class GameScene:
         self.shown_levels = ease_toward(self.shown_levels, target, STEP)
         if self.music is not None and not paused:
             self.music.step(self.world)
+        if self.music is not None and self.deck is not None:
+            self.deck.feed(self.music.ready)
+            if world.game_over:
+                rate, toward_hand = 1.0, False
+            else:
+                rate = self.hand.music_rate(world)
+                toward_hand = bool(world.hand) or world.freezing > 0
+            self.deck.step(rate, toward_hand, self.music.harmony)
 
     def advance(self) -> None:
         """Un paso del mundo con la intención de este momento.
@@ -248,9 +262,9 @@ class GameScene:
             self.log_section()
 
     def play_music(self) -> None:
-        """Pasa al canal de audio los bloques que el secuenciador dejó listos."""
-        if self.music is not None and self.music_player is not None:
-            self.music_player.update(self.music.ready)
+        """Pasa al canal de audio los bloques que la mezcla dejó listos."""
+        if self.deck is not None and self.music_player is not None:
+            self.music_player.update(self.deck.ready)
 
     def intent(self) -> Vector2:
         if self.demo is not None:
