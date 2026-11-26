@@ -10,7 +10,7 @@ import pytest
 from pygame.math import Vector2
 
 from circlebh.balance import BALANCE
-from circlebh.pilot import simulate_worlds
+from circlebh.pilot import simulate_dodging, simulate_worlds
 from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
 from circlebh.world.swarm import lattice, step_swarm
@@ -24,6 +24,29 @@ def test_simulacion_de_60_s_sin_errores() -> None:
     worlds = simulate_worlds(BALANCE, seconds=60.0, seed=1)
     assert sum(world.elapsed for world in worlds) == pytest.approx(60.0)
     assert [world.separations for world in worlds] == [0] * len(worlds)
+
+
+SEMILLAS_P1 = range(1, 11)
+TOPE_P1 = 60.0
+"""Hasta cuánto juega cada partida de P1, en segundos. Sin tope, la media con σ = 0,2
+es de 87 s y con σ = 1,2, de 46 s (2026-11-25); con 60 s, la diferencia sigue clara y
+el test tarda un cuarto."""
+
+
+def vida_media_p1(sigma: float) -> float:
+    """Cuánto vive P1 con `sigma`, en promedio, en la primera partida de cada semilla."""
+    vidas = [
+        simulate_dodging(BALANCE, TOPE_P1, seed, sigma)[0].elapsed
+        for seed in SEMILLAS_P1
+    ]
+    return sum(vidas) / len(vidas)
+
+
+@pytest.mark.simulacion
+def test_menos_sigma_vive_al_menos_lo_mismo() -> None:
+    # ADR 0030, Confirmación: el error σ simula la habilidad. Si con menos error no vive
+    # al menos lo mismo, σ no sirve para medir el balance.
+    assert vida_media_p1(0.2) >= vida_media_p1(1.2)
 
 
 @pytest.mark.simulacion
