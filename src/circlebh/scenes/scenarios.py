@@ -310,8 +310,9 @@ SCENARIOS: dict[str, Scenario] = {
         Scenario(
             "circulo",
             "El jugador quieto, con el círculo en vez del punto, y siete hexágonos a la"
-            " derecha que lo persiguen. Cada anillo crece desde el jugador y le quita a"
-            " cada hexágono que barre la cara que lo mira: una línea por pasada.",
+            " derecha que lo persiguen. El anillo crece desde el jugador, le quita a"
+            " cada hexágono que barre la cara que lo mira, y pierde el arco que lo"
+            " cubría: queda un hueco donde pegó (ADR 0032).",
             pilot=False,
             lethal=False,
             start_weapon="circle",

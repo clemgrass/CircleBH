@@ -34,7 +34,12 @@ from circlebh.render.palette import Palette
 from circlebh.viewport import Viewport
 from circlebh.world.cards import Loadout, apply
 from circlebh.world.game import World
-from circlebh.world.terms import advance_at, projectile_offset
+from circlebh.world.terms import (
+    advance_at,
+    projectile_offset,
+    samples_for,
+    trace_points,
+)
 
 CARD_SIZE = (300.0, 420.0)
 """El ancho y el alto de una tarjeta, en unidades del plano."""
@@ -56,6 +61,9 @@ TEXT_FIT = 0.86
 """Lo más ancho que puede ser un texto, como fracción del ancho de la tarjeta."""
 PREVIEW_SECONDS = 8.0
 """Lo más que vive un proyectil en la vista previa: una mina quieta no se acumula."""
+
+TRACE_PREVIEW_SECONDS = 1.5
+"""Cada cuánto vuelve a nacer un trazo en la vista previa, en segundos."""
 
 FAMILY_NAMES = {
     "knob": "PERILLA",
@@ -330,6 +338,9 @@ def _draw_weapon_preview(
 ) -> None:
     """El arma disparando sola hacia la derecha, sin enemigos, con los mismos términos
     que en el plano (`world/terms.py`). El alcance llena la caja."""
+    if spec.kind == "trace":
+        _draw_trace_preview(surface, box, spec, viewport, time, palette)
+        return
     origin = Vector2(box.left + viewport.width(8), box.centery)
     scale = (box.width - viewport.width(16)) / spec.reach
     dot = max(2, viewport.width(3))
@@ -344,6 +355,38 @@ def _draw_weapon_preview(
         point = origin + Vector2(offset.x, -offset.y) * scale
         if box.collidepoint(point):
             pygame.draw.circle(surface, palette.foreground, point, dot)
+
+
+def _draw_trace_preview(
+    surface: pygame.Surface,
+    box: pygame.Rect,
+    spec: WeaponSpec,
+    viewport: Viewport,
+    time: float,
+    palette: Palette,
+) -> None:
+    """Un trazo polar que crece desde el jugador, en el centro de la caja, con
+    `trace_points`. Se repite cada `TRACE_PREVIEW_SECONDS`, sin esperar su `cooldown`:
+    así se ve aunque el arma recargue lento. `R` llena la caja de alto."""
+    center = Vector2(box.center)
+    scale = (box.height / 2 - viewport.width(4)) / spec.reach
+    pygame.draw.circle(surface, palette.foreground, center, max(3, viewport.width(6)))
+    age = time % TRACE_PREVIEW_SECONDS
+    if advance_at(spec, age) >= spec.reach:
+        return
+    samples = samples_for(spec, age, 1 / scale)
+    # La Y del plano va hacia arriba; la de la pantalla, hacia abajo.
+    points = [
+        center + Vector2(p.x, -p.y) * scale for p in trace_points(spec, age, samples)
+    ]
+    if len(points) > 1:
+        pygame.draw.lines(
+            surface,
+            palette.foreground,
+            True,
+            points,
+            viewport.width(spec.payload.width),
+        )
 
 
 def _draw_player_preview(
@@ -378,6 +421,15 @@ def weapon_formula(spec: WeaponSpec) -> str:
     advance = ""
     if spec.advance.coefficient:
         advance = ("v·τ", "v·t", "v·t²/2τ")[spec.advance.degree]
+    if spec.kind == "trace":
+        # El trazo polar es una curva en θ, que crece hasta R (ADR 0029).
+        bounded = f"min({advance}, R)" if advance else ""
+        waves = " + ".join(
+            f"A{_sub(i)}·sin(k{_sub(i)}(θ − Ωt) + φ{_sub(i)})"
+            for i in range(1, len(spec.harmonics) + 1)
+        )
+        rho = " + ".join(term for term in (bounded, waves) if term) or "0"
+        return f"ρ(θ, t) = {rho}"
     waves = " + ".join(
         f"A{_sub(i)}·sin(k{_sub(i)}t + φ{_sub(i)})"
         for i in range(1, len(spec.harmonics) + 1)

@@ -55,15 +55,16 @@ def draw_world(
                     BULLET_DRAW_RADIUS * viewport.scale,
                 )
         elif isinstance(weapon, TraceWeapon):
-            # La curva cerrada, con su grosor: el mismo que cuenta para tocar.
+            # Los tramos vivos, sin los huecos donde pegó (ADR 0032). Un anillo entero
+            # ya repite su primer punto al final.
             width = viewport.width(weapon.spec.payload.width)
-            for curve in weapon.curves():
-                if len(curve) > 1:
+            for arc in weapon.curves():
+                if len(arc) > 1:
                     pygame.draw.lines(
                         screen,
                         palette.foreground,
-                        True,
-                        [viewport.to_screen(p) for p in curve],
+                        False,
+                        [viewport.to_screen(p) for p in arc],
                         width,
                     )
 

@@ -14,7 +14,7 @@ from circlebh.balance import Balance, WeaponSpec
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
 from circlebh.world.events import Event, Hit, Shot
-from circlebh.world.sweep import Pass
+from circlebh.world.sweep import strike
 from circlebh.world.terms import (
     advance_at,
     projectile_offset,
@@ -252,15 +252,18 @@ class ProjectileWeapon(Weapon):
 
 class Trace:
     """Un trazo polar lanzado: la curva `ρ(θ, t)` de `trace_points`, centrada en el
-    jugador de ahora, que revienta cuando su avance llega a `R` (`reach`)."""
+    jugador de ahora, que revienta cuando su avance llega a `R` (`reach`).
+
+    Se gasta donde pega (ADR 0032): al golpear a un enemigo, pierde el arco que lo
+    cubre visto desde el jugador, y ese hueco no vuelve a dibujarse ni a dañar."""
 
     def __init__(self, center: Vector2, spec: WeaponSpec) -> None:
         self.spec = spec
         """El `spec` del arma cuando nació. Una mejora posterior no lo cambia."""
         self.center = Vector2(center)
         """Dónde estaba el jugador en el último paso: el centro de la curva."""
-        self.sweep = Pass()
-        """Sus pasadas, por enemigo."""
+        self.gaps: list[tuple[float, float]] = []
+        """Los arcos gastados, como `(φ, a)`: los θ a lo más `a` de `φ`, en la vuelta."""
         self._steps = 0
 
     @property
@@ -274,12 +277,38 @@ class Trace:
         return advance_at(self.spec, self.age) >= self.spec.reach
 
     def points(self, samples: int) -> list[Vector2]:
-        """La curva ahora, en el plano, con `samples` puntos."""
+        """La curva ahora, en el plano, con `samples` puntos, también los gastados."""
         return [self.center + p for p in trace_points(self.spec, self.age, samples)]
 
+    def arcs(self, samples: int) -> list[list[Vector2]]:
+        """Los tramos vivos de la curva ahora, sin los huecos, para el dibujo.
+
+        Sin huecos, es un solo tramo cerrado: repite su primer punto al final. Con
+        huecos, cada tramo empieza justo después de uno, así que ninguno se corta en
+        θ = 0. Gastada entera, no hay tramos."""
+        points = self.points(samples)
+        live = self._live(samples)
+        if all(live):
+            return [[*points, points[0]]]
+        # El primer punto vivo después de un hueco.
+        start = next((i for i in range(samples) if live[i] and not live[i - 1]), None)
+        if start is None:
+            return []
+        arcs: list[list[Vector2]] = []
+        for j in range(start, start + samples):
+            i = j % samples
+            if not live[i]:
+                continue
+            if live[i - 1] and arcs:
+                arcs[-1].append(points[i])
+            else:
+                arcs.append([points[i]])
+        return arcs
+
     def step(self, center: Vector2, enemies: list[Enemy], spacing: float) -> list[Hit]:
-        """Avanza un paso hacia el jugador en `center` y barre: cada punto va de donde
-        estaba en el paso anterior a donde está ahora."""
+        """Avanza un paso hacia el jugador en `center` y barre: cada punto vivo va de
+        donde estaba en el paso anterior a donde está ahora. Por cada enemigo golpeado,
+        suma el hueco que lo cubre."""
         before = self.age
         old_center = self.center
         self._steps += 1
@@ -290,14 +319,38 @@ class Trace:
             samples_for(self.spec, before, spacing),
             samples_for(self.spec, self.age, spacing),
         )
-        previous = [old_center + p for p in trace_points(self.spec, before, samples)]
-        return self.sweep.strike(
-            previous,
-            self.points(samples),
+        live = self._live(samples)
+        previous = trace_points(self.spec, before, samples)
+        now = self.points(samples)
+        hits = strike(
+            [old_center + previous[i] for i in range(samples) if live[i]],
+            [now[i] for i in range(samples) if live[i]],
             enemies,
             self.spec.payload.lines,
-            self.spec.payload.width,
         )
+        for enemy in dict.fromkeys(hit.enemy for hit in hits):
+            self.gaps.append(self._gap_over(enemy))
+        return hits
+
+    def _gap_over(self, enemy: Enemy) -> tuple[float, float]:
+        """El arco que cubre a `enemy` visto desde el centro: `φ ± asin(r/d)`. Con
+        `d ≤ r`, el enemigo rodea al centro y el arco es la vuelta entera."""
+        offset = enemy.position - self.center
+        d = offset.length()
+        half = math.pi if d <= enemy.radius else math.asin(enemy.radius / d)
+        return math.atan2(offset.y, offset.x), half
+
+    def _live(self, samples: int) -> list[bool]:
+        """Si el punto `i` de `samples`, en `θᵢ = 2π·i / samples`, está fuera de todo
+        hueco. La distancia entre ángulos se mide en la vuelta, así que un hueco puede
+        pasar por θ = 0."""
+        live = []
+        for i in range(samples):
+            theta = math.tau * i / samples
+            live.append(
+                not any(_angle_between(theta, phi) <= half for phi, half in self.gaps)
+            )
+        return live
 
 
 class TraceWeapon(Weapon):
@@ -330,11 +383,18 @@ class TraceWeapon(Weapon):
         return events
 
     def curves(self) -> list[list[Vector2]]:
-        """Las curvas de los trazos vivos, en el plano, para el dibujo."""
+        """Los tramos vivos de todos los trazos, en el plano, para el dibujo."""
         return [
-            trace.points(samples_for(trace.spec, trace.age, self.spacing))
+            arc
             for trace in self.traces
+            for arc in trace.arcs(samples_for(trace.spec, trace.age, self.spacing))
         ]
+
+
+def _angle_between(a: float, b: float) -> float:
+    """La distancia entre dos ángulos en la vuelta, en `[0, π]`."""
+    d = (a - b) % math.tau
+    return min(d, math.tau - d)
 
 
 def make_weapon(spec: WeaponSpec, spacing: float) -> Weapon:

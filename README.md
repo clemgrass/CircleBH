@@ -35,7 +35,7 @@ Cada arma es una fórmula. El **círculo** es una curva polar centrada en el jug
 ρ(θ, t) = min(v·t, R)
 ```
 
-Daña por barrido. En cada paso, la curva se muestrea en puntos, y cada punto actúa como una bala que va de donde estaba a donde está. En cada pasada por un enemigo, el anillo le quita a lo más una línea: la primera que barre, que es la que mira al jugador. El círculo se toma como arma nueva al subir de nivel.
+Daña por barrido. En cada paso, la curva se muestrea en puntos, y cada punto actúa como una bala que va de donde estaba a donde está. Como la bala, el anillo se gasta donde pega: le quita al enemigo la primera línea que barre, la que mira al jugador, y pierde el arco que lo cubría. Un enemigo de radio `r` a distancia `d` se lleva el arco `φ ± asin(r/d)`, y ahí el anillo queda con un hueco. El círculo se toma como arma nueva al subir de nivel.
 
 ## Documentos
 

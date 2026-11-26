@@ -803,7 +803,7 @@
       "frame": "polar",
       "aim": "nearest",
       "advance": {
-        "coefficient": 90.0,
+        "coefficient": 200.0,
         "degree": 1
       },
       "harmonics": [],
@@ -816,10 +816,10 @@
         "lines": 1,
         "pierce": 0,
         "duration": 0.0,
-        "width": 4.0
+        "width": 2.0
       },
-      "cooldown": 1.6,
-      "reach": 320.0,
+      "cooldown": 15.6,
+      "reach": 200.0,
       "tau": 0.5
     }
   },

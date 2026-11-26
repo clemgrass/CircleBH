@@ -35,7 +35,7 @@ Each weapon is a formula. The **circle** is a polar curve centered on the player
 ρ(θ, t) = min(v·t, R)
 ```
 
-It deals damage by sweeping. Each step, the curve is sampled into points, and each point acts as a bullet that travels from where it was to where it is. On each pass over an enemy, the ring removes at most one line: the first one it sweeps, which is the one facing the player. You pick up the circle as a new weapon when you level up.
+It deals damage by sweeping. Each step, the curve is sampled into points, and each point acts as a bullet that travels from where it was to where it is. Like the bullet, the ring is spent where it hits: it removes the first line it sweeps, the one facing the player, and loses the arc that covered the enemy. An enemy of radius `r` at distance `d` takes the arc `φ ± asin(r/d)`, leaving a gap in the ring there. You pick up the circle as a new weapon when you level up.
 
 ## Documents
 

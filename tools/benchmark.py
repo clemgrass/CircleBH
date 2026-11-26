@@ -60,10 +60,16 @@ def swarm_world() -> World:
 
 def trace_world() -> World:
     """El enjambre, con el círculo además del punto: cada anillo barre a muchos
-    hexágonos a la vez, con un punto de muestra cada `sampling.spacing` (#42)."""
+    hexágonos a la vez, con un punto de muestra cada `sampling.spacing` (#42).
+
+    El círculo recarga en lo que dura un anillo, `R / v`, y no con su `cooldown`: así
+    siempre hay uno barriendo, que es el peor caso del costo."""
     world = swarm_world()
     circle = QUIET.weapons["circle"]
-    world.arsenal["circle"] = make_weapon(circle, QUIET.sampling.spacing)
+    life = circle.reach / circle.advance.coefficient
+    world.arsenal["circle"] = make_weapon(
+        replace(circle, cooldown=life), QUIET.sampling.spacing
+    )
     return world
 
 
