@@ -14,7 +14,7 @@ La restricción de no usar sprites ni imágenes es el tema del juego, no un lím
 
 - **El escenario es un plano cartesiano.** Los ejes X e Y van bien marcados y el resto es una cuadrícula muy suave que no distrae. Los ejes están fijos en el mundo: la cámara sigue al jugador, que puede alejarse del origen. En una esquina se muestran sus coordenadas, por ejemplo `(x: 142, y: −37)`.
 - **Es blanco y negro con un solo color de acento**, reservado para el peligro: las balas enemigas y el destello cuando el jugador recibe daño. El fondo es negro, y una opción de la configuración lo invierte a blanco *(decisión del autor, 2026-11-20; ADR 0023)*. El acento es el rojo `#ff3b30`, el mismo sobre los dos fondos *(decisión del autor, 2026-11-21, al comparar capturas)*.
-- **La experiencia trae un segundo color, que no es de peligro:** una luz azul detrás de cada punto *(decisión del autor, 2026-11-25; spec de la 0.3.0, decisiones 4 y 5)*. El rojo dice "esto te mata", y la luz azul, "esto es tuyo". Marca también el borde que se carga y la tarjeta elegida. Sobre el fondo blanco va más oscura, con el mismo tono, y no se invierte ([ADR 0031](decisiones/0031-la-luz-de-la-experiencia.md), propuesto).
+- **La experiencia trae un segundo color, que no es de peligro:** una luz azul detrás de cada punto *(decisión del autor, 2026-11-25; spec de la 0.3.0, decisiones 4 y 5)*. El rojo dice "esto te mata", y la luz azul, "esto es tuyo". Marca también el borde que se carga y la tarjeta elegida. Sobre el fondo blanco va más oscura, con el mismo tono, y no se invierte ([ADR 0031](decisiones/0031-la-luz-de-la-experiencia.md)).
 - **Todo se lee por su forma y su movimiento:**
 
 | Qué es | Cómo se ve |

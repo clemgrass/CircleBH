@@ -1,5 +1,5 @@
 ---
-estado: propuesto
+estado: aceptado
 fecha: 2026-11-25
 ---
 
@@ -99,7 +99,7 @@ Todos pasan el 3:1 que WCAG pide a lo que no es texto (criterio 1.4.11). Una ΔE
 
 ## Preguntas abiertas
 
-- Si el halo del punto que menos vale, el más chico, se distingue de una bala del jugador con el enjambre lleno. Se mira en la prueba manual y en el afinado (tarea 20 del plan).
+- Si el halo del punto que menos vale, el más chico, se distingue de una bala del jugador con el enjambre lleno. En la prueba manual del 2026-11-25 el autor no vio problemas. Se vuelve a mirar en el afinado (tarea 20 del plan).
 
 ## Más información
 
