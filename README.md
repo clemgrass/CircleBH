@@ -53,4 +53,4 @@ claude plugin install superpowers@claude-plugins-official --scope project
 
 ## Licencia
 
-[MIT](LICENSE).
+[MIT](LICENSE). Lo que el repo incluye de terceros, con su licencia, está en [CREDITS.md](CREDITS.md).

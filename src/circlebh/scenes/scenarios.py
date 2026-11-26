@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from circlebh.controls import HandCommand
+
 
 @dataclass(frozen=True)
 class Scenario:
@@ -35,6 +37,9 @@ class Scenario:
     """Puntos de experiencia al empezar, como `(x, y, valor)` relativos al jugador."""
     inverted: bool = False
     """Si se ve con los colores invertidos, como `accessibility.invert_colors`."""
+    hand_moves: tuple[tuple[float, HandCommand], ...] = ()
+    """Órdenes que la demo da en cada mano, a los segundos indicados desde que se abre.
+    Si ninguna elige, la demo elige al azar después de la última."""
 
 
 ORB_ROW = tuple((-120.0 + 60.0 * k, 90.0, 1.0 + 0.5 * k) for k in range(5))
@@ -283,6 +288,22 @@ SCENARIOS: dict[str, Scenario] = {
             armed=False,
             orbs=ORB_ROW,
             inverted=True,
+        ),
+        Scenario(
+            "mano",
+            "El jugador quieto, armado y sin morir, junta los cinco puntos y sube de"
+            " nivel: el juego frena, se oscurece y suben tres tarjetas. La demo pasa"
+            " a la segunda, la da vuelta hacia arriba para ver su fórmula, la vuelve"
+            " hacia abajo y la elige.",
+            pilot=False,
+            lethal=False,
+            orbs=ORB_ROW,
+            hand_moves=(
+                (0.6, "right"),
+                (1.0, "flip_up"),
+                (2.2, "flip_down"),
+                (2.8, "choose"),
+            ),
         ),
     ]
 }

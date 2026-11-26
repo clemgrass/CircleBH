@@ -25,7 +25,7 @@ from circlebh.audio.intensity import PHRASE_BARS
 from circlebh.audio.rhythm import RATE, SIXTEENTHS
 from circlebh.audio.sequencer import Sequencer
 from circlebh.balance import BALANCE
-from circlebh.pilot import pilot_intent
+from circlebh.pilot import choose_at_random, pilot_intent
 from circlebh.scenes.game import DEMO_RESTART_STEPS
 from circlebh.seeds import next_seed
 from circlebh.world.clock import STEP
@@ -61,11 +61,15 @@ def main() -> None:
     )
     games = [args.semilla]
     world = World(BALANCE, random.Random(args.semilla), lethal=not args.inmortal)
+    # Como la demo, elige cada mano al azar con una `Random` propia. La demo además la
+    # muestra un rato, con la música detenida; aquí elige al tiro, y suena igual.
+    chooser = random.Random(args.semilla)
     sequencer.start_game(args.semilla)
     dead_steps = 0
     costs = []
     for _ in range(round(args.segundos / STEP)):
         if not world.game_over:
+            choose_at_random(world, chooser)
             world.update(pilot_intent(world.steps))
         else:
             dead_steps += 1
@@ -73,6 +77,7 @@ def main() -> None:
                 seed = next_seed(args.semilla, len(games), demo=True, fixed=True)
                 games.append(seed)
                 world = World(BALANCE, random.Random(seed))
+                chooser = random.Random(seed)
                 sequencer.start_game(seed)
                 dead_steps = 0
         start = time.perf_counter()

@@ -56,4 +56,11 @@ def choose_at_random(world: World, rng: random.Random) -> None:
     (spec de la 0.3.0, decisión 13): así, elegir no cambia lo que el mundo sortea
     después. Sin mano, no hace nada ni saca números."""
     if world.hand:
-        world.choose(rng.randrange(len(world.hand)))
+        world.choose(pick_at_random(world, rng))
+
+
+def pick_at_random(world: World, rng: random.Random) -> int:
+    """El índice que elegiría `choose_at_random`, sin elegirlo: la demo lo marca y lo
+    anima antes de elegir. Saca de `rng` lo mismo, así que la demo juega la misma
+    partida que la simulación."""
+    return rng.randrange(len(world.hand))
