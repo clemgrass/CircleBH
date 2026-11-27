@@ -1,6 +1,6 @@
 # Diseño del juego: curvas (nombre por definir)
 
-Un juego de acción del género survivors (oleadas de enemigos, ataque automático, mejoras al subir de nivel) en Pygame, donde **todo lo que se ve se dibuja con código** y **las armas son curvas matemáticas**.
+Un juego de acción del género survivors (oleadas de enemigos, ataque automático, mejoras al subir de nivel) en Pygame, donde **todo lo que se ve se dibuja con código** y **las armas son funciones matemáticas de un punto** *(ADR 0033; antes, curvas matemáticas)*.
 
 ## Por qué existe
 
@@ -30,12 +30,13 @@ La tabla es el punto de partida. El prototipo puede ajustarla si algo no se lee 
 
 ## Cómo se juega
 
-- **El primer ataque es un punto** *(decisión del autor, 2026-11-19)*: una bala que sale sola hacia el centro del enemigo más cercano, porque el punto es de donde parte la geometría cartesiana. Es el arma de la 0.1.0; las curvas llegan después.
-- **Las armas son curvas** y disparan solas alrededor del jugador:
-  - **Recta:** un rayo en la dirección en que se mueve el jugador.
-  - **Círculo:** un anillo que se expande y revienta.
-  - **Seno:** una onda que avanza ondulando.
-  - **Espiral:** proyectiles que salen girando desde el centro.
+- **El primer ataque es un punto** *(decisión del autor, 2026-11-19)*: una bala que sale sola hacia el centro del enemigo más cercano, porque el punto es de donde parte la geometría cartesiana.
+- **El centro del juego es tu punto, y todo ataque es un punto** *(decisión del autor, 2026-11-27; [ADR 0033](decisiones/0033-las-armas-son-funciones-del-punto.md). Antes, las armas eran curvas: la recta, el círculo, el seno, la espiral y la rosa, y algunas dañaban con todo su trazo)*:
+  - **un arma es una función** que entrega cada punto que dispara: su trayectoria, su tamaño, su rapidez y su cooldown. Mejorarla es cambiar esa función;
+  - **ninguna forma se fuerza:** si combinas las mejoras correctas, el punto puede terminar ondulando como un seno o girando como una espiral, pero no hay armas con nombre como meta;
+  - **un disparo puede soltar varios puntos**, por ejemplo n en estrella con `Cₙ`;
+  - **un arma nueva es otro punto** (`f₂`, `f₃`, `f₄`), que parte igual que el del inicio y se mejora por su lado;
+  - **cada arma apunta a un enemigo distinto:** `fₖ` al `k`-ésimo más cercano, y si hay menos enemigos, la cuenta da la vuelta.
 - **Las mejoras y las combinaciones salen de ideas matemáticas** *(decisión del autor, 2026-11-19)*: derivar, integrar, componer o sumar curvas, por ejemplo `r(θ, t) = v·t + A·sin(kθ)`, un anillo que ondula. La idea es diferenciarse de los survivors donde dos armas al máximo se fusionan. El mecanismo exacto sigue abierto.
   - **El sistema de armas queda decidido entero para el MVP, con las combinaciones incluidas** *(decisión del autor, 2026-11-24)*. Lo decide el ADR de mejoras de la 0.3.0 (#88 y #89), después de una investigación amplia que no se limita a las ideas de esta sección.
   - **El mecanismo** *(decisiones del autor, 2026-11-24; [ADR 0029](decisiones/0029-armas-por-terminos-y-tarjetas.md))*:
@@ -47,18 +48,15 @@ La tabla es el punto de partida. El prototipo puede ajustarla si algo no se lee 
     - **Una tarjeta puede traer un precio:** más presupuesto para el director, una contra en el arma, un efecto sobre los enemigos o un efecto que dura unos compases.
     - **Lo que importa es que las partidas lleguen a formas distintas.** Un test lo mide.
     - **Las armas y las tarjetas son datos del balance y cambian al jugar,** como los enemigos. No hay topes de mejora.
-  - **Rosa** (`r = cos(kθ)`): pétalos que orbitan alrededor del jugador.
+  - **El catálogo de mejoras se arma recorriendo, de forma exhaustiva, los conceptos matemáticos** que puedan ser mejoras entretenidas, y termina con las mejoras listas en el balance *(decisión del autor, 2026-11-27)*.
 - **La experiencia la deja cada enemigo que matas, según su amenaza** (`threat`), y tu carga la atrae *(decisión del autor, 2026-11-25)*.
-- **Al subir de nivel, el juego frena hasta quedar quieto y aparecen tres tarjetas** *(decisiones del autor, 2026-11-25; spec de la 0.3.0, decisiones 8, 9 y 11)*. Una tarjeta puede dar un arma nueva o mejorar una que ya tienes. No hace falta entender la fórmula para elegir, porque la diferencia se ve en el ataque:
+- **Al subir de nivel, el juego frena hasta quedar quieto y aparecen tres tarjetas** *(decisiones del autor, 2026-11-25; spec de la 0.3.0, decisiones 8, 9 y 11)*. Una tarjeta puede dar un arma nueva o mejorar una que ya tienes, y dice a qué arma va (`f₂`, con su forma actual en miniatura) *(decisión del autor, 2026-11-27)*. No hace falta entender la fórmula para elegir, porque la diferencia se ve en el ataque:
   - **el frente** muestra el tipo de idea, su símbolo (`d/dt`, `C₃`, `+ A·sin(kθ)`), un verbo ("Derivar el círculo") y tu arma en movimiento, como la tienes ahora y con la tarjeta puesta;
   - **el reverso** muestra la fórmula, con lo nuevo subrayado, y el precio. La tarjeta se da vuelta con ↑ y ↓;
   - **R** (Y en el control) cambia la mano entera y **B** (X en el control) saca la tarjeta elegida de la partida, mientras queden usos;
   - las tarjetas usan la fuente Tektur, y lo que el repo incluye de terceros se anota en `CREDITS.md`.
 - **Los enemigos son polígonos hechos de líneas, y sus líneas son su vida** *(decisión del autor, 2026-11-19; antes, un golpe convertía el hexágono en pentágono)*. Cada golpe quita la línea exacta que golpea, así que la forma que queda cuenta dónde le pegaste. Sin líneas, desaparece. Una figura abierta deja pasar las balas por sus huecos: el jugador tiene que moverse para encontrar el ángulo. Los polígonos con más lados llegan más tarde en la partida.
-- **Cada arma hace daño a su manera:**
-  - La **recta** y el **círculo** dañan en todo su trazo: el rayo y el anillo. Un trazo daña **por barrido** *(decisión del autor, 2026-11-24; ADR 0029)*: cada punto de la curva actúa como una bala, y la línea que la curva barre primero se pierde, con un tope de líneas por pasada. El anillo rompe la cara que te mira, y un escudo quieto daña a quien choca contra él.
-  - El **seno** y la **espiral** son proyectiles que recorren la curva. Dejan una estela corta que se ve pero no hace daño.
-  - La **rosa** daña con sus pétalos completos mientras orbitan.
+- **Cada punto quita la línea que cruza y desaparece,** como la bala del inicio. Las mejoras pueden cambiar cuántas líneas quita y cuántas atraviesa *(ADR 0029 y 0033)*.
 - **Es un bullet hell:** hay enemigos que disparan, además de los que persiguen al jugador.
 - **El jugador es un círculo y muere de un golpe.** Cada tarjeta de anillo extra le suma un anillo concéntrico por fuera, y los anillos se acumulan sin límite *(decisión del autor, 2026-11-24; ADR 0029. Antes, el anillo se recogía como una protección)*. Al perder un anillo, queda invulnerable un rato corto *(decisión del autor, 2026-11-25)*. Cada anillo es una vida más, pero agranda al jugador: el anillo de afuera es más grande que el de adentro, así que tener más vidas hace más fácil que algo te golpee. Cada golpe rompe el anillo de afuera. *(Lo propuso Claude: que se rompa el de afuera es lo que hace que el jugador se achique al perder una vida.)*
 - **Fuera del ataque hay seis mejoras** *(decisión del autor, 2026-11-24; ADR 0029. La sexta, el 2026-11-25)*:
@@ -87,7 +85,7 @@ La música sale de la misma geometría que el juego, sobre una base de techno, y
 ## El MVP
 
 - Un menú, una partida de unos 5 minutos con la forma de un tema, el jefe al terminar el drop 2, el modo infinito y la pantalla final.
-- 4 o 5 armas-curva.
+- Hasta 4 armas, todas funciones del punto, con el catálogo de mejoras *(ADR 0033; antes, 4 o 5 armas-curva)*.
 - Los diez tipos de enemigo; el pentágono dispara.
 - El jefe.
 - Los anillos de protección del jugador.
@@ -117,7 +115,7 @@ Para no cerrarle la puerta al editor, el MVP define los enemigos y las armas por
 
 - **Metas:** que se juegue bien y se vea distinto a otros survivors; un código que sirva de ejemplo de Pygame, POO y trigonometría.
 - **No-metas para el MVP:** secretos en el plano, el editor de enemigos y piezas, más contenido del listado arriba.
-- **Anti-metas:** cualquier archivo de imagen o sprite dibujado a mano; un survivors común con una capa geométrica encima, donde las curvas no cambian cómo se juega; cualquier mención de la organización o el curso que motivó el proyecto (en el código, en el README o en los commits).
+- **Anti-metas:** cualquier archivo de imagen o sprite dibujado a mano; un survivors común con una capa geométrica encima, donde las mejoras no cambian cómo se juega; cualquier mención de la organización o el curso que motivó el proyecto (en el código, en el README o en los commits).
 
 ## Restricciones
 

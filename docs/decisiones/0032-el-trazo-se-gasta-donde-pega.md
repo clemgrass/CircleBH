@@ -1,5 +1,5 @@
 ---
-estado: aceptado
+estado: aceptado; queda sin efecto por el ADR 0033, que saca los trazos
 fecha: 2026-11-26
 ---
 
