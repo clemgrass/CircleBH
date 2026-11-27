@@ -88,7 +88,7 @@ Elegimos **A, D, G y J** *(decisiones del autor, 2026-11-27)*.
 ### El catálogo de mejoras
 
 - **Un issue aparte recorre, de forma exhaustiva, los conceptos matemáticos** que puedan ser mejoras entretenidas: términos, operadores, simetrías, sucesiones, geometría, ritmo y lo que aparezca *(decisión del autor)*. Cada uno con qué hace con el punto, cómo se ve, su contra o precio y con qué choca.
-- **El issue termina con las mejoras listas en el balance,** no con una lista de ideas *(decisión del autor)*.
+- **El trabajo del catálogo termina con las mejoras listas en el balance,** no con una lista de ideas *(decisión del autor)*. Su issue sigue abierto hasta entonces: la investigación va en su propio PR, y la construcción, en tareas chicas con su issue cada una *(corregido el 2026-11-27, antes de llegar a `main`, con el acuerdo del autor; antes decía "el issue termina…", y no calzaba con el plan, que lo parte en piezas)*.
 - **Mientras tanto,** se construye con lo que el 0029 ya decide para el punto: perillas, términos y operadores.
 
 ### En el código *(J)*
