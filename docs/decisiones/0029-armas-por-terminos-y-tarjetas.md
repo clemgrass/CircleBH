@@ -1,5 +1,5 @@
 ---
-estado: aceptado
+estado: aceptado; la regla de la pasada la reemplaza el ADR 0032, y las seis armas, los trazos y la regla de no ofrecer una suma que da un arma que ya existe, el ADR 0033
 fecha: 2026-11-24
 ---
 
