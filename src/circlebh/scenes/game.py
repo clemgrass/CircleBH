@@ -152,6 +152,9 @@ class GameScene:
         # Para el desarrollo, el tema puede partir en otra sección (decisión 75).
         section = self.settings.debug.start_section if demo is None else demo.section
         balance = replace(BALANCE, director=start_from(BALANCE.director, section))
+        if demo is not None and demo.start_weapon:
+            player = replace(BALANCE.player, start_weapon=demo.start_weapon)
+            balance = replace(balance, player=player)
         self.world = World(
             balance,
             random.Random(seed),

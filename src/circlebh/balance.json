@@ -796,7 +796,35 @@
       "cooldown": 0.6,
       "reach": 700.0,
       "tau": 0.5
+    },
+    "circle": {
+      "title": "Círculo",
+      "kind": "trace",
+      "frame": "polar",
+      "aim": "nearest",
+      "advance": {
+        "coefficient": 200.0,
+        "degree": 1
+      },
+      "harmonics": [],
+      "spin": 0.0,
+      "copies": 1,
+      "mirror": false,
+      "parallel": 0.0,
+      "payload": {
+        "size": 0.0,
+        "lines": 1,
+        "pierce": 0,
+        "duration": 0.0,
+        "width": 2.0
+      },
+      "cooldown": 15.6,
+      "reach": 200.0,
+      "tau": 0.5
     }
+  },
+  "sampling": {
+    "spacing": 4.0
   },
   "enemy_bullet": {
     "speed": 330.0,
@@ -897,6 +925,17 @@
         ]
       },
       "shape": false
+    },
+    "circle_weapon": {
+      "title": "Dibujar un círculo",
+      "symbol": "ρ = v·t",
+      "family": "weapon",
+      "weapons": [],
+      "change": {
+        "kind": "weapon",
+        "weapon": "circle"
+      },
+      "shape": true
     }
   }
 }

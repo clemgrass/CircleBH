@@ -1,6 +1,8 @@
 """Mide los milisegundos por paso de `World.update` en dos escenarios cargados (ADR 0006).
 
 - **enjambre:** 300 hexágonos apretados alrededor del jugador quieto (ADR 0021).
+- **trazos:** el mismo enjambre, con el círculo, para medir el barrido (ADR 0029, #42).
+  Además del paso entero, reporta el barrido solo.
 - **jefe:** un enemigo de 100 líneas, solo y al alcance del arma, para medir las balas
   contra muchas líneas (ADR 0020).
 - **infinito:** `max_alive` cuerpos del mazo del infinito, con sus ataques, que es lo
@@ -28,6 +30,7 @@ from circlebh.world.director import body_weight, deck_weights
 from circlebh.world.enemy import Enemy
 from circlebh.world.game import World
 from circlebh.world.swarm import lattice
+from circlebh.world.weapons import make_weapon
 
 WARMUP_STEPS = 60
 MEASURED_STEPS = 600
@@ -52,6 +55,21 @@ def swarm_world() -> World:
     world = World(QUIET, random.Random(1), lethal=False)
     hexagon = QUIET.enemies["hexagon"]
     world.enemies = [Enemy(hexagon, p) for p in lattice(Vector2(), 300, 60)]
+    return world
+
+
+def trace_world() -> World:
+    """El enjambre, con el círculo además del punto: cada anillo barre a muchos
+    hexágonos a la vez, con un punto de muestra cada `sampling.spacing` (#42).
+
+    El círculo recarga en lo que dura un anillo, `R / v`, y no con su `cooldown`: así
+    siempre hay uno barriendo, que es el peor caso del costo."""
+    world = swarm_world()
+    circle = QUIET.weapons["circle"]
+    life = circle.reach / circle.advance.coefficient
+    world.arsenal["circle"] = make_weapon(
+        replace(circle, cooldown=life), QUIET.sampling.spacing
+    )
     return world
 
 
@@ -113,12 +131,32 @@ def measure(make_world: Callable[[], World]) -> tuple[float, float]:
     return statistics.fmean(times_ms), statistics.quantiles(times_ms, n=20)[-1]
 
 
+def measure_sweep() -> tuple[float, float]:
+    """El promedio y el percentil 95 del barrido solo, en ms: el `update` del círculo
+    en el caso de trazos. El total del caso no lo muestra, porque los anillos matan
+    hexágonos y el resto del paso se aliviana.
+
+    El círculo se saca del arsenal y se avanza aparte, después de cada paso del mundo:
+    así se le toma el tiempo sin contar lo demás."""
+    world = trace_world()
+    circle = world.arsenal.pop("circle")
+    times_ms = []
+    for step in range(WARMUP_STEPS + MEASURED_STEPS):
+        world.update(Vector2())
+        start = time.perf_counter()
+        circle.update(world.player.position, world.enemies)
+        if step >= WARMUP_STEPS:
+            times_ms.append((time.perf_counter() - start) * 1000)
+    return statistics.fmean(times_ms), statistics.quantiles(times_ms, n=20)[-1]
+
+
 def main() -> int:
     ok = True
     endless = BALANCE.director.endless
     capped = Danger(endless.speed_cap, endless.cadence_cap, 1.0)
     cases: list[tuple[str, Callable[[], World]]] = [
         ("enjambre", swarm_world),
+        ("trazos", trace_world),
         ("jefe", boss_world),
         ("infinito", lambda: endless_world(NEUTRAL)),
         ("infinito-tope", lambda: endless_world(capped)),
@@ -130,6 +168,9 @@ def main() -> int:
             f"{name}: {MEASURED_STEPS} pasos, promedio {mean:.2f} ms, p95 {p95:.2f} ms"
             f" (meta: < {BUDGET_MS:.1f} ms)"
         )
+    # El barrido es parte de un paso: se reporta sin meta propia (ADR 0029, sin topes).
+    mean, p95 = measure_sweep()
+    print(f"barrido (trazos): promedio {mean:.2f} ms, p95 {p95:.2f} ms")
     return 0 if ok else 1
 
 

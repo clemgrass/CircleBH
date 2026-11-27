@@ -6,7 +6,7 @@ A survivors-like game made in Python with [pygame-ce](https://pyga.me/). Everyth
 
 `CircleBH` is a working title.
 
-> Work in progress. Version 0.2.0 brings ten enemies and a run shaped like a house track, which ends in an endless mode that keeps getting harder. For now the point shoots on its own in a straight line: the curves come later.
+> Work in progress. Version 0.2.0 brings ten enemies and a run shaped like a house track, which ends in an endless mode that keeps getting harder. The point shoots on its own in a straight line, and when you level up you can add the circle. The other curves come later.
 
 ## Play
 
@@ -26,6 +26,16 @@ uv run circlebh
 | Quit | Escape | |
 
 itch.io page: https://cgrassdev.itch.io/circle-bh
+
+## Weapons
+
+Each weapon is a formula. The **circle** is a polar curve centered on the player. It grows at `v` units per second up to its reach `R`, where it bursts:
+
+```
+ρ(θ, t) = min(v·t, R)
+```
+
+It deals damage by sweeping. Each step, the curve is sampled into points, and each point acts as a bullet that travels from where it was to where it is. Like the bullet, the ring is spent where it hits: it removes the first line it sweeps, the one facing the player, and loses the arc that covered the enemy. An enemy of radius `r` at distance `d` takes the arc `φ ± asin(r/d)`, leaving a gap in the ring there. You pick up the circle as a new weapon when you level up.
 
 ## Documents
 

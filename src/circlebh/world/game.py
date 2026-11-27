@@ -42,7 +42,7 @@ from circlebh.world.spawning import (
 )
 from circlebh.world.split import check_splits, fragments
 from circlebh.world.swarm import step_swarm
-from circlebh.world.weapons import ProjectileWeapon, Weapon, check_weapons
+from circlebh.world.weapons import Weapon, check_weapons, make_weapon
 
 
 class World:
@@ -90,7 +90,9 @@ class World:
         check_cards(balance)
         start = balance.player.start_weapon
         self.arsenal: dict[str, Weapon] = (
-            {start: ProjectileWeapon(balance.weapons[start])} if armed else {}
+            {start: make_weapon(balance.weapons[start], balance.sampling.spacing)}
+            if armed
+            else {}
         )
         """Las armas del jugador, por nombre, en el orden en que llegaron."""
         self.enemy_bullets: list[EnemyBullet] = []
@@ -357,7 +359,7 @@ class World:
             if name in self.arsenal:
                 self.arsenal[name].spec = spec
             else:
-                self.arsenal[name] = ProjectileWeapon(spec)
+                self.arsenal[name] = make_weapon(spec, self.balance.sampling.spacing)
         self.player.spec = state.player
         self.rerolls = state.rerolls
         self.banishes = state.banishes

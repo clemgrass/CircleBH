@@ -6,7 +6,13 @@ from dataclasses import replace
 import pytest
 from pygame.math import Vector2
 
-from circlebh.balance import BALANCE, AdvanceSpec, EnemySpec, StarPolygonShape
+from circlebh.balance import (
+    BALANCE,
+    AdvanceSpec,
+    EnemySpec,
+    SamplingSpec,
+    StarPolygonShape,
+)
 from circlebh.pilot import pilot_intent
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
@@ -336,8 +342,18 @@ def test_arma_inicial_que_no_existe() -> None:
 @pytest.mark.parametrize(
     ("cambio", "campo"),
     [
-        ({"kind": "trace"}, "kind"),
+        # Hoy se arman el proyectil cartesiano y el trazo polar; la recta y la
+        # espiral llegan en las tareas 8 y 9.
+        ({"kind": "trace"}, "frame"),
         ({"frame": "polar"}, "frame"),
+        (
+            {
+                "kind": "trace",
+                "frame": "polar",
+                "payload": replace(POINT.payload, duration=1.0),
+            },
+            "payload.duration",
+        ),
         ({"aim": "motion"}, "aim"),
         ({"advance": AdvanceSpec(coefficient=300.0, degree=0)}, "advance.degree"),
         ({"copies": 3}, "copies"),
@@ -361,3 +377,18 @@ def test_rechaza_lo_que_todavia_no_se_arma(
 
 def test_el_punto_del_balance_se_arma() -> None:
     check_weapons(BALANCE)
+
+
+def test_el_circulo_del_balance_se_arma() -> None:
+    # El círculo es un trazo polar, y el chequeo lo deja pasar.
+    circulo = BALANCE.weapons["circle"]
+    assert (circulo.kind, circulo.frame) == ("trace", "polar")
+    check_weapons(replace(BALANCE, weapons={"point": POINT, "circle": circulo}))
+
+
+@pytest.mark.parametrize("spacing", [0.0, -1.0])
+def test_rechaza_un_espaciado_no_positivo(spacing: float) -> None:
+    # Negativo: sin espaciado positivo, un trazo no sabe cuántas muestras tomar.
+    balance = replace(BALANCE, sampling=SamplingSpec(spacing=spacing))
+    with pytest.raises(ValueError, match=r"sampling\.spacing"):
+        check_weapons(balance)
