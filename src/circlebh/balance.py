@@ -573,7 +573,8 @@ class PayloadSpec:
     """El radio del proyectil, en unidades del plano. Con 0, es un punto."""
 
     lines: int
-    """Cuántas líneas quita un golpe, o una pasada de un trazo."""
+    """Cuántas líneas quita un golpe de un proyectil, o un trazo cada vez que pega en un
+    enemigo (ADR 0032)."""
 
     pierce: int
     """A cuántos enemigos atraviesa un proyectil antes de desaparecer."""
@@ -582,7 +583,8 @@ class PayloadSpec:
     """Cuántos segundos dura un trazo."""
 
     width: float
-    """El grosor de un trazo, en unidades del plano."""
+    """El grosor con que se dibuja un trazo, en unidades del plano. Solo es visual: no
+    cuenta para pegar (ADR 0032)."""
 
 
 @dataclass(frozen=True)

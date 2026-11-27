@@ -60,7 +60,7 @@ def check_weapons(balance: Balance) -> None:
             "mirror": spec.mirror,
             "parallel": spec.parallel != 0,
             "payload.size": spec.payload.size != 0,
-            # Un trazo ya quita las que diga por pasada; un proyectil, todavía una.
+            # Un trazo ya quita las que diga cada vez que pega; un proyectil, todavía una.
             "payload.lines": spec.kind == "projectile" and spec.payload.lines != 1,
             "payload.pierce": spec.payload.pierce != 0,
             "payload.duration": spec.payload.duration != 0,

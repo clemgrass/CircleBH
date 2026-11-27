@@ -264,6 +264,14 @@ def test_el_filtro_no_deja_fuera_ningun_golpe(
             assert i in cercanos
 
 
+def test_con_un_giro_de_un_radian_el_filtro_no_descarta() -> None:
+    # Borde: si el enemigo gira un radián o más en un paso, la cota no existe, y el
+    # filtro deja pasar a todos los puntos.
+    enemigo = Enemy(replace(HEXAGON, spin=60.0), Vector2())
+    enemigo.step(Vector2())
+    assert query_radius(enemigo, 0.0) == math.inf
+
+
 def en_anillo(centro: Vector2, radio: float, n: int) -> list[Vector2]:
     return [centro + Vector2(radio, 0).rotate_rad(math.tau * i / n) for i in range(n)]
 
