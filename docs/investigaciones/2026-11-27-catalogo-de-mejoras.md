@@ -18,6 +18,7 @@ Fecha: 2026-11-27. Cada fuente lleva su URL y la fecha de consulta. Lo marcado *
   - disparar dos veces fue entretenido, pero por una razón muy sencilla.
 
   De ahí salen dos preguntas para cada concepto: cómo escala con el enjambre y qué decisión nueva le da al jugador. Si la única respuesta es "más disparos", el concepto cuenta como número.
+- **Que se visualice claro.** Al revisar Nace, el autor dejó fuera N7 y N10 porque no se los visualizaba claramente. N10 le pareció vago: si el arma sube sola cuando hay muchos enemigos, no se ve qué gana una mejora. De ahí sale una tercera pregunta, con más peso que las otras dos: ¿se ve en pantalla qué cambió?
 - **El catálogo se ordena por el momento de la vida del punto,** con las áreas de la matemática como lista de chequeo (ver "Método").
 
 ## Alcance
@@ -401,6 +402,249 @@ Notación: `û` es la dirección del disparo, `θ₀` su ángulo, `R(α)` la rot
 - **La ráfaga:** `m` disparos seguidos y una pausa. Es un caso de N12 con otro `k`.
 - **El arma nueva `fₖ`:** ya está construida (#126).
 
-### Viaja, Pega y Termina
+### Viaja: la trayectoria
 
-*(Pendientes: se llenan después de que el autor revise Nace.)*
+Las perillas que ya existen (`v`, `cooldown` y `reach`) son números y no se repiten aquí.
+
+| | Concepto | Ley o número | Se ve claro | Escala con el enjambre | Cabe en `WeaponSpec` |
+|---|---|---|---|---|---|
+| V1 | Armónico: la onda | ley | sí | igual | sí, ya funciona |
+| V2 | Vaivén: avanza a tirones | ley | a medias | igual | campo nuevo |
+| V3 | Giro: la espiral | ley | sí | más cuando te rodean | sí, `frame` y `spin` |
+| V4 | `d/dt`: la mina | ley | sí | más cuando vienen a ti | sí, `degree`, más una duración |
+| V5 | `∫dt`: acelera | ley | sí | más con enemigos lejos | sí, `degree` |
+| V6 | Anclar al jugador | ley | sí | igual | campo nuevo |
+| V7 | Bumerán | ley | sí | más con enemigos en fila | pide cambiar el avance |
+| V8 | Rizo: la trocoide | ley | sí | más con grupos | campo nuevo |
+| V9 | Curva: la parábola | ley | sí | igual | campo nuevo |
+| V10 | Persecución | ley sin decisión | sí | igual | pide estado en la bala |
+| V11 | Carga: la bala siente al enjambre | ley | sí | más con muchos | pide estado en la bala |
+| V12 | Crece mientras viaja | ley de lo que viaja | sí | más con grupos | campo nuevo y otro choque |
+
+**Decisión del autor (2026-11-27):** entran todos. Claude no recomendaba V2 solo.
+
+#### V1. Armónico: la onda
+
+- **Fórmula:** `y(t) = A·sin(k·t + φ)` por la normal, sumado al avance: `p(t) = p₀ + a(t)·û + y(t)·n̂`.
+- **Qué hace:** el punto ondula de lado mientras avanza.
+- **Cómo se ve:**
+  ```
+     @ ∿∿∿∿∿∿ →
+  ```
+- **Ley o número:** ley. Otra tarjeta suma un segundo armónico (M2 del ADR 0029), y `k` sale de una lista por semilla.
+- **Escala con el enjambre:** igual. Con `A` grande, barre más ancho y falla más a los enemigos chicos.
+- **Decisión nueva:** poca: cambia la forma. Su fuerza está en lo que combina: con N5 da la trenza, y con V3, una espiral que ondula.
+- **Cómo apunta:** `intercept` sigue sirviendo, porque el avance por `û` no cambia; la onda se desvía a lo más `A`.
+- **Precio o contra:** la contra viene adentro: falla a lo que está justo en la recta si `A` es grande.
+- **Con qué choca:** con nada; es la base de N5.
+- **Cabe en `WeaponSpec`:** sí, `harmonics`. `check_weapons` no lo rechaza y `projectile_offset` ya lo calcula: falta solo la tarjeta de término.
+- **Fuente:** ADR 0029 (M2).
+
+#### V2. Vaivén: avanza a tirones
+
+- **Fórmula:** el armónico va por `û` en vez de la normal: `x(t) = a(t) + A·sin(k·t)`. Si `A·k > v`, a ratos retrocede.
+- **Qué hace:** el punto avanza, frena y vuelve un poco, como un resorte.
+- **Cómo se ve:** igual que el punto, pero con tirones; en una captura quieta no se distingue.
+- **Ley o número:** ley.
+- **Escala con el enjambre:** igual.
+- **Decisión nueva:** ninguna clara.
+- **Cómo apunta:** `intercept` con la rapidez media `v` se equivoca hasta `A`.
+- **Precio o contra:** ninguno.
+- **Con qué choca:** con V1, por el armónico: hoy un armónico solo puede ir de lado (cartesiano) o por el radio (polar).
+- **Cabe en `WeaponSpec`:** con el marco polar y `Ω = 0` ya da esto, pero entonces no puede tener a la vez una onda de lado. Un campo `axis` por armónico (`"normal"` o `"along"`) resuelve V2, V8 y V9.
+- **Fuente:** ninguna; es el armónico en el otro eje.
+- **Nota:** de esta lista, es el que menos se ve. Claude no lo recomienda solo.
+
+#### V3. Giro: la espiral
+
+- **Fórmula:** en el marco polar, `r(t) = a(t)` y `θ(t) = θ₀ + Ω·t`. Con el avance de grado 1 es la espiral de Arquímedes, `r = (v/Ω)·(θ − θ₀)`, con vueltas separadas por `2π·v/Ω` (deducido de la fórmula).
+- **Qué hace:** el punto sale girando y se aleja en espiral.
+- **Cómo se ve:**
+  ```
+        ╭──╮
+       │ @╮ │
+        ╰─╯ ╯ →
+  ```
+- **Ley o número:** ley.
+- **Escala con el enjambre:** más cuando te rodean, porque recorre toda la vuelta.
+- **Decisión nueva:** el arma ya no pega en línea recta: te conviene estar a una distancia en que la espiral cruce al enjambre.
+- **Cómo apunta:** `intercept` no sirve. Se propone adelantar el giro: si el enemigo está a distancia `D`, la espiral llega en `t* = D/v`, así que `θ₀ = θ_enemigo − Ω·t*`. Así el punto le llega después de girar.
+- **Precio o contra:** la contra viene adentro: tarda más en llegar.
+- **Con qué choca:** con V6: hoy la espiral gira en torno a donde nació, no en torno a ti (ver V6).
+- **Cabe en `WeaponSpec`:** sí, `frame: "polar"` y `spin`. Hoy `check_weapons` rechaza el marco polar.
+- **Fuente:** MathWorld, *Archimedes' Spiral*, https://mathworld.wolfram.com/ArchimedesSpiral.html (2026-11-27). La fórmula de la página es una imagen y no se pudo leer; la separación de las vueltas la deducimos nosotros.
+
+#### V4. `d/dt`: la mina
+
+- **Fórmula:** el avance baja de grado: `a(t) = v·t → v·τ`. El punto aparece a `v·τ` de donde nació y se queda ahí.
+- **Qué hace:** el disparo deja una mina quieta. Con V3, la mina gira en un círculo de radio `v·τ`. Con V3 y V6, gira en torno a ti: un satélite.
+- **Cómo se ve:**
+  ```
+     @      ·        la mina, a v·τ, quieta
+  ```
+- **Ley o número:** ley.
+- **Escala con el enjambre:** más cuando el enjambre viene hacia ti, porque se mete en las minas.
+- **Decisión nueva:** llevar al enjambre por donde dejaste las minas, o quedarte cerca del satélite.
+- **Cómo apunta:** hacia tu enemigo, para que la mina quede en su camino; sin `intercept`.
+- **Precio o contra:** la contra viene adentro: deja de alcanzar lejos (ADR 0029: "`d/dt` defiende, pero deja de matar").
+- **Con qué choca:**
+  - **Nunca termina:** el avance queda en `v·τ` (150) y nunca llega a `reach` (700). Pide una duración, del momento Termina.
+  - **Salta:** en `t = 0` ya está a `v·τ`, así que la bala aparece allá sin cruzar lo que hay en el medio.
+  - Con V5, se deshacen uno al otro (ADR 0029).
+- **Cabe en `WeaponSpec`:** sí, `advance.degree: 0`, más una duración que hoy no existe. Hoy `check_weapons` lo rechaza.
+- **Fuente:** ADR 0029 (M3).
+
+#### V5. `∫dt`: acelera
+
+- **Fórmula:** el avance sube de grado: `a(t) = v·t²/(2τ)`. Su rapidez es `v·t/τ`: igual a `v` en `t = τ`, y después más.
+- **Qué hace:** el punto sale lento y se dispara.
+- **Cómo se ve:** `@ ·  ·    ·        ·              ·  →` (cada paso, más lejos que el anterior).
+- **Ley o número:** ley.
+- **Escala con el enjambre:** más con enemigos lejos; contra los de cerca, llega tarde.
+- **Decisión nueva:** mantener la distancia, porque de lejos pega más rápido.
+- **Cómo apunta:** `intercept` supone rapidez fija. Hay que resolver `|d + vₑ·t| = v·t²/(2τ)`, que es de cuarto grado: con un método numérico, como bisección.
+- **Precio o contra:** la contra viene adentro: lento de cerca.
+- **Con qué choca:** con V4 (se deshacen).
+- **Cabe en `WeaponSpec`:** sí, `advance.degree: 2`. Hoy `check_weapons` lo rechaza.
+- **Fuente:** ADR 0029 (M3).
+
+#### V6. Anclar al jugador
+
+- **Fórmula:** el origen de la trayectoria te sigue: `p(t) = jugador(t) + desplazamiento(t)`, en vez de `p₀ + desplazamiento(t)`.
+- **Qué hace:** tus disparos se mueven contigo. Solo, el punto hereda tu movimiento; con V3, la espiral sale de ti aunque corras; con V3 y V4, es el satélite que te orbita.
+- **Cómo se ve:**
+  ```
+       ·
+     ·   ·      V3 + V4 + V6: satélites que te siguen
+       @   →
+     ·   ·
+  ```
+- **Ley o número:** ley.
+- **Escala con el enjambre:** igual.
+- **Decisión nueva:** el ataque se arrastra contigo: moverte es mover el ataque.
+- **Cómo apunta:** `intercept` con la velocidad relativa: la del enemigo menos la tuya.
+- **Precio o contra:** ninguno.
+- **Con qué choca:** con V10 y V11, que tienen estado propio y no se sabe qué sería "anclarlos".
+- **Cabe en `WeaponSpec`:** un campo nuevo, `anchor: "birth" | "player"`. La tarea 9 tachada ya definía la espiral "centrada en el jugador de ahora".
+- **Fuente:** ninguna; es el marco de la fórmula.
+
+#### V7. Bumerán
+
+- **Fórmula:** `a(t) = v·t·(1 − t/T)`. Llega a `v·T/4` en `T/2` y vuelve a donde nació en `T`. Con V6, vuelve a ti.
+- **Qué hace:** el punto va y vuelve, y puede pegar en la ida y en la vuelta.
+- **Cómo se ve:**
+  ```
+     @ ⇄ ·
+  ```
+- **Ley o número:** ley.
+- **Escala con el enjambre:** más con enemigos en fila, porque los cruza dos veces.
+- **Decisión nueva:** ponerte para que la vuelta pase por el enjambre; con V6, la vuelta te sigue.
+- **Cómo apunta:** `intercept` para la ida, si el enemigo está a menos de `v·T/4`.
+- **Precio o contra:** la contra viene adentro: no llega lejos.
+- **Con qué choca:** con V4 y V5.
+- **Cabe en `WeaponSpec`:** no: es un avance de dos términos (`v·t − v·t²/T`), y `AdvanceSpec` tiene uno solo. Si el avance pasa a ser un polinomio, `a(t) = Σ cᵢ·tⁱ`, el bumerán cabe y `d/dt` y `∫dt` actúan término a término. Es un argumento para la estructura.
+- **Fuente:** ninguna; es una parábola en `t`.
+
+#### V8. Rizo: la trocoide
+
+- **Fórmula:** al avance se le suma un vector que gira: `x(t) = v·t − R·sin(ω·t)` y `y(t) = R·(1 − cos(ω·t))`. Es la curva de un punto pegado a una rueda que rueda. Si `R > v/ω`, la curva hace rulos (deducido: es el caso *prolate* de MathWorld).
+- **Qué hace:** el punto avanza dando vueltas, como un resorte visto de lado.
+- **Cómo se ve:**
+  ```
+     @ ─ᘓᘓᘓᘓ→
+  ```
+- **Ley o número:** ley.
+- **Escala con el enjambre:** más con grupos, porque los rulos barren más ancho.
+- **Decisión nueva:** poca: cambia la forma.
+- **Cómo apunta:** `intercept` con la rapidez media `v`, con un error de hasta `2R`.
+- **Precio o contra:** ninguno.
+- **Con qué choca:** con V1 y V2: es un armónico en cada eje, desfasados un cuarto. Sumar armónicos así da los epiciclos y, en el límite, cualquier curva: la serie de Fourier.
+- **Cabe en `WeaponSpec`:** con el campo `axis` por armónico de V2: son dos armónicos, uno por eje.
+- **Fuentes:**
+  - MathWorld, *Trochoid*, https://mathworld.wolfram.com/Trochoid.html (2026-11-27): `x = aφ − b·sin φ`, `y = a − b·cos φ`, y con `b > a` es una cicloide *prolate*. Que haga rulos lo deducimos; la página no lo dice.
+  - Wikipedia, *Deferent and epicycle*, https://en.wikipedia.org/wiki/Deferent_and_epicycle (2026-11-27): cualquier trayectoria se puede representar con epiciclos, porque son una serie de Fourier compleja.
+
+#### V9. Curva: la parábola
+
+- **Fórmula:** un avance de grado 2 por la normal: `y(t) = c·t²/(2τ)`. El punto se tuerce hacia un lado, como una pelota con efecto.
+- **Qué hace:** el disparo hace una curva. Con N5, dos curvas que se cierran sobre el enemigo como una pinza.
+- **Cómo se ve:**
+  ```
+            ↗
+     @ ─ ─╯       con N5:  @ ⊂ ◇  (dos arcos que se juntan)
+  ```
+- **Ley o número:** ley.
+- **Escala con el enjambre:** igual.
+- **Decisión nueva:** poca: la pinza esquiva a los enemigos que están en el medio.
+- **Cómo apunta:** hay que girar `û` para que la parábola pase por el enemigo: el ángulo sale de resolver la curva en el tiempo de llegada.
+- **Precio o contra:** la contra viene adentro: tarda más.
+- **Con qué choca:** con V10, que también curva.
+- **Cabe en `WeaponSpec`:** con un avance por eje (el polinomio de V7 más el `axis` de V2).
+- **Fuente:** ninguna; es el tiro parabólico.
+
+#### V10. Persecución
+
+- **Fórmula:** la bala corrige su rumbo en cada paso hacia su enemigo: `ṗ = v·(q − p)/|q − p|`, con `q` la posición del enemigo ahora. Con un giro máximo `ω_max`, la curva se ve más.
+- **Qué hace:** el punto persigue a su enemigo hasta pegarle.
+- **Cómo se ve:** balas que se curvan siguiendo a un enemigo que esquiva.
+- **Ley o número:** ley sin decisión, como N8: el arma decide sola.
+- **Escala con el enjambre:** igual. Rinde más contra enemigos rápidos, que hoy se escapan.
+- **Decisión nueva:** ninguna.
+- **Cómo apunta:** no necesita `intercept`.
+- **Precio o contra:** presupuesto, porque casi no falla. O el giro máximo como contra en el arma.
+- **Con qué choca:**
+  - **Con el diseño de `terms.py`:** hoy la posición es una función pura del `spec` y de `t`. La persecución no tiene una fórmula cerrada en general, así que hay que integrarla paso a paso, con la bala guardando su posición y su rumbo.
+  - Con V1, V3 y V8: ¿la onda se suma al rumbo que cambia? Hay que decidirlo.
+  - Con V6 y V11.
+- **Cabe en `WeaponSpec`:** no: pide estado en la bala, un cambio de estructura.
+- **Fuente:** MathWorld, *Pursuit Curve*, https://mathworld.wolfram.com/PursuitCurve.html (2026-11-27): la estudió Bouguer en 1732, y solo tiene una forma cerrada en casos especiales.
+
+#### V11. Carga: la bala siente al enjambre
+
+- **Fórmula:** la bala tiene una carga `q` y siente la ley de cargas del ADR 0021, la misma que mueve a los enemigos y a la experiencia: `p̈ = Σ F(enemigo, bala)`, integrada paso a paso.
+- **Qué hace:** el punto se desvía hacia los enemigos (o los esquiva, con el otro signo), y puede dar la vuelta a uno grande como una honda.
+- **Cómo se ve:** balas que se tuercen hacia el enjambre y lo rodean.
+- **Ley o número:** ley, y es la física del juego.
+- **Escala con el enjambre:** más con muchos, porque hay más que la atraiga.
+- **Decisión nueva:** poca.
+- **Cómo apunta:** `intercept` al disparar, y después manda la física.
+- **Precio o contra:** ninguno; con muchos enemigos se puede quedar orbitando sin pegar.
+- **Con qué choca:** con V10 (los dos tuercen) y con el diseño de `terms.py`, como V10.
+- **Cabe en `WeaponSpec`:** no: pide estado en la bala. Puede reusar la ley de `world/charges`.
+- **Fuente:** ADR 0021.
+
+#### V12. Crece mientras viaja
+
+- **Fórmula:** el radio del punto crece con el tiempo: `s(t) = s₀ + c·t`.
+- **Qué hace:** el disparo es una bola de nieve: chico al salir y grande lejos.
+- **Cómo se ve:** `@ · ∘ ○ ◯ →`
+- **Ley o número:** ley de lo que viaja: cambia qué es pegar.
+- **Escala con el enjambre:** más con grupos, sobre todo si atraviesa (Pega).
+- **Decisión nueva:** mantener la distancia para que llegue grande.
+- **Cómo apunta:** `intercept`.
+- **Precio o contra:** ninguno.
+- **Con qué choca:** con el choque: hoy la bala es un tramo que cruza líneas (`Enemy.hit_by`, ADR 0020). Con radio, el choque pasa a ser un círculo que barre, otra función de choque.
+- **Cabe en `WeaponSpec`:** `payload.size` existe (hoy rechazado), y el crecimiento es un campo nuevo.
+- **Fuente:** ninguna.
+
+#### Lo que se revisó en Viaja y quedó fuera
+
+- **La inversión en un círculo:** convierte una recta que no pasa por el centro en un círculo que sí pasa, así que el punto daría una vuelta y volvería a ti. Pero el punto nace en el centro, y ahí la inversión degenera: viene desde el infinito. Solo funcionaría con N4, y cuesta visualizarlo. Fuente: MathWorld, *Inversion*, https://mathworld.wolfram.com/Inversion.html (2026-11-27).
+- **La espiral logarítmica:** `a(t) = v·τ·(e^{t/τ} − 1)`, que es la suma de todas las integrales. En pantalla se parece a V5 con V3. Fuente: MathWorld, *Logarithmic Spiral*, https://mathworld.wolfram.com/LogarithmicSpiral.html (2026-11-27).
+- **Lissajous:** dos armónicos, uno por eje, con frecuencias distintas. Es V8 con otros valores: entra si entra V8.
+- **La onda cuadrada o triangular:** son sumas de armónicos impares. Con `A` chico, no se distinguen de V1.
+- **El caos (Lorenz) y el paseo al azar:** no se visualizan claro, y el paseo saca un número de `World.rng` en cada paso.
+- **La rapidez según la distancia al enemigo:** es un número.
+
+#### Lo que Viaja le pide a la estructura
+
+1. **Un eje por armónico** (`axis`): V2, V8 y V9.
+2. **El avance como polinomio,** `a(t) = Σ cᵢ·tⁱ`: V7 y V9, y deja a `d/dt` y `∫dt` como operaciones término a término.
+3. **El anclaje** (`anchor`): V6.
+4. **Una duración** que no dependa del avance: V4. Viene de Termina.
+5. **Estado en la bala,** con integración paso a paso: V10 y V11. Es el cambio más grande: la posición deja de ser una función pura de `t`.
+6. **Un choque con radio:** V12.
+
+### Pega y Termina
+
+*(Pendientes: se llenan después de que el autor revise Viaja.)*
