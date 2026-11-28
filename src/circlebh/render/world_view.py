@@ -10,7 +10,6 @@ from circlebh.viewport import Viewport
 from circlebh.world.clock import STEP
 from circlebh.world.figures import local_lines
 from circlebh.world.game import World
-from circlebh.world.weapons import ProjectileWeapon, TraceWeapon
 
 BULLET_DRAW_RADIUS = 3.0
 """Radio con que se dibuja la bala, en unidades del plano. Solo es visual: para chocar,
@@ -46,27 +45,13 @@ def draw_world(
     """
     draw_orbs(screen, world, viewport, palette)
     for weapon in world.weapons:
-        if isinstance(weapon, ProjectileWeapon):
-            for bullet in weapon.bullets:
-                pygame.draw.circle(
-                    screen,
-                    palette.foreground,
-                    viewport.to_screen(bullet.position),
-                    BULLET_DRAW_RADIUS * viewport.scale,
-                )
-        elif isinstance(weapon, TraceWeapon):
-            # Los tramos vivos, sin los huecos donde pegó (ADR 0032). Un anillo entero
-            # ya repite su primer punto al final.
-            width = viewport.width(weapon.spec.payload.width)
-            for arc in weapon.curves():
-                if len(arc) > 1:
-                    pygame.draw.lines(
-                        screen,
-                        palette.foreground,
-                        False,
-                        [viewport.to_screen(p) for p in arc],
-                        width,
-                    )
+        for bullet in weapon.bullets:
+            pygame.draw.circle(
+                screen,
+                palette.foreground,
+                viewport.to_screen(bullet.position),
+                BULLET_DRAW_RADIUS * viewport.scale,
+            )
 
     player = world.player
     pygame.draw.circle(

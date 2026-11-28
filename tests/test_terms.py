@@ -12,33 +12,10 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from circlebh.balance import BALANCE, AdvanceSpec, HarmonicSpec
-from circlebh.world.terms import (
-    advance_at,
-    projectile_offset,
-    samples_for,
-    trace_points,
-)
+from circlebh.world.terms import advance_at, projectile_offset
 
-POINT = BALANCE.weapons["point"]
+POINT = BALANCE.weapon
 TIEMPOS = st.floats(min_value=0, max_value=10, allow_nan=False)
-# El círculo: un trazo polar que crece a 90 por segundo hasta 320.
-CIRCLE = replace(
-    POINT,
-    kind="trace",
-    frame="polar",
-    advance=AdvanceSpec(coefficient=90.0, degree=1),
-    reach=320.0,
-)
-ARMONICOS = st.lists(
-    st.builds(
-        HarmonicSpec,
-        amplitude=st.floats(min_value=-40, max_value=40),
-        k=st.integers(min_value=0, max_value=8).map(float),
-        phase=st.floats(min_value=-math.pi, max_value=math.pi),
-    ),
-    max_size=3,
-).map(tuple)
-GIROS = st.floats(min_value=-3, max_value=3)
 
 
 # --- El avance ---
@@ -112,55 +89,3 @@ def test_polar_sin_giro_es_cartesiano_sin_armonicos() -> None:
     # Borde: sin giro ni armónicos, los dos marcos dan la misma recta.
     polar = replace(POINT, frame="polar")
     assert projectile_offset(polar, 1.5) == projectile_offset(POINT, 1.5)
-
-
-# --- El trazo polar ---
-
-
-@given(TIEMPOS, ARMONICOS, GIROS, st.integers(min_value=1, max_value=200))
-def test_trazo_polar_sigue_su_formula(
-    t: float, armonicos: tuple[HarmonicSpec, ...], giro: float, muestras: int
-) -> None:
-    # `ρ(θ, t) = min(a(t), R) + Σ A·sin(k(θ − Ωt) + φ)`, con θ repartido en la vuelta.
-    spec = replace(CIRCLE, harmonics=armonicos, spin=giro)
-    puntos = trace_points(spec, t, muestras)
-    assert len(puntos) == muestras
-    for i, punto in enumerate(puntos):
-        theta = 2 * math.pi * i / muestras
-        rho = min(90.0 * t, 320.0) + sum(
-            h.amplitude * math.sin(h.k * (theta - giro * t) + h.phase)
-            for h in armonicos
-        )
-        assert punto.x == pytest.approx(rho * math.cos(theta), abs=1e-6)
-        assert punto.y == pytest.approx(rho * math.sin(theta), abs=1e-6)
-
-
-@given(TIEMPOS, ARMONICOS, GIROS, st.floats(min_value=2, max_value=50))
-def test_muestras_quedan_a_lo_mas_spacing(
-    t: float, armonicos: tuple[HarmonicSpec, ...], giro: float, spacing: float
-) -> None:
-    # Dos puntos seguidos, también el último y el primero, quedan a lo más `spacing`:
-    # así ninguna línea pasa entre dos muestras sin que la crucen.
-    spec = replace(CIRCLE, harmonics=armonicos, spin=giro)
-    puntos = trace_points(spec, t, samples_for(spec, t, spacing))
-    for a, b in zip(puntos, puntos[1:] + puntos[:1], strict=True):
-        assert a.distance_to(b) <= spacing + 1e-9
-
-
-def test_anillo_recien_nacido_es_un_punto() -> None:
-    # Borde: en `t = 0` el radio es 0, y basta una muestra, en el centro.
-    assert samples_for(CIRCLE, 0.0, 4.0) == 1
-    assert trace_points(CIRCLE, 0.0, 1)[0].length() == 0
-
-
-def test_anillo_no_pasa_de_su_alcance() -> None:
-    # Borde: el `min(a(t), R)` deja el último paso en R.
-    puntos = trace_points(CIRCLE, 100.0, samples_for(CIRCLE, 100.0, 4.0))
-    assert all(p.length() == pytest.approx(320.0) for p in puntos)
-
-
-@pytest.mark.parametrize("spacing", [0.0, -4.0])
-def test_spacing_no_positivo_se_rechaza(spacing: float) -> None:
-    # Negativo: sin un espaciado positivo no hay cuántas muestras tomar.
-    with pytest.raises(ValueError, match="spacing"):
-        samples_for(CIRCLE, 1.0, spacing)

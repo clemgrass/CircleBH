@@ -3,6 +3,9 @@
 Toda arma hereda de `Weapon` y avanza con `update`, un paso de `STEP` a la vez (ADR 0005).
 Cada arma lee su `spec` en cada paso, así que mejorarla es reemplazar su `spec`. Dónde
 está lo que dispara sale de sus términos, en `world/terms.py` (ADR 0029).
+
+Todo ataque es un punto (ADR 0033): las armas `f₁` a `f₄` son `ProjectileWeapon`, y
+la `k`-ésima apunta al `k`-ésimo enemigo más cercano.
 """
 
 import math
@@ -14,13 +17,7 @@ from circlebh.balance import Balance, WeaponSpec
 from circlebh.world.clock import STEP
 from circlebh.world.enemy import Enemy
 from circlebh.world.events import Event, Hit, Shot
-from circlebh.world.sweep import strike
-from circlebh.world.terms import (
-    advance_at,
-    projectile_offset,
-    samples_for,
-    trace_points,
-)
+from circlebh.world.terms import advance_at, projectile_offset
 
 
 class Weapon(ABC):
@@ -39,37 +36,27 @@ def check_weapons(balance: Balance) -> None:
     """Rechaza al crear el mundo un arma que el código todavía no sabe armar, nombrando
     el campo, para que un dato del balance no quede ignorado en silencio.
 
-    Lo que se rechaza aquí llega con su tarea del plan de la 0.3.0: la recta, la espiral,
-    apuntar hacia donde te mueves, `d/dt` y `∫dt`, los operadores y lo que viaja.
+    Todo ataque es un punto (ADR 0033): un `kind` que no sea `projectile`, como un trazo,
+    se rechaza. Lo demás llega con el catálogo de mejoras (#127): el marco polar, apuntar
+    hacia donde te mueves, `d/dt` y `∫dt`, los operadores y lo que viaja.
     """
-    start = balance.player.start_weapon
-    if start not in balance.weapons:
-        raise ValueError(f"player.start_weapon: no existe el arma {start}")
-    if balance.sampling.spacing <= 0:
-        raise ValueError(
-            f"sampling.spacing: tiene que ser positivo, llegó {balance.sampling.spacing}"
-        )
-    for name, spec in balance.weapons.items():
-        # Se arman el proyectil cartesiano (el punto) y el trazo polar (el círculo).
-        expected_frame = "cartesian" if spec.kind == "projectile" else "polar"
-        unsupported = {
-            "frame": spec.frame != expected_frame,
-            "aim": spec.aim != "nearest",
-            "advance.degree": spec.advance.degree != 1,
-            "copies": spec.copies != 1,
-            "mirror": spec.mirror,
-            "parallel": spec.parallel != 0,
-            "payload.size": spec.payload.size != 0,
-            # Un trazo ya quita las que diga cada vez que pega; un proyectil, todavía una.
-            "payload.lines": spec.kind == "projectile" and spec.payload.lines != 1,
-            "payload.pierce": spec.payload.pierce != 0,
-            "payload.duration": spec.payload.duration != 0,
-        }
-        for field, rejected in unsupported.items():
-            if rejected:
-                raise ValueError(
-                    f"weapons.{name}.{field}: el código todavía no sabe armarlo"
-                )
+    spec = balance.weapon
+    if spec.kind != "projectile":
+        raise ValueError(f"weapon.kind: todo ataque es un punto, llegó {spec.kind}")
+    unsupported = {
+        "frame": spec.frame != "cartesian",
+        "aim": spec.aim != "nearest",
+        "advance.degree": spec.advance.degree != 1,
+        "copies": spec.copies != 1,
+        "mirror": spec.mirror,
+        "parallel": spec.parallel != 0,
+        "payload.size": spec.payload.size != 0,
+        "payload.lines": spec.payload.lines != 1,
+        "payload.pierce": spec.payload.pierce != 0,
+    }
+    for field, rejected in unsupported.items():
+        if rejected:
+            raise ValueError(f"weapon.{field}: el código todavía no sabe armarlo")
 
 
 class Bullet:
@@ -149,9 +136,15 @@ def intercept(
     return target + velocity * min(times)
 
 
-def nearest(origin: Vector2, enemies: list[Enemy]) -> Enemy | None:
-    """El enemigo de centro más cercano a `origin` al que se puede apuntar. Si empatan,
-    el primero de la lista.
+def ranked_target(origin: Vector2, enemies: list[Enemy], rank: int) -> Enemy | None:
+    """El enemigo al que apunta el arma de rango `rank` (`fₖ`, con `rank = k − 1`): el
+    de índice `rank mod n` entre los `n` que se pueden apuntar, del centro más cercano
+    a `origin` al más lejano (ADR 0033). Si empatan, va primero el primero de la lista.
+    Sin ninguno, `None`.
+
+    La cuenta da la vuelta: con 2 enemigos y 4 armas, `f₃` vuelve al más cercano y `f₄`
+    al segundo. Se cuenta con los que se pueden apuntar en este paso, así que un enemigo
+    que muere corre a los demás un lugar.
 
     Descarta a los muertos (los que perdieron su última línea en este paso y `World`
     todavía no quita) y a los que tienen el centro en `origin`: hacia ellos no hay
@@ -170,20 +163,21 @@ def nearest(origin: Vector2, enemies: list[Enemy]) -> Enemy | None:
         for e in enemies
         if e.alive and not e.spec.phantom and e.position.distance_squared_to(origin) > 0
     ]
-    # `min` devuelve el primero de los empatados.
-    return min(
-        targets,
-        key=lambda enemy: enemy.position.distance_squared_to(origin),
-        default=None,
-    )
+    if not targets:
+        return None
+    # El orden de Python es estable: deja a los empatados en el orden de la lista.
+    targets.sort(key=lambda enemy: enemy.position.distance_squared_to(origin))
+    return targets[rank % len(targets)]
 
 
 class ProjectileWeapon(Weapon):
-    """Un arma de proyectiles: uno cada `cooldown` segundos hacia el enemigo más
-    cercano, que sigue los términos de su `spec`."""
+    """Un arma de proyectiles, `fₖ`: un punto cada `cooldown` segundos hacia su
+    enemigo (`ranked_target`), que sigue los términos de su `spec`."""
 
-    def __init__(self, spec: WeaponSpec) -> None:
+    def __init__(self, spec: WeaponSpec, rank: int) -> None:
         super().__init__(spec)
+        self.rank = rank
+        """`k − 1`: a qué enemigo apunta, contando desde el más cercano. `f₁` es 0."""
         self.bullets: list[Bullet] = []
         self._steps_to_next = 0
         """Pasos que faltan para el próximo disparo. Parte en 0: dispara en el primer
@@ -233,172 +227,18 @@ class ProjectileWeapon(Weapon):
         return Hit(enemy, k)
 
     def _fire(self, origin: Vector2, enemies: list[Enemy]) -> bool:
-        """Dispara al más cercano, hacia donde se va a cruzar con la bala, y devuelve
+        """Dispara a su enemigo, hacia donde se va a cruzar con la bala, y devuelve
         `True`. Sin objetivo, no dispara."""
-        target = nearest(origin, enemies)
+        target = ranked_target(origin, enemies, self.rank)
         if target is None:
             return False
         # El punto avanza con grado 1: su rapidez es el coeficiente del avance.
         speed = self.spec.advance.coefficient
         aim = intercept(origin, target.position, target.velocity, speed)
         if aim.distance_squared_to(origin) == 0:
-            # `nearest` garantiza que el objetivo mismo da una dirección.
+            # `ranked_target` garantiza que el objetivo mismo da una dirección.
             aim = target.position
         direction = (aim - origin).normalize()
         self.bullets.append(Bullet(origin, direction, self.spec))
         self._steps_to_next = round(self.spec.cooldown / STEP)
         return True
-
-
-class Trace:
-    """Un trazo polar lanzado: la curva `ρ(θ, t)` de `trace_points`, centrada en el
-    jugador de ahora, que revienta cuando su avance llega a `R` (`reach`).
-
-    Se gasta donde pega (ADR 0032): al golpear a un enemigo, pierde el arco que lo
-    cubre visto desde el jugador, y ese hueco no vuelve a dibujarse ni a dañar."""
-
-    def __init__(self, center: Vector2, spec: WeaponSpec) -> None:
-        self.spec = spec
-        """El `spec` del arma cuando nació. Una mejora posterior no lo cambia."""
-        self.center = Vector2(center)
-        """Dónde estaba el jugador en el último paso: el centro de la curva."""
-        self.gaps: list[tuple[float, float]] = []
-        """Los arcos gastados, como `(φ, a)`: los θ a lo más `a` de `φ`, en la vuelta."""
-        self._steps = 0
-
-    @property
-    def age(self) -> float:
-        """Segundos desde que nació, contados en pasos enteros."""
-        return self._steps * STEP
-
-    @property
-    def expired(self) -> bool:
-        """Revienta cuando su avance llega a `R`."""
-        return advance_at(self.spec, self.age) >= self.spec.reach
-
-    def points(self, samples: int) -> list[Vector2]:
-        """La curva ahora, en el plano, con `samples` puntos, también los gastados."""
-        return [self.center + p for p in trace_points(self.spec, self.age, samples)]
-
-    def arcs(self, samples: int) -> list[list[Vector2]]:
-        """Los tramos vivos de la curva ahora, sin los huecos, para el dibujo.
-
-        Sin huecos, es un solo tramo cerrado: repite su primer punto al final. Con
-        huecos, cada tramo empieza justo después de uno, así que ninguno se corta en
-        θ = 0. Gastada entera, no hay tramos."""
-        points = self.points(samples)
-        live = self._live(samples)
-        if all(live):
-            return [[*points, points[0]]]
-        # El primer punto vivo después de un hueco.
-        start = next((i for i in range(samples) if live[i] and not live[i - 1]), None)
-        if start is None:
-            return []
-        arcs: list[list[Vector2]] = []
-        for j in range(start, start + samples):
-            i = j % samples
-            if not live[i]:
-                continue
-            if live[i - 1] and arcs:
-                arcs[-1].append(points[i])
-            else:
-                arcs.append([points[i]])
-        return arcs
-
-    def step(self, center: Vector2, enemies: list[Enemy], spacing: float) -> list[Hit]:
-        """Avanza un paso hacia el jugador en `center` y barre: cada punto vivo va de
-        donde estaba en el paso anterior a donde está ahora. Por cada enemigo golpeado,
-        suma el hueco que lo cubre."""
-        before = self.age
-        old_center = self.center
-        self._steps += 1
-        self.center = Vector2(center)
-        # La misma cantidad de puntos en los dos tiempos: así el punto `i` es el mismo
-        # punto de la curva. Se toma la mayor, para que ninguno quede a más de `spacing`.
-        samples = max(
-            samples_for(self.spec, before, spacing),
-            samples_for(self.spec, self.age, spacing),
-        )
-        live = self._live(samples)
-        previous = trace_points(self.spec, before, samples)
-        now = self.points(samples)
-        hits = strike(
-            [old_center + previous[i] for i in range(samples) if live[i]],
-            [now[i] for i in range(samples) if live[i]],
-            enemies,
-            self.spec.payload.lines,
-        )
-        for enemy in dict.fromkeys(hit.enemy for hit in hits):
-            self.gaps.append(self._gap_over(enemy))
-        return hits
-
-    def _gap_over(self, enemy: Enemy) -> tuple[float, float]:
-        """El arco que cubre a `enemy` visto desde el centro: `φ ± asin(r/d)`. Con
-        `d ≤ r`, el enemigo rodea al centro y el arco es la vuelta entera."""
-        offset = enemy.position - self.center
-        d = offset.length()
-        half = math.pi if d <= enemy.radius else math.asin(enemy.radius / d)
-        return math.atan2(offset.y, offset.x), half
-
-    def _live(self, samples: int) -> list[bool]:
-        """Si el punto `i` de `samples`, en `θᵢ = 2π·i / samples`, está fuera de todo
-        hueco. La distancia entre ángulos se mide en la vuelta, así que un hueco puede
-        pasar por θ = 0."""
-        live = []
-        for i in range(samples):
-            theta = math.tau * i / samples
-            live.append(
-                not any(_angle_between(theta, phi) <= half for phi, half in self.gaps)
-            )
-        return live
-
-
-class TraceWeapon(Weapon):
-    """Un arma de trazos polares: lanza uno cada `cooldown` segundos, haya enemigos o
-    no, y cada uno daña por barrido (`world/sweep.py`)."""
-
-    def __init__(self, spec: WeaponSpec, spacing: float) -> None:
-        super().__init__(spec)
-        self.spacing = spacing
-        """`sampling.spacing`: la distancia máxima entre dos puntos de muestra."""
-        self.traces: list[Trace] = []
-        self._steps_to_next = 0
-
-    def update(self, origin: Vector2, enemies: list[Enemy]) -> list[Event]:
-        """Avanza los trazos hacia el jugador en `origin`, aplica sus golpes y quita los
-        que reventaron. Un trazo que llega a `R` en este paso todavía golpea en `R`.
-
-        El trazo nuevo nace en `origin`, con radio 0, y empieza a crecer en el paso
-        siguiente. Devuelve un `Hit` por cada línea quitada y un `Shot` si lanzó.
-        """
-        events: list[Event] = []
-        for trace in self.traces:
-            events += trace.step(origin, enemies, self.spacing)
-        self.traces = [trace for trace in self.traces if not trace.expired]
-        self._steps_to_next -= 1
-        if self._steps_to_next <= 0:
-            self.traces.append(Trace(origin, self.spec))
-            self._steps_to_next = round(self.spec.cooldown / STEP)
-            events.append(Shot(self))
-        return events
-
-    def curves(self) -> list[list[Vector2]]:
-        """Los tramos vivos de todos los trazos, en el plano, para el dibujo."""
-        return [
-            arc
-            for trace in self.traces
-            for arc in trace.arcs(samples_for(trace.spec, trace.age, self.spacing))
-        ]
-
-
-def _angle_between(a: float, b: float) -> float:
-    """La distancia entre dos ángulos en la vuelta, en `[0, π]`."""
-    d = (a - b) % math.tau
-    return min(d, math.tau - d)
-
-
-def make_weapon(spec: WeaponSpec, spacing: float) -> Weapon:
-    """El arma que corresponde al `kind` de `spec`. `spacing` es `sampling.spacing`."""
-    if spec.kind == "trace":
-        return TraceWeapon(spec, spacing)
-    return ProjectileWeapon(spec)

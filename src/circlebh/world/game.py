@@ -8,7 +8,14 @@ from pygame.math import Vector2
 
 from circlebh.balance import Balance, RegenerateSpec
 from circlebh.world.actions import Deliver, check_actions, step_actions, steps_of
-from circlebh.world.cards import Loadout, Offer, apply, check_cards, deal
+from circlebh.world.cards import (
+    Loadout,
+    Offer,
+    apply,
+    check_cards,
+    deal,
+    weapon_name,
+)
 from circlebh.world.clock import STEP
 from circlebh.world.critical_mass import (
     CriticalMass,
@@ -42,7 +49,7 @@ from circlebh.world.spawning import (
 )
 from circlebh.world.split import check_splits, fragments
 from circlebh.world.swarm import step_swarm
-from circlebh.world.weapons import Weapon, check_weapons, make_weapon
+from circlebh.world.weapons import ProjectileWeapon, check_weapons
 
 
 class World:
@@ -88,13 +95,11 @@ class World:
         check_experience(balance.experience)
         check_weapons(balance)
         check_cards(balance)
-        start = balance.player.start_weapon
-        self.arsenal: dict[str, Weapon] = (
-            {start: make_weapon(balance.weapons[start], balance.sampling.spacing)}
-            if armed
-            else {}
+        self.arsenal: dict[str, ProjectileWeapon] = (
+            {weapon_name(0): ProjectileWeapon(balance.weapon, 0)} if armed else {}
         )
-        """Las armas del jugador, por nombre, en el orden en que llegaron."""
+        """Las armas del jugador, de `"f1"` a `"f4"`, en el orden en que llegaron. Parte
+        con `f₁`, la función base (ADR 0033)."""
         self.enemy_bullets: list[EnemyBullet] = []
         """Las balas de los enemigos. Atraviesan a los demás enemigos y matan al jugador."""
         self.game_over = False
@@ -154,7 +159,7 @@ class World:
         )
 
     @property
-    def weapons(self) -> list[Weapon]:
+    def weapons(self) -> list[ProjectileWeapon]:
         """Las armas del jugador, en el orden en que llegaron."""
         return list(self.arsenal.values())
 
@@ -296,7 +301,7 @@ class World:
         if not 0 <= index < len(self.hand):
             raise IndexError(f"no hay tarjeta {index} en una mano de {len(self.hand)}")
         offer = self.hand[index]
-        state = apply(offer, self.loadout, self.balance.cards, self.balance.weapons)
+        state = apply(offer, self.loadout, self.balance.cards, self.balance.weapon)
         self._equip(state)
         self._chosen.append(CardChosen(offer))
         self._close_hand()
@@ -354,12 +359,13 @@ class World:
 
     def _equip(self, state: Loadout) -> None:
         """Deja al jugador y sus armas como dice `state`. Un arma que ya tenías cambia
-        su `spec`; una nueva empieza sin balas."""
+        su `spec`; una nueva empieza sin balas, con el rango que le toca por orden de
+        llegada."""
         for name, spec in state.weapons.items():
             if name in self.arsenal:
                 self.arsenal[name].spec = spec
             else:
-                self.arsenal[name] = make_weapon(spec, self.balance.sampling.spacing)
+                self.arsenal[name] = ProjectileWeapon(spec, len(self.arsenal))
         self.player.spec = state.player
         self.rerolls = state.rerolls
         self.banishes = state.banishes

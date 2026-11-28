@@ -29,9 +29,6 @@ class PlayerSpec:
     """Su carga eléctrica, de signo contrario a la de los enemigos: los atrae. Es una
     carga fija, como de masa infinita: ninguna fuerza lo mueve (ADR 0021)."""
 
-    start_weapon: str
-    """El arma con que empieza la partida, una clave de `weapons`."""
-
 
 @dataclass(frozen=True)
 class ChargesSpec:
@@ -566,30 +563,22 @@ class HarmonicSpec:
 
 @dataclass(frozen=True)
 class PayloadSpec:
-    """Lo que viaja (ADR 0029). Un proyectil usa `size`, `lines` y `pierce`; un trazo,
-    `lines`, `duration` y `width`."""
+    """Lo que viaja: el punto que dispara el arma (ADR 0029 y 0033)."""
 
     size: float
     """El radio del proyectil, en unidades del plano. Con 0, es un punto."""
 
     lines: int
-    """Cuántas líneas quita un golpe de un proyectil, o un trazo cada vez que pega en un
-    enemigo (ADR 0032)."""
+    """Cuántas líneas quita un golpe."""
 
     pierce: int
     """A cuántos enemigos atraviesa un proyectil antes de desaparecer."""
 
-    duration: float
-    """Cuántos segundos dura un trazo."""
-
-    width: float
-    """El grosor con que se dibuja un trazo, en unidades del plano. Solo es visual: no
-    cuenta para pegar (ADR 0032)."""
-
 
 @dataclass(frozen=True)
 class WeaponSpec:
-    """Un arma: tres términos en un marco, con sus operadores (ADR 0029).
+    """Un arma: una función del punto, con tres términos en un marco y sus operadores
+    (ADR 0029 y 0033).
 
     La posición de lo que dispara es una función pura de este `spec` y del tiempo
     (`world/terms.py`). Mejorar el arma es reemplazar su `spec`.
@@ -598,11 +587,12 @@ class WeaponSpec:
     title: str
     """Su nombre, como se muestra al jugador."""
 
-    kind: Literal["projectile", "trace"]
-    """Si dispara proyectiles o dibuja un trazo."""
+    kind: Literal["projectile"]
+    """Qué dispara. Todo ataque es un punto (ADR 0033)."""
 
     frame: Literal["cartesian", "polar"]
-    """El marco: cartesiano, fijo donde se disparó, o polar, centrado en el jugador."""
+    """El marco, con el origen donde se disparó: cartesiano, o polar, en que el radio
+    gira con `Ω`."""
 
     aim: Literal["nearest", "motion"]
     """Hacia dónde apunta `û`: al enemigo más cercano, con anticipación, o hacia donde
@@ -633,21 +623,11 @@ class WeaponSpec:
     """Segundos entre un disparo y el siguiente."""
 
     reach: float
-    """El alcance de un proyectil, el `R` de un trazo polar o el `L` de la recta, en
-    unidades del plano."""
+    """El alcance: el punto desaparece cuando su avance llega aquí, en unidades del
+    plano."""
 
     tau: float
     """`τ`, en segundos: la constante de `d/dt` y `∫dt`, que deja las unidades en largo."""
-
-
-@dataclass(frozen=True)
-class SamplingSpec:
-    """Cómo se muestrea un trazo para el barrido (ADR 0029). Cambia el daño: una línea
-    más corta que el espaciado puede quedar entre dos muestras."""
-
-    spacing: float
-    """La distancia máxima entre dos puntos de muestra seguidos, en unidades del plano.
-    Tiene que ser mayor que 0. No hay tope de puntos: salen del largo de la curva."""
 
 
 @dataclass(frozen=True)
@@ -716,12 +696,9 @@ class KnobChange:
 
 @dataclass(frozen=True)
 class NewWeaponChange:
-    """Un arma nueva."""
+    """Un arma nueva: suma la `fₖ` que sigue, igual a la función base (ADR 0033)."""
 
     kind: Literal["weapon"]
-
-    weapon: str
-    """El arma que da, una clave de `weapons`."""
 
 
 @dataclass(frozen=True)
@@ -759,7 +736,7 @@ class CardSpec:
     """El tipo que muestra el frente: perilla, suma, operador, arma nueva o jugador."""
 
     weapons: tuple[str, ...]
-    """Las armas a las que sirve. Vacío: a toda arma que tengas."""
+    """Las armas a las que sirve, de `"f1"` a `"f4"`. Vacío: a toda arma que tengas."""
 
     change: CardChange
     """Lo que cambia."""
@@ -814,11 +791,8 @@ class Balance:
     critical_mass: CriticalMassSpec
     """Cuándo aparece el círculo que reparte al enjambre."""
 
-    weapons: dict[str, WeaponSpec]
-    """Las armas, por nombre."""
-
-    sampling: SamplingSpec
-    """Cómo se muestrean los trazos para el barrido."""
+    weapon: WeaponSpec
+    """La función base, el punto: con ella parte `f₁`, y cada arma nueva (ADR 0033)."""
 
     enemy_bullet: EnemyBulletSpec
     """Las balas que disparan los enemigos."""
@@ -838,7 +812,7 @@ class Balance:
 
 # >>> datos (lo genera poe balance-importar)
 BALANCE = Balance(
-    player=PlayerSpec(speed=240.0, radius=12.0, charge=-14.0, start_weapon="point"),
+    player=PlayerSpec(speed=240.0, radius=12.0, charge=-14.0),
     charges=ChargesSpec(
         k=171000.0,
         cutoff=150.0,
@@ -1305,41 +1279,22 @@ BALANCE = Balance(
     critical_mass=CriticalMassSpec(
         enemy="circle", count=30, imbalance=0.5, cooldown_bars=8.0
     ),
-    weapons={
-        "point": WeaponSpec(
-            title="Punto",
-            kind="projectile",
-            frame="cartesian",
-            aim="nearest",
-            advance=AdvanceSpec(coefficient=300.0, degree=1),
-            harmonics=(),
-            spin=0.0,
-            copies=1,
-            mirror=False,
-            parallel=0.0,
-            payload=PayloadSpec(size=0.0, lines=1, pierce=0, duration=0.0, width=0.0),
-            cooldown=0.6,
-            reach=700.0,
-            tau=0.5,
-        ),
-        "circle": WeaponSpec(
-            title="Círculo",
-            kind="trace",
-            frame="polar",
-            aim="nearest",
-            advance=AdvanceSpec(coefficient=200.0, degree=1),
-            harmonics=(),
-            spin=0.0,
-            copies=1,
-            mirror=False,
-            parallel=0.0,
-            payload=PayloadSpec(size=0.0, lines=1, pierce=0, duration=0.0, width=2.0),
-            cooldown=15.6,
-            reach=200.0,
-            tau=0.5,
-        ),
-    },
-    sampling=SamplingSpec(spacing=4.0),
+    weapon=WeaponSpec(
+        title="Punto",
+        kind="projectile",
+        frame="cartesian",
+        aim="nearest",
+        advance=AdvanceSpec(coefficient=300.0, degree=1),
+        harmonics=(),
+        spin=0.0,
+        copies=1,
+        mirror=False,
+        parallel=0.0,
+        payload=PayloadSpec(size=0.0, lines=1, pierce=0),
+        cooldown=0.6,
+        reach=700.0,
+        tau=0.5,
+    ),
     enemy_bullet=EnemyBulletSpec(speed=330.0, radius=4.0),
     regrow=RegrowSpec(fade=0.4),
     experience=ExperienceSpec(charge=3.0, friction=3.0, base=6.0, exponent=1.5),
@@ -1351,7 +1306,7 @@ BALANCE = Balance(
             title="Acelerar el punto",
             symbol="v × 1,25",
             family="knob",
-            weapons=("point",),
+            weapons=(),
             change=KnobChange(
                 kind="knob", field="advance.coefficient", op="mul", values=(1.25,)
             ),
@@ -1361,7 +1316,7 @@ BALANCE = Balance(
             title="Disparar más seguido",
             symbol="cooldown × 0,8",
             family="knob",
-            weapons=("point",),
+            weapons=(),
             change=KnobChange(kind="knob", field="cooldown", op="mul", values=(0.8,)),
             shape=False,
         ),
@@ -1391,12 +1346,12 @@ BALANCE = Balance(
             ),
             shape=False,
         ),
-        "circle_weapon": CardSpec(
-            title="Dibujar un círculo",
-            symbol="ρ = v·t",
+        "new_weapon": CardSpec(
+            title="Sumar otro punto",
+            symbol="+ f",
             family="weapon",
             weapons=(),
-            change=NewWeaponChange(kind="weapon", weapon="circle"),
+            change=NewWeaponChange(kind="weapon"),
             shape=True,
         ),
     },

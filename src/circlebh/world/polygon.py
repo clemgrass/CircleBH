@@ -74,10 +74,10 @@ def edge_sectors(start: Vector2, end: Vector2, sides: int) -> list[int]:
     a0 = math.atan2(start.y, start.x)
     a1 = math.atan2(end.y, end.x)
     # El barrido corto, en [−π, π).
-    sweep = (a1 - a0 + math.pi) % math.tau - math.pi
-    if abs(sweep) > math.pi - NEAR_HALF_TURN:
+    turn = (a1 - a0 + math.pi) % math.tau - math.pi
+    if abs(turn) > math.pi - NEAR_HALF_TURN:
         return list(range(sides))
-    direction = 1 if sweep >= 0 else -1
+    direction = 1 if turn >= 0 else -1
     first, last = sector(start, sides), sector(end, sides)
     found = {(first - direction) % sides}
     k = first

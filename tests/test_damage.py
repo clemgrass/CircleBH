@@ -16,7 +16,7 @@ from circlebh.world.polygon import vertex
 from circlebh.world.weapons import ProjectileWeapon
 
 SPEC = replace(
-    BALANCE.weapons["point"],
+    BALANCE.weapon,
     cooldown=0.5,
     advance=AdvanceSpec(coefficient=600.0, degree=1),
     reach=700.0,
@@ -43,7 +43,7 @@ ORIGEN = Vector2(0, 0)
 
 def disparar(enemy: Enemy, pasos: int) -> ProjectileWeapon:
     """Un arma en el origen que dispara `pasos` veces al enemigo, que no se mueve."""
-    weapon = ProjectileWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC, 0)
     for _ in range(pasos):
         weapon.update(ORIGEN, [enemy])
     return weapon
@@ -114,7 +114,7 @@ def test_enemigo_que_avanza_no_deja_pasar_la_bala() -> None:
     enemy = Enemy(rapido, Vector2(300, 0))
     # Sin roce ni patrones, avanza a velocidad fija hacia el origen.
     enemy.velocity = Vector2(-3000, 0)
-    weapon = ProjectileWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC, 0)
     for _ in range(10):
         enemy.step(Vector2())
         weapon.update(ORIGEN, [enemy])
