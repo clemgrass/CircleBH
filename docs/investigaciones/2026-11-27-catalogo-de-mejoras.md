@@ -835,6 +835,199 @@ Hoy, al cruzar una línea, la bala la quita y desaparece (`ProjectileWeapon._str
 4. **El ancla en el enemigo** (P8), que extiende el `anchor` de V6.
 5. **Figuras que no están en el balance** (P10).
 
-### Termina
+### Termina: qué pasa al final
 
-*(Pendiente: se llena después de que el autor revise Pega.)*
+Hoy la bala desaparece cuando su avance llega a `reach` (`Bullet.expired`), y no deja nada.
+
+| | Concepto | Ley o número | Se ve claro | Escala con el enjambre | Cabe en `WeaponSpec` |
+|---|---|---|---|---|---|
+| T1 | Duración | número que habilita | — | igual | campo nuevo |
+| T2 | Estallar al terminar | ley | sí | más cuando te rodean | campo nuevo |
+| T3 | Volver a ti | ley | sí | más con enemigos en fila | campo nuevo |
+| T4 | Frenar y quedarse | ley | sí | más cuando vienen a ti | campo nuevo |
+| T5 | Reaparecer por el otro lado | ley | a medias | más cuando te rodean | campo nuevo |
+| T6 | Dejar un rastro | ley | sí | más cuando te persiguen | campo nuevo |
+| T7 | Los vértices del que muere | ley | sí | más con enjambres densos | campo nuevo |
+
+**Decisión del autor (2026-11-27):** entran T2 a T6. Quedan fuera T1 y T7. Claude no recomendaba T5 solo.
+
+**T1 como dato, no como tarjeta** *(propuesta de Claude)*: V4, P8, T4 y T6 no terminan sin una duración. La duración queda como un campo del arma que fija la tarjeta que la necesita, y no se ofrece sola. Así lo decía ya su ficha.
+
+#### T1. Duración
+
+- **Fórmula:** la bala termina a los `L` segundos, aunque su avance no llegue a `reach`. Termina con lo primero que pase.
+- **Qué hace:** sola, nada que se vea. Hace posibles a V4, V6 con V4 (el satélite), P8 y T4, que hoy nunca terminan.
+- **Cómo se ve:** no se ve; es la regla de cuándo se apaga.
+- **Ley o número:** número, pero sin él varias leyes no existen.
+- **Escala con el enjambre:** igual.
+- **Decisión nueva:** ninguna.
+- **Cómo apunta:** no cambia.
+- **Precio o contra:** ninguno.
+- **Con qué choca:** con nada. No se ofrece como tarjeta: es un dato del arma, y la tarjeta que la necesita lo cambia.
+- **Cabe en `WeaponSpec`:** un campo nuevo, `lifetime`. `0` es "sin duración", porque `datafile` no acepta `null` (restricciones del plan).
+- **Fuente:** ninguna.
+
+#### T2. Estallar al terminar
+
+- **Fórmula:** al terminar sin haber pegado, la bala suelta `m` puntos en `Cₘ` desde donde está. Es P3, pero al final.
+- **Qué hace:** cada disparo que falla revienta al final de su alcance, como un fuego artificial.
+- **Cómo se ve:**
+  ```
+                 ·
+     @ ─ ─ ─ ─ · ✱ ·      al llegar a reach
+                 ·
+  ```
+- **Ley o número:** ley.
+- **Escala con el enjambre:** más cuando te rodean a la distancia de `reach`.
+- **Decisión nueva:** mantener al enjambre a la distancia en que revientan.
+- **Cómo apunta:** `intercept`; los puntos del estallido, a ciegas.
+- **Precio o contra:** presupuesto, como P3.
+- **Con qué choca:** con P3, con el que comparte la forma de soltar `m` puntos (se escribe igual: renacer). Con T3, T4 y T5, porque todos dicen qué pasa al final.
+- **Cabe en `WeaponSpec`:** un campo nuevo, `burst: m`.
+- **Fuente:** ninguna.
+
+#### T3. Volver a ti
+
+- **Fórmula:** al llegar a `reach`, la bala renace donde está y apunta, con `intercept`, a donde vas a estar tú. Desaparece al llegar a ti.
+- **Qué hace:** todo disparo vuelve, y pega en la vuelta.
+- **Cómo se ve:** `@ ⇄ · ` con la vuelta siguiéndote.
+- **Ley o número:** ley.
+- **Escala con el enjambre:** más con enemigos entre tú y el final del alcance.
+- **Decisión nueva:** ponerte para que la vuelta cruce al enjambre.
+- **Cómo apunta:** la ida, a tu enemigo; la vuelta, a ti, con tu velocidad.
+- **Precio o contra:** ninguno.
+- **Con qué choca:** con V7 (el bumerán), que vuelve por su fórmula y no te persigue. Se diferencian en que T3 llega a `reach` y te sigue. Con T2, T4 y T5.
+- **Cabe en `WeaponSpec`:** un campo nuevo, `on_end: "vanish" | "burst" | "return" | "stop" | "wrap"`, que agrupa T2 a T5.
+- **Fuente:** ninguna.
+
+#### T4. Frenar y quedarse
+
+- **Fórmula:** la bala siente un roce lineal: su rapidez es `v·e^{−t/τ_f}`, y su avance, `a(t) = v·τ_f·(1 − e^{−t/τ_f})`. Nunca pasa de `v·τ_f`: se frena y se queda ahí `L` segundos (T1).
+- **Qué hace:** los disparos se frenan y forman un anillo de minas a `v·τ_f` de donde nacieron.
+- **Cómo se ve:**
+  ```
+       ·   ·
+     ·   @   ·      un anillo de minas que se va armando
+       ·   ·
+  ```
+- **Ley o número:** ley: es el roce del ADR 0021 en la bala.
+- **Escala con el enjambre:** más cuando el enjambre viene hacia ti y cruza el anillo.
+- **Decisión nueva:** quedarte dentro del anillo que armaste, o llevar al enjambre hacia él.
+- **Cómo apunta:** hacia tu enemigo, para que la mina quede en su camino.
+- **Precio o contra:** la contra viene adentro: deja de alcanzar lejos.
+- **Con qué choca:** con V4, que también deja minas, pero aparecen de golpe; T4 se ve llegar. Con V5 (`∫dt`), con el que se contradice. Con T2, T3 y T5.
+- **Cabe en `WeaponSpec`:** un avance exponencial, que no es un polinomio (V7), más `lifetime`.
+- **Fuente:** la deducimos de `ẍ = −ẋ/τ_f`. Las páginas de Wikipedia *Drag (physics)* y *Stokes's law* (2026-11-27) dan el roce proporcional a la velocidad, pero no la caída exponencial ni la distancia `v·τ_f` (**no verificado** en una fuente).
+
+#### T5. Reaparecer por el otro lado
+
+- **Fórmula:** al llegar a `reach`, la bala reaparece en el punto opuesto del círculo de radio `reach` en torno a donde nació (`p → 2·p₀ − p`) y sigue con el mismo `û`. Ahora viene de atrás hacia el centro.
+- **Qué hace:** el disparo que se pasa vuelve por la espalda y cruza el círculo otra vez.
+- **Cómo se ve:** `· → @ → → →|` y reaparece `|· → @`: entra por el lado opuesto.
+- **Ley o número:** ley. Es el plano proyectivo: un disco con los puntos opuestos del borde pegados.
+- **Escala con el enjambre:** más cuando te rodean, porque cruza dos lados.
+- **Decisión nueva:** poca.
+- **Cómo apunta:** `intercept`.
+- **Precio o contra:** ninguno.
+- **Con qué choca:** con T2, T3 y T4. Repite una vez o hasta `w` veces.
+- **Cabe en `WeaponSpec`:** en el `on_end` de T3, más las vueltas.
+- **Fuente:** Wikipedia, *Real projective plane*, https://en.wikipedia.org/wiki/Real_projective_plane (2026-11-27): se forma desde un disco pegando los pares de puntos opuestos de su borde.
+- **Nota:** se ve a medias: un punto que salta de un lado al otro se puede leer como un error.
+
+#### T6. Dejar un rastro
+
+- **Fórmula:** mientras viaja, la bala suelta un punto quieto cada `Δ` segundos, que dura `L` (T1).
+- **Qué hace:** cada disparo deja una línea de puntos detrás.
+- **Cómo se ve:** `@ · · · · · →` (los puntos quedan después de que pasa).
+- **Ley o número:** ley.
+- **Escala con el enjambre:** más cuando te persiguen y cruzan el rastro. Con V3, el rastro es una espiral.
+- **Decisión nueva:** dibujar con tus disparos dónde va a pisar el enjambre.
+- **Cómo apunta:** `intercept`.
+- **Precio o contra:** presupuesto: muchos puntos por disparo.
+- **Con qué choca:** con el rendimiento: `L/Δ` puntos quietos por bala viva (#42).
+- **Cabe en `WeaponSpec`:** un campo nuevo, `trail: (Δ, L)`.
+- **Fuente:** ninguna.
+- **Nota:** actúa mientras viaja, así que por la regla del método va en Viaja. Va aquí porque apareció después de que el autor revisó Viaja, y porque lo que importa es lo que queda.
+
+#### T7. Los vértices del que muere
+
+- **Fórmula:** cuando la bala le quita la última línea a un enemigo, de cada vértice que tenía sale un punto hacia afuera, por el radio desde su centro: `ûᵥ = (vértice − centro)/|vértice − centro|`.
+- **Qué hace:** el polígono que muere revienta en sus vértices, y cada uno es un disparo tuyo.
+- **Cómo se ve:**
+  ```
+       ↖   ↗
+         ⬡          un hexágono suelta 6 puntos
+       ↙   ↘
+  ```
+- **Ley o número:** ley, y une al arma con la forma de los enemigos: un triángulo suelta 3 y un hexágono, 6.
+- **Escala con el enjambre:** más con enjambres densos, donde un vértice mata a otro y encadena.
+- **Decisión nueva:** pelear dentro del grupo, donde las reacciones en cadena rinden.
+- **Cómo apunta:** a ciegas, por los radios.
+- **Precio o contra:** presupuesto, porque puede encadenar sin fin.
+- **Con qué choca:**
+  - Con `split_into`, que también actúa cuando muere el enemigo (decisión 71 de la spec de la 0.2.0).
+  - Con P3: los dos sueltan puntos después de pegar. Se diferencian en que T7 solo pasa al matar y depende del enemigo.
+  - Con las figuras abiertas: se toman los vértices de la figura entera, no solo los de las líneas que le quedaban.
+- **Cabe en `WeaponSpec`:** un campo nuevo, `on_kill: "vertices"`. Es un momento que hoy no existe: el que mata. La bala necesita saber que su golpe mató (`Enemy.alive` después de `remove_edge`).
+- **Fuente:** ninguna.
+
+#### Lo que se revisó en Termina y quedó fuera
+
+- **Un disparo gratis al terminar:** relanzar desde el jugador. Es "más disparos": número.
+- **Devolver el `cooldown` si no pegó:** no se ve.
+- **Recoger experiencia:** es una mejora fuera del ataque (tareas 14 y 15).
+- **El mundo con forma de toro:** el plano no tiene borde. T5 es la versión que sí lo tiene: el círculo del alcance.
+
+## La lista de chequeo: área × momento
+
+Los conceptos que entraron van por número; los que el autor dejó fuera, entre paréntesis; los que Claude descartó al revisar, en cursiva.
+
+| Área | Nace | Viaja | Pega | Termina |
+|---|---|---|---|---|
+| Simetría y grupos | N1, N2, N3, N5 | V3 | P4 | T5 |
+| Cálculo | — ¹ | V4, V5, V7, V9 | — ¹ | — ¹ |
+| Series y armónicos | — ² | V1, V2, V8, *Lissajous*, *onda cuadrada* | — ¹ | — ¹ |
+| Sucesiones | N6 | — ³ | P3 | — ⁴ |
+| Teoría de números | N6, N12, *primos*, *Fibonacci en la cantidad* | — ⁵ | — ⁴ | — ⁴ |
+| Geometría | N2, N9 | V3, V9, *inversión* | P2, P4, P6, (P10) | (T7) |
+| Sistemas dinámicos | N11, (N10) | V10, V11, *caos* | P8 | T4 |
+| Fractales e iteración | — ⁶ | *L-systems* (ADR 0029, M7) | P3 | T2 |
+| Probabilidad | (N14) | *paseo al azar* | *crítico* | — ⁷ |
+| Grafos | N8, N13 | — ⁸ | P5 | — ⁸ |
+| Física del juego | (N7) | V6, V11, V12 | P1, P7, (P9) | T4, T6 |
+| Topología *(apareció al revisar)* | — ⁹ | V6 | P8 | T5 |
+| Ritmo | N12, *polirritmo*, *ráfaga* | — ¹⁰ | — ¹⁰ | — ¹⁰ |
+
+**Por qué quedaron vacías:**
+
+1. **El instante no tiene derivada.** Nacer, pegar y terminar pasan en un paso: derivar o integrar, o sumarles un armónico, no tiene sobre qué actuar. Lo que sigue al instante es una trayectoria nueva, y eso es Viaja.
+2. **Un armónico en el ángulo de salida** (`θₘ = θ₀ + A·sin(k·m)`) da un abanico que barre ida y vuelta. Se ve como N3 con N6, así que no suma una ley.
+3. **Un avance por sucesión** (saltos de Fibonacci, por ejemplo) es discreto: en pantalla, el punto se teletransporta.
+4. **Al pegar y al terminar, una sucesión** solo puede contar cuántos puntos salen, y eso ya lo hacen P3 y T2 con `m`.
+5. **Una trayectoria que se cierra** cuando la razón de sus frecuencias es racional es una propiedad de V8, no un concepto nuevo.
+6. **Un fractal de disparos** al nacer sería soltar puntos que se dividen solos; eso es P3 sin el golpe, o T2.
+7. **Cualquier azar al terminar** es un número y gasta `World.rng`.
+8. **Un grafo en la trayectoria o al final** solo tiene sentido si se recorren enemigos, y eso es P5.
+9. **Una topología al nacer** sería nacer en otro lugar, y eso es N13.
+10. **El ritmo** actúa sobre cuándo se dispara. Después de nacer, el punto ya no escucha el compás. Que una bala pegue a tiempo con la música queda como idea para el ADR 0022, no como mejora.
+
+## Resumen
+
+- **Entraron 36 de 43:**
+  - Nace: 11 de 14.
+  - Viaja: 12 de 12.
+  - Pega: 8 de 10.
+  - Termina: 5 de 7.
+- **Ley o número:** de los que entraron, solo 3 son números (N4, P1 y P2), y los tres se ven. La anti-meta queda lejos.
+- **Lo que la lista le pide a la estructura del arma** (sale de "Lo que Viaja le pide" y "Lo que Pega le pide"):
+  1. un eje por armónico;
+  2. el avance como polinomio, o como una ley con nombre (polinomio o exponencial, T4);
+  3. un ancla: donde nació, el jugador o el enemigo;
+  4. una duración, como dato y no como tarjeta;
+  5. renacer: al pegar y al terminar, la bala muere y suelta otras con una dirección nueva;
+  6. un orden fijo entre lo que sigue al golpe y al final;
+  7. estado en la bala solo para V10 y V11;
+  8. un choque con radio (V12);
+  9. funciones nuevas del enemigo: el impulso (P7) y quitar varias líneas en orden (P2);
+  10. reglas de "hacia dónde sale" que compiten: N2, N6, N8 y N9.
+- **Siguiente paso:** con la lista aprobada, un ADR decide si esto cabe agregando campos a `WeaponSpec` (J) o si el arma pasa a ser una lista de términos (K). Después, las tareas de la 8c.
