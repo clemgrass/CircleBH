@@ -31,8 +31,8 @@ class Offer:
     """La clave de la tarjeta en `Balance.cards`."""
 
     weapon: str
-    """El arma que cambia, o la que da una tarjeta de arma nueva. `""` en las tarjetas
-    del jugador."""
+    """El arma que cambia, como `"f2"`, o la que suma una tarjeta de arma nueva. `""` en
+    las tarjetas del jugador."""
 
     value: float
     """El valor sorteado de la lista de la tarjeta. 0 en una de arma nueva."""
@@ -43,7 +43,7 @@ class Loadout:
     """Lo que tiene el jugador, sin el mundo: lo que una tarjeta puede cambiar."""
 
     weapons: dict[str, WeaponSpec]
-    """Sus armas, por nombre, en el orden en que llegaron."""
+    """Sus armas, de `"f1"` en adelante, en el orden en que llegaron (`weapon_name`)."""
 
     player: PlayerSpec
     """Cómo es el jugador ahora."""
@@ -55,6 +55,11 @@ class Loadout:
     """Cuántas tarjetas puede sacar todavía."""
 
 
+def weapon_name(rank: int) -> str:
+    """El nombre del arma de rango `rank`: `"f1"` para el 0, `"f2"` para el 1."""
+    return f"f{rank + 1}"
+
+
 def available(
     state: Loadout,
     cards: Mapping[str, CardSpec],
@@ -63,7 +68,7 @@ def available(
 ) -> list[tuple[str, str]]:
     """Los pares (tarjeta, arma) que tienen efecto sobre `state`, en el orden de `cards`
     y de las armas. Una tarjeta del jugador va con el arma `""`, y una de arma nueva,
-    con el arma que da. No entran las sacadas con banish."""
+    con la `fₖ` que suma. No entran las sacadas con banish."""
     pairs: list[tuple[str, str]] = []
     for name, card in cards.items():
         if name in banished:
@@ -103,14 +108,22 @@ def deal(
 
 
 def apply(
-    offer: Offer,
-    state: Loadout,
-    cards: Mapping[str, CardSpec],
-    weapons: Mapping[str, WeaponSpec],
+    offer: Offer, state: Loadout, cards: Mapping[str, CardSpec], base: WeaponSpec
 ) -> Loadout:
-    """Lo que tendría el jugador después de elegir `offer`. `weapons` es el catálogo
-    del balance, de donde sale un arma nueva."""
-    match cards[offer.card].change:
+    """Lo que tendría el jugador después de elegir `offer`. Un arma nueva parte igual a
+    `base`, la función base del balance, aunque `f₁` ya esté mejorada (ADR 0033)."""
+    change = cards[offer.card].change
+    if isinstance(change, NewWeaponChange):
+        return replace(state, weapons=state.weapons | {offer.weapon: base})
+    return _improve(offer, state, change)
+
+
+def _improve(
+    offer: Offer, state: Loadout, change: KnobChange | PlayerChange
+) -> Loadout:
+    """Lo que tendría el jugador después de un cambio a algo que ya tiene: una perilla
+    de un arma o el jugador."""
+    match change:
         case KnobChange(field=field, op=op):
             spec = state.weapons[offer.weapon]
             changed = _change_path(spec, field.split("."), op, offer.value)
@@ -124,25 +137,20 @@ def apply(
         case PlayerChange(field=field, op=op):
             player = _change_path(state.player, [field], op, offer.value)
             return replace(state, player=player)
-        case NewWeaponChange(weapon=weapon):
-            return replace(state, weapons=state.weapons | {weapon: weapons[weapon]})
 
 
 def check_cards(balance: Balance) -> None:
     """Rechaza al crear el mundo una tarjeta que no se puede aplicar, nombrando el
-    campo: una perilla de un campo que no es un número del arma, un arma que no existe
-    o una tarjeta sin valores."""
+    campo: una perilla de un campo que no es un número del arma, un arma que no puede
+    haber (de `"f1"` a la de `level_up.max_weapons`) o una tarjeta sin valores."""
+    names = {weapon_name(rank) for rank in range(balance.level_up.max_weapons)}
     for name, card in balance.cards.items():
         where = f"cards.{name}"
         for weapon in card.weapons:
-            if weapon not in balance.weapons:
-                raise ValueError(f"{where}.weapons: no existe el arma {weapon}")
+            if weapon not in names:
+                raise ValueError(f"{where}.weapons: no puede haber un arma {weapon}")
         change = card.change
         if isinstance(change, NewWeaponChange):
-            if change.weapon not in balance.weapons:
-                raise ValueError(
-                    f"{where}.change.weapon: no existe el arma {change.weapon}"
-                )
             continue
         if isinstance(change, KnobChange) and not _is_number_path(
             WeaponSpec, change.field.split(".")
@@ -155,16 +163,16 @@ def check_cards(balance: Balance) -> None:
 
 
 def _targets(card: CardSpec, state: Loadout, spec: LevelUpSpec) -> list[str]:
-    """A qué puede ir `card`: las armas que tienes y le sirven, el jugador (`""`) o el
-    arma que da, si no la tienes y te cabe."""
+    """A qué puede ir `card`: las armas que tienes y le sirven, el jugador (`""`) o la
+    `fₖ` que sigue, si te cabe."""
     match card.change:
         case KnobChange():
             return [w for w in state.weapons if not card.weapons or w in card.weapons]
         case PlayerChange():
             return [""]
-        case NewWeaponChange(weapon=weapon):
-            fits = len(state.weapons) < spec.max_weapons
-            return [weapon] if fits and weapon not in state.weapons else []
+        case NewWeaponChange():
+            count = len(state.weapons)
+            return [weapon_name(count)] if count < spec.max_weapons else []
 
 
 def _values_with_effect(
@@ -178,8 +186,7 @@ def _values_with_effect(
     return [
         value
         for value in change.values
-        # Sin catálogo: una perilla o el jugador no lo usan.
-        if apply(Offer(name, target, value), state, cards, {}) != state
+        if _improve(Offer(name, target, value), state, change) != state
     ]
 
 

@@ -28,9 +28,9 @@ from circlebh.world.enemy import Enemy
 from circlebh.world.events import CardChosen, Shot
 from circlebh.world.experience import Orb, level_cost
 from circlebh.world.game import World
-from circlebh.world.weapons import ProjectileWeapon, TraceWeapon
+from circlebh.world.weapons import ProjectileWeapon
 
-PUNTO = BALANCE.weapons["point"]
+PUNTO = BALANCE.weapon
 MANO = LevelUpSpec(freeze_steps=12, hand_size=3, max_weapons=4, rerolls=1, banishes=1)
 
 
@@ -67,14 +67,14 @@ def del_jugador(field: str, values: tuple[float, ...] = (2.0,)) -> CardSpec:
     )
 
 
-def arma_nueva(weapon: str) -> CardSpec:
-    """Una tarjeta de ejemplo que da el arma `weapon`."""
+def arma_nueva() -> CardSpec:
+    """Una tarjeta de ejemplo que suma otra `fₖ`, igual a la base."""
     return CardSpec(
-        title=weapon,
-        symbol=weapon,
+        title="otra",
+        symbol="otra",
         family="weapon",
         weapons=(),
-        change=NewWeaponChange(kind="weapon", weapon=weapon),
+        change=NewWeaponChange(kind="weapon"),
         shape=True,
     )
 
@@ -89,58 +89,57 @@ def equipo(*armas: str) -> Loadout:
     )
 
 
-CATALOGO = {f"arma_{i}": PUNTO for i in range(6)}
-"""Seis armas iguales al punto, con otro nombre."""
-
-
 # --- apply ---
 
 
 def test_perilla_multiplica_su_campo() -> None:
     cartas = {"seguido": perilla("cooldown", values=(0.8,))}
-    nuevo = apply(Offer("seguido", "a", 0.8), equipo("a"), cartas, CATALOGO)
+    nuevo = apply(Offer("seguido", "a", 0.8), equipo("a"), cartas, PUNTO)
     assert nuevo.weapons["a"].cooldown == pytest.approx(PUNTO.cooldown * 0.8)
 
 
 def test_perilla_llega_a_un_campo_anidado() -> None:
     cartas = {"rapido": perilla("advance.coefficient", op="add", values=(50.0,))}
-    nuevo = apply(Offer("rapido", "a", 50.0), equipo("a"), cartas, CATALOGO)
+    nuevo = apply(Offer("rapido", "a", 50.0), equipo("a"), cartas, PUNTO)
     assert nuevo.weapons["a"].advance.coefficient == PUNTO.advance.coefficient + 50
     assert nuevo.weapons["a"].advance.degree == PUNTO.advance.degree
 
 
 def test_perilla_solo_cambia_su_arma() -> None:
     cartas = {"seguido": perilla("cooldown")}
-    nuevo = apply(Offer("seguido", "a", 2.0), equipo("a", "b"), cartas, CATALOGO)
+    nuevo = apply(Offer("seguido", "a", 2.0), equipo("a", "b"), cartas, PUNTO)
     assert nuevo.weapons["b"] == PUNTO
 
 
 def test_perilla_entera_queda_entera() -> None:
     # Borde: `copies` es un entero, y multiplicarlo no lo deja en 1.5.
     cartas = {"copias": perilla("copies", values=(1.5,))}
-    nuevo = apply(Offer("copias", "a", 1.5), equipo("a"), cartas, CATALOGO)
+    nuevo = apply(Offer("copias", "a", 1.5), equipo("a"), cartas, PUNTO)
     assert nuevo.weapons["a"].copies == 2
     assert isinstance(nuevo.weapons["a"].copies, int)
 
 
 def test_tarjeta_del_jugador_cambia_su_spec() -> None:
     cartas = {"chico": del_jugador("radius", (0.9,))}
-    nuevo = apply(Offer("chico", "", 0.9), equipo("a"), cartas, CATALOGO)
+    nuevo = apply(Offer("chico", "", 0.9), equipo("a"), cartas, PUNTO)
     assert nuevo.player.radius == pytest.approx(BALANCE.player.radius * 0.9)
     assert nuevo.weapons == equipo("a").weapons
 
 
 def test_tarjeta_de_rerolls_suma_usos() -> None:
     cartas = {"otra": del_jugador("rerolls", (2.0,))}
-    nuevo = apply(Offer("otra", "", 2.0), equipo("a"), cartas, CATALOGO)
+    nuevo = apply(Offer("otra", "", 2.0), equipo("a"), cartas, PUNTO)
     assert nuevo.rerolls == 2
     assert nuevo.player == BALANCE.player
 
 
-def test_arma_nueva_se_suma() -> None:
-    cartas = {"dar": arma_nueva("arma_2")}
-    nuevo = apply(Offer("dar", "arma_2", 0.0), equipo("a"), cartas, CATALOGO)
-    assert list(nuevo.weapons) == ["a", "arma_2"]
+def test_arma_nueva_suma_otra_funcion_igual_a_la_base() -> None:
+    # ADR 0033: `f₂` parte igual al punto del inicio, aunque `f₁` ya esté mejorada.
+    mejorada = replace(PUNTO, cooldown=0.1)
+    estado = Loadout({"f1": mejorada}, BALANCE.player, rerolls=1, banishes=1)
+    cartas = {"otra": arma_nueva()}
+    nuevo = apply(Offer("otra", "f2", 0.0), estado, cartas, PUNTO)
+    assert nuevo.weapons == {"f1": mejorada, "f2": PUNTO}
 
 
 # --- available ---
@@ -172,21 +171,23 @@ def test_tarjeta_del_jugador_va_sin_arma() -> None:
 
 
 def test_ofrece_arma_nueva_con_menos_de_cuatro() -> None:
-    cartas = {"dar": arma_nueva("arma_4")}
-    estado = equipo("arma_0", "arma_1", "arma_2")
-    assert available(estado, cartas, MANO, set()) == [("dar", "arma_4")]
+    # La tarjeta va a la `fₖ` que sigue.
+    cartas = {"otra": arma_nueva()}
+    estado = equipo("f1", "f2", "f3")
+    assert available(estado, cartas, MANO, set()) == [("otra", "f4")]
 
 
-def test_no_ofrece_arma_nueva_con_cuatro_armas() -> None:
+def test_sin_armas_la_nueva_es_f1() -> None:
+    # Borde: un jugador sin armas suma la primera.
+    cartas = {"otra": arma_nueva()}
+    assert available(equipo(), cartas, MANO, set()) == [("otra", "f1")]
+
+
+def test_no_ofrece_arma_nueva_con_cuatro() -> None:
     # Negativo: con `max_weapons` armas, no cabe otra.
-    cartas = {"dar": arma_nueva("arma_4")}
-    estado = equipo("arma_0", "arma_1", "arma_2", "arma_3")
+    cartas = {"otra": arma_nueva()}
+    estado = equipo("f1", "f2", "f3", "f4")
     assert available(estado, cartas, MANO, set()) == []
-
-
-def test_no_ofrece_un_arma_que_ya_tienes() -> None:
-    cartas = {"dar": arma_nueva("arma_0")}
-    assert available(equipo("arma_0"), cartas, MANO, set()) == []
 
 
 def test_tarjeta_desterrada_no_se_ofrece() -> None:
@@ -255,10 +256,17 @@ def test_rechaza_perilla_de_un_campo_que_no_es_numero() -> None:
         check_cards(balance)
 
 
-def test_rechaza_arma_nueva_que_no_existe() -> None:
-    balance = replace(BALANCE, cards={"mala": arma_nueva("laser")})
-    with pytest.raises(ValueError, match=r"cards\.mala\.change\.weapon"):
+@pytest.mark.parametrize("arma", ["f5", "f0", "point"])
+def test_rechaza_tarjeta_de_un_arma_que_no_puede_haber(arma: str) -> None:
+    # Negativo: con `max_weapons = 4`, las armas son `f1` a `f4`.
+    balance = replace(BALANCE, cards={"mala": perilla("cooldown", weapons=(arma,))})
+    with pytest.raises(ValueError, match=r"cards\.mala\.weapons"):
         check_cards(balance)
+
+
+def test_acepta_tarjeta_de_la_ultima_arma() -> None:
+    # Borde: `f4` existe con `max_weapons = 4`.
+    check_cards(replace(BALANCE, cards={"buena": perilla("cooldown", weapons=("f4",))}))
 
 
 def test_rechaza_tarjeta_sin_valores() -> None:
@@ -337,20 +345,31 @@ def test_con_la_mano_el_mundo_no_avanza() -> None:
 def test_elegir_cambia_el_arma() -> None:
     world = con_mano()
     # La mano se fija para no depender del sorteo.
-    world.hand = (Offer("point_cooldown", "point", 0.8),)
+    world.hand = (Offer("point_cooldown", "f1", 0.8),)
     world.choose(0)
     [arma] = world.weapons
     assert arma.spec.cooldown == pytest.approx(PUNTO.cooldown * 0.8)
 
 
-def test_elegir_el_circulo_lo_arma_como_trazo() -> None:
-    # La tarjeta de arma nueva del balance da el círculo, que daña por barrido.
+def test_elegir_arma_nueva_suma_f2() -> None:
+    # La tarjeta de arma nueva del balance suma otro punto, que apunta al segundo.
     world = con_mano()
-    world.hand = (Offer("circle_weapon", "circle", 0.0),)
+    world.hand = (Offer("new_weapon", "f2", 0.0),)
     world.choose(0)
-    assert list(world.arsenal) == ["point", "circle"]
-    assert isinstance(world.arsenal["circle"], TraceWeapon)
-    assert world.arsenal["circle"].spec == BALANCE.weapons["circle"]
+    assert list(world.arsenal) == ["f1", "f2"]
+    nueva = world.arsenal["f2"]
+    assert (nueva.spec, nueva.rank) == (BALANCE.weapon, 1)
+
+
+def test_mejorar_f2_no_cambia_f1() -> None:
+    # Negativo: cada arma se mejora por su lado. Dos niveles: dos manos seguidas.
+    world = con_mano(niveles=2)
+    world.hand = (Offer("new_weapon", "f2", 0.0),)
+    world.choose(0)
+    world.hand = (Offer("point_cooldown", "f2", 0.8),)
+    world.choose(0)
+    assert world.arsenal["f1"].spec == BALANCE.weapon
+    assert world.arsenal["f2"].spec.cooldown == pytest.approx(PUNTO.cooldown * 0.8)
 
 
 def test_elegir_emite_card_chosen_en_el_paso_siguiente() -> None:
@@ -423,10 +442,10 @@ def test_sin_tarjetas_no_se_detiene() -> None:
 
 
 def test_mano_corta_en_el_mundo() -> None:
-    # Borde: sin armas, y con el círculo sacado de la partida, quedan solo las tres del
-    # jugador.
+    # Borde: sin armas, y con el arma nueva sacada de la partida, quedan solo las tres
+    # del jugador.
     world = mundo_que_sube(armed=False)
-    world.banished.add("circle_weapon")
+    world.banished.add("new_weapon")
     avanzar(world, 1 + FRENADO)
     assert {o.card for o in world.hand} == {
         "player_speed",
@@ -502,7 +521,7 @@ def test_reroll_y_banish_sin_mano_no_hacen_nada() -> None:
 def test_cooldown_no_baja_de_un_paso() -> None:
     # Foco 4: un cooldown menor que un paso dispara una vez por paso, nunca más.
     hexagono = replace(BALANCE.enemies["hexagon"], speed=0.0, patterns=(), actions=())
-    arma = ProjectileWeapon(replace(PUNTO, cooldown=0.001))
+    arma = ProjectileWeapon(replace(PUNTO, cooldown=0.001), 0)
     enemigos = [Enemy(hexagono, Vector2(10_000, 0))]
     disparos = [
         sum(isinstance(e, Shot) for e in arma.update(Vector2(), enemigos))

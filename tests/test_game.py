@@ -64,9 +64,11 @@ def test_world_empieza_sin_enemigos() -> None:
 
 def test_mundo_parte_con_el_arma_punto() -> None:
     world = World(BALANCE, random.Random(1))
+    # ADR 0033: parte con `f₁`, la función base, que apunta al más cercano.
+    assert list(world.arsenal) == ["f1"]
     [weapon] = world.weapons
     assert isinstance(weapon, ProjectileWeapon)
-    assert weapon.spec == BALANCE.weapons["point"]
+    assert (weapon.spec, weapon.rank) == (BALANCE.weapon, 0)
 
 
 def test_la_bala_nace_donde_quedo_el_jugador() -> None:
@@ -610,6 +612,6 @@ def test_sin_mejoras_en_el_infinito() -> None:
         world.update(Vector2())
     assert world.weapons == armas
     assert all(
-        isinstance(w, ProjectileWeapon) and w.spec == BALANCE.weapons["point"]
+        isinstance(w, ProjectileWeapon) and w.spec == BALANCE.weapon
         for w in world.weapons
     )

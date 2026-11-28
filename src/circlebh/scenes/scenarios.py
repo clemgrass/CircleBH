@@ -30,9 +30,7 @@ class Scenario:
     lethal: bool = True
     """Si el contacto termina la partida."""
     armed: bool = True
-    """Si el jugador tiene armas."""
-    start_weapon: str = ""
-    """El arma con que parte, una clave de `weapons`. `""` es la del balance."""
+    """Si el jugador tiene armas. Con armas, parte con `f₁`, el punto."""
     section: str = ""
     """La sección del tema en que parte, como `debug.start_section`. `""` es el comienzo."""
     orbs: tuple[tuple[float, float, float], ...] = ()
@@ -306,18 +304,6 @@ SCENARIOS: dict[str, Scenario] = {
                 (2.2, "flip_down"),
                 (2.8, "choose"),
             ),
-        ),
-        Scenario(
-            "circulo",
-            "El jugador quieto, con el círculo en vez del punto, y siete hexágonos a la"
-            " derecha que lo persiguen. El anillo crece desde el jugador, le quita a"
-            " cada hexágono que barre la cara que lo mira, y pierde el arco que lo"
-            " cubría: queda un hueco donde pegó (ADR 0032).",
-            pilot=False,
-            lethal=False,
-            start_weapon="circle",
-            crowd=7,
-            crowd_center=(260.0, 0.0),
         ),
     ]
 }

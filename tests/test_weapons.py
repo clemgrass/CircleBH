@@ -10,7 +10,6 @@ from circlebh.balance import (
     BALANCE,
     AdvanceSpec,
     EnemySpec,
-    SamplingSpec,
     StarPolygonShape,
 )
 from circlebh.pilot import pilot_intent
@@ -23,12 +22,12 @@ from circlebh.world.weapons import (
     ProjectileWeapon,
     check_weapons,
     intercept,
-    nearest,
+    ranked_target,
 )
 
 # 0,5 s = 30 pasos entre disparos; 600 / 60 = 10 unidades por paso; 700 / 10 = 70 pasos
 # de vida.
-POINT = BALANCE.weapons["point"]
+POINT = BALANCE.weapon
 SPEED = 600.0
 SPEC = replace(
     POINT,
@@ -98,8 +97,8 @@ def test_bala_vence_al_recorrer_range() -> None:
 # --- A quién apunta ---
 
 
-def test_nearest_sin_enemigos_es_none() -> None:
-    assert nearest(Vector2(0, 0), []) is None
+def test_sin_enemigos_no_hay_objetivo() -> None:
+    assert ranked_target(Vector2(0, 0), [], 0) is None
 
 
 def test_el_arma_no_le_apunta_al_fantasma() -> None:
@@ -107,14 +106,71 @@ def test_el_arma_no_le_apunta_al_fantasma() -> None:
     # aunque el centro de la estrella esté más cerca.
     fantasma = Enemy(replace(HEXAGON, phantom=True, radius=150.0), Vector2(10, 0))
     hexagono = enemigo(0, -100)
-    assert nearest(Vector2(0, 0), [fantasma, hexagono]) is hexagono
-    assert nearest(Vector2(0, 0), [fantasma]) is None
+    assert ranked_target(Vector2(0, 0), [fantasma, hexagono], 0) is hexagono
+    assert ranked_target(Vector2(0, 0), [fantasma], 0) is None
+
+
+def test_cada_arma_apunta_a_su_enemigo() -> None:
+    # ADR 0033: `fₖ` apunta al `k`-ésimo más cercano. La lista va desordenada.
+    cuarto, primero, tercero, segundo = (
+        enemigo(400, 0),
+        enemigo(100, 0),
+        enemigo(0, -300),
+        enemigo(0, 200),
+    )
+    enemigos = [cuarto, primero, tercero, segundo]
+    objetivos = [ranked_target(Vector2(0, 0), enemigos, k) for k in range(4)]
+    assert objetivos == [primero, segundo, tercero, cuarto]
+
+
+@pytest.mark.parametrize(
+    ("cuantos", "esperados"),
+    [
+        # Con 2 enemigos y 4 armas, `f₃` vuelve al más cercano y `f₄` al segundo.
+        (2, [0, 1, 0, 1]),
+        # Con uno, todas le apuntan a él.
+        (1, [0, 0, 0, 0]),
+    ],
+)
+def test_la_cuenta_da_la_vuelta(cuantos: int, esperados: list[int]) -> None:
+    enemigos = [enemigo(100.0 * (i + 1), 0) for i in range(cuantos)]
+    objetivos = [ranked_target(Vector2(0, 0), enemigos, k) for k in range(4)]
+    assert objetivos == [enemigos[i] for i in esperados]
+
+
+def test_la_cuenta_se_hace_con_los_que_se_pueden_apuntar() -> None:
+    # Borde: el muerto, el fantasma y el que está sobre el jugador no cuentan. Con dos
+    # apuntables, `f₃` vuelve al más cercano de ellos.
+    muerto = enemigo(10, 0)
+    for k in range(HEXAGON.shape.line_count):
+        muerto.remove_edge(k)
+    fantasma = Enemy(replace(HEXAGON, phantom=True), Vector2(20, 0))
+    encima = enemigo(0, 0)
+    cerca, lejos = enemigo(0, 100), enemigo(0, -200)
+    enemigos = [muerto, fantasma, encima, lejos, cerca]
+    objetivos = [ranked_target(Vector2(0, 0), enemigos, k) for k in range(3)]
+    assert objetivos == [cerca, lejos, cerca]
+
+
+def test_el_arma_de_rango_uno_dispara_al_segundo() -> None:
+    weapon = ProjectileWeapon(SPEC, 1)
+    weapon.update(Vector2(0, 0), [enemigo(500, 0), enemigo(0, -100)])
+    [bullet] = weapon.bullets
+    assert bullet.direction == Vector2(1, 0)
+
+
+def test_sin_enemigos_ninguna_dispara() -> None:
+    # Negativo: sin nadie a quien apuntar, ningún rango dispara.
+    armas = [ProjectileWeapon(SPEC, k) for k in range(4)]
+    for arma in armas:
+        arma.update(Vector2(0, 0), [])
+    assert all(arma.bullets == [] for arma in armas)
 
 
 def test_la_bala_le_quita_una_linea_al_fantasma() -> None:
     # Las balas del jugador sí lo golpean: así se rompe la trampa.
     fantasma = Enemy(replace(HEXAGON, phantom=True), Vector2(100, 0))
-    weapon = ProjectileWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC, 0)
     weapon.bullets.append(Bullet(Vector2(0, 0), Vector2(1, 0), SPEC))
     for _ in range(20):
         weapon.update(Vector2(0, 0), [fantasma])
@@ -122,14 +178,14 @@ def test_la_bala_le_quita_una_linea_al_fantasma() -> None:
 
 
 def test_dispara_al_centro_del_mas_cercano() -> None:
-    weapon = ProjectileWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC, 0)
     weapon.update(Vector2(0, 0), [enemigo(500, 0), enemigo(0, -100)])
     [bullet] = weapon.bullets
     assert bullet.direction == Vector2(0, -1)
 
 
 def test_empate_gana_el_primero() -> None:
-    weapon = ProjectileWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC, 0)
     weapon.update(Vector2(0, 0), [enemigo(100, 0), enemigo(-100, 0)])
     [bullet] = weapon.bullets
     assert bullet.direction == Vector2(1, 0)
@@ -137,7 +193,7 @@ def test_empate_gana_el_primero() -> None:
 
 def test_centro_sobre_el_jugador_no_dispara() -> None:
     # Negativo: la dirección es nula y no se puede normalizar.
-    weapon = ProjectileWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC, 0)
     weapon.update(Vector2(5, 5), [enemigo(5, 5)])
     assert weapon.bullets == []
 
@@ -145,7 +201,7 @@ def test_centro_sobre_el_jugador_no_dispara() -> None:
 def test_centro_casi_sobre_el_jugador_no_falla() -> None:
     # Negativo: a 1e-200, la dirección no es nula, pero su largo al cuadrado se redondea
     # a 0 y `normalize` lanzaría ValueError.
-    weapon = ProjectileWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC, 0)
     weapon.update(Vector2(0, 0), [enemigo(1e-200, 0)])
     assert weapon.bullets == []
 
@@ -153,7 +209,7 @@ def test_centro_casi_sobre_el_jugador_no_falla() -> None:
 def test_un_enemigo_a_una_millonesima_si_recibe_disparo() -> None:
     # Borde: la igualdad de Vector2 tiene tolerancia 1e-6; a 1e-7 el enemigo no está
     # "encima" y se le dispara.
-    weapon = ProjectileWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC, 0)
     weapon.update(Vector2(0, 0), [enemigo(1e-7, 0)])
     [bullet] = weapon.bullets
     assert bullet.direction == Vector2(1, 0)
@@ -162,7 +218,7 @@ def test_un_enemigo_a_una_millonesima_si_recibe_disparo() -> None:
 def test_ignora_al_enemigo_sobre_el_jugador_y_apunta_al_siguiente() -> None:
     # Un enemigo abierto puede quedar estacionado sobre el jugador quieto. No debe
     # callar el arma contra los demás.
-    weapon = ProjectileWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC, 0)
     weapon.update(Vector2(0, 0), [enemigo(0, 0), enemigo(0, 200)])
     [bullet] = weapon.bullets
     assert bullet.direction == Vector2(0, 1)
@@ -174,7 +230,7 @@ def test_no_apunta_a_un_enemigo_muerto() -> None:
     muerto = enemigo(50, 0)
     for k in range(HEXAGON.shape.line_count):
         muerto.remove_edge(k)
-    weapon = ProjectileWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC, 0)
     weapon.update(Vector2(0, 0), [muerto, enemigo(0, -300)])
     [bullet] = weapon.bullets
     assert bullet.direction == Vector2(0, -1)
@@ -184,7 +240,7 @@ def test_no_apunta_a_un_enemigo_muerto() -> None:
 
 
 def test_dispara_uno_cada_cooldown() -> None:
-    weapon = ProjectileWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC, 0)
     lejos = [enemigo(10_000, 0)]
     disparos = []
     for paso in range(100):
@@ -195,7 +251,7 @@ def test_dispara_uno_cada_cooldown() -> None:
 
 
 def test_las_balas_vencidas_se_quitan() -> None:
-    weapon = ProjectileWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC, 0)
     lejos = [enemigo(10_000, 0)]
     for _ in range(VIDA + 1):
         weapon.update(Vector2(0, 0), lejos)
@@ -204,7 +260,7 @@ def test_las_balas_vencidas_se_quitan() -> None:
 
 
 def test_sin_enemigos_no_dispara_y_queda_lista() -> None:
-    weapon = ProjectileWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC, 0)
     for _ in range(COOLDOWN * 3):
         weapon.update(Vector2(0, 0), [])
     assert weapon.bullets == []
@@ -213,7 +269,7 @@ def test_sin_enemigos_no_dispara_y_queda_lista() -> None:
 
 
 def test_la_bala_no_sigue_al_jugador() -> None:
-    weapon = ProjectileWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC, 0)
     objetivo = [enemigo(10_000, 0)]
     weapon.update(Vector2(0, 0), objetivo)
     for _ in range(10):
@@ -248,7 +304,7 @@ def test_si_se_aleja_mas_rapido_apunta_a_donde_esta() -> None:
 def test_le_acierta_al_que_cruza_de_lado() -> None:
     # Sin anticipar, la bala llega en 0,5 s y el hexágono ya avanzó 60, más que su
     # radio (24): fallaría.
-    weapon = ProjectileWeapon(SPEC)
+    weapon = ProjectileWeapon(SPEC, 0)
     objetivo = enemigo(300, 0)
     objetivo.velocity = Vector2(0, 120)
     golpes = []
@@ -332,28 +388,25 @@ def test_misma_semilla_mismos_golpes() -> None:
     assert golpes_de_la_demo(seed=1, seconds=60.0) == GOLPES_DE_LA_DEMO
 
 
-def test_arma_inicial_que_no_existe() -> None:
-    # Negativo: `start_weapon` tiene que ser una clave de `weapons`.
-    sin_arma = replace(BALANCE, player=replace(BALANCE.player, start_weapon="laser"))
-    with pytest.raises(ValueError, match=r"player\.start_weapon"):
-        check_weapons(sin_arma)
+def test_balance_trae_una_sola_funcion_base() -> None:
+    # ADR 0033: el balance guarda el punto, y no un catálogo de armas con nombre.
+    assert BALANCE.weapon.kind == "projectile"
+    assert BALANCE.weapon.frame == "cartesian"
+    check_weapons(BALANCE)
+
+
+def test_rechaza_un_trazo() -> None:
+    # Negativo: todo ataque es un punto (ADR 0033).
+    trazo = replace(POINT, kind="trace")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match=r"weapon\.kind"):
+        check_weapons(replace(BALANCE, weapon=trazo))
 
 
 @pytest.mark.parametrize(
     ("cambio", "campo"),
     [
-        # Hoy se arman el proyectil cartesiano y el trazo polar; la recta y la
-        # espiral llegan en las tareas 8 y 9.
-        ({"kind": "trace"}, "frame"),
+        # Lo que el punto todavía no sabe hacer llega con el catálogo (#127).
         ({"frame": "polar"}, "frame"),
-        (
-            {
-                "kind": "trace",
-                "frame": "polar",
-                "payload": replace(POINT.payload, duration=1.0),
-            },
-            "payload.duration",
-        ),
         ({"aim": "motion"}, "aim"),
         ({"advance": AdvanceSpec(coefficient=300.0, degree=0)}, "advance.degree"),
         ({"copies": 3}, "copies"),
@@ -370,25 +423,5 @@ def test_rechaza_lo_que_todavia_no_se_arma(
     # Negativo: el balance solo puede pedir lo que el código sabe armar; lo demás llega
     # con su tarea. Así un dato no queda ignorado en silencio.
     arma = replace(POINT, **cambio)  # type: ignore[arg-type]
-    balance = replace(BALANCE, weapons={"point": arma})
-    with pytest.raises(ValueError, match=rf"weapons\.point\.{campo}"):
-        check_weapons(balance)
-
-
-def test_el_punto_del_balance_se_arma() -> None:
-    check_weapons(BALANCE)
-
-
-def test_el_circulo_del_balance_se_arma() -> None:
-    # El círculo es un trazo polar, y el chequeo lo deja pasar.
-    circulo = BALANCE.weapons["circle"]
-    assert (circulo.kind, circulo.frame) == ("trace", "polar")
-    check_weapons(replace(BALANCE, weapons={"point": POINT, "circle": circulo}))
-
-
-@pytest.mark.parametrize("spacing", [0.0, -1.0])
-def test_rechaza_un_espaciado_no_positivo(spacing: float) -> None:
-    # Negativo: sin espaciado positivo, un trazo no sabe cuántas muestras tomar.
-    balance = replace(BALANCE, sampling=SamplingSpec(spacing=spacing))
-    with pytest.raises(ValueError, match=r"sampling\.spacing"):
-        check_weapons(balance)
+    with pytest.raises(ValueError, match=rf"weapon\.{campo}"):
+        check_weapons(replace(BALANCE, weapon=arma))

@@ -150,7 +150,7 @@ def test_toda_nota_de_un_enemigo_esta_en_el_acorde(
 
 
 def arma(cooldown: float) -> WeaponSpec:
-    return replace(BALANCE.weapons["point"], cooldown=cooldown)
+    return replace(BALANCE.weapon, cooldown=cooldown)
 
 
 def test_arma_punto_con_cooldown_06_es_e_3_16() -> None:

@@ -34,12 +34,7 @@ from circlebh.render.palette import Palette
 from circlebh.viewport import Viewport
 from circlebh.world.cards import Loadout, apply
 from circlebh.world.game import World
-from circlebh.world.terms import (
-    advance_at,
-    projectile_offset,
-    samples_for,
-    trace_points,
-)
+from circlebh.world.terms import advance_at, projectile_offset
 
 CARD_SIZE = (300.0, 420.0)
 """El ancho y el alto de una tarjeta, en unidades del plano."""
@@ -61,9 +56,6 @@ TEXT_FIT = 0.86
 """Lo más ancho que puede ser un texto, como fracción del ancho de la tarjeta."""
 PREVIEW_SECONDS = 8.0
 """Lo más que vive un proyectil en la vista previa: una mina quieta no se acumula."""
-
-TRACE_PREVIEW_SECONDS = 1.5
-"""Cada cuánto vuelve a nacer un trazo en la vista previa, en segundos."""
 
 FAMILY_NAMES = {
     "knob": "PERILLA",
@@ -118,6 +110,8 @@ class CardView:
     spec: CardSpec
     weapon: WeaponSpec | None
     """El arma como quedaría con la tarjeta puesta, o `None` en las del jugador."""
+    label: str
+    """A qué arma va, como `f₂` (ADR 0033). `""` en las del jugador."""
     player: PlayerSpec
     """El jugador como quedaría."""
     changes: tuple[Change, ...]
@@ -158,15 +152,17 @@ def card_views(world: World) -> list[CardView]:
     views = []
     for offer in world.hand:
         spec = world.balance.cards[offer.card]
-        after = apply(offer, before, world.balance.cards, world.balance.weapons)
+        after = apply(offer, before, world.balance.cards, world.balance.weapon)
         if isinstance(spec.change, PlayerChange):
             changes = _diff(_player_numbers(before), _player_numbers(after))
-            views.append(CardView(spec, None, after.player, changes))
+            views.append(CardView(spec, None, "", after.player, changes))
             continue
         weapon = after.weapons[offer.weapon]
         old = before.weapons.get(offer.weapon)
         changes = () if old is None else _diff(dump(old), dump(weapon))
-        views.append(CardView(spec, weapon, after.player, changes))
+        # "f2" se lee `f₂`.
+        label = offer.weapon.translate(SUBSCRIPTS)
+        views.append(CardView(spec, weapon, label, after.player, changes))
     return views
 
 
@@ -256,7 +252,8 @@ def _draw_front(
     time: float,
     palette: Palette,
 ) -> None:
-    """El tipo arriba, el símbolo grande, el verbo y, abajo, el arma en movimiento."""
+    """El tipo arriba, el símbolo grande, el verbo y, abajo, el arma en movimiento, con
+    su etiqueta, como `f₂`, en la esquina."""
     w, h = surface.get_size()
     fg = palette.foreground
     _centered(surface, FAMILY_NAMES[view.spec.family], 16, 0.08, viewport, fg)
@@ -266,6 +263,8 @@ def _draw_front(
     box = pygame.Rect(pad, round(h * 0.5), w - 2 * pad, round(h * 0.44))
     if view.weapon is not None:
         _draw_weapon_preview(surface, box, view.weapon, viewport, time, palette)
+        label = font(viewport.width(22)).render(view.label, True, fg)
+        surface.blit(label, box.topleft)
     else:
         _draw_player_preview(surface, box, view.player, viewport, time, palette)
 
@@ -281,7 +280,7 @@ def _draw_back(
             formula = PLAYER_FORMULAS[field]
         case KnobChange() | NewWeaponChange():
             assert view.weapon is not None
-            formula = weapon_formula(view.weapon)
+            formula = weapon_formula(view.weapon, view.label)
     _centered(surface, formula, 20, 0.24, viewport, fg)
     y = 0.42
     for change in view.changes:
@@ -338,9 +337,6 @@ def _draw_weapon_preview(
 ) -> None:
     """El arma disparando sola hacia la derecha, sin enemigos, con los mismos términos
     que en el plano (`world/terms.py`). El alcance llena la caja."""
-    if spec.kind == "trace":
-        _draw_trace_preview(surface, box, spec, viewport, time, palette)
-        return
     origin = Vector2(box.left + viewport.width(8), box.centery)
     scale = (box.width - viewport.width(16)) / spec.reach
     dot = max(2, viewport.width(3))
@@ -355,38 +351,6 @@ def _draw_weapon_preview(
         point = origin + Vector2(offset.x, -offset.y) * scale
         if box.collidepoint(point):
             pygame.draw.circle(surface, palette.foreground, point, dot)
-
-
-def _draw_trace_preview(
-    surface: pygame.Surface,
-    box: pygame.Rect,
-    spec: WeaponSpec,
-    viewport: Viewport,
-    time: float,
-    palette: Palette,
-) -> None:
-    """Un trazo polar que crece desde el jugador, en el centro de la caja, con
-    `trace_points`. Se repite cada `TRACE_PREVIEW_SECONDS`, sin esperar su `cooldown`:
-    así se ve aunque el arma recargue lento. `R` llena la caja de alto."""
-    center = Vector2(box.center)
-    scale = (box.height / 2 - viewport.width(4)) / spec.reach
-    pygame.draw.circle(surface, palette.foreground, center, max(3, viewport.width(6)))
-    age = time % TRACE_PREVIEW_SECONDS
-    if advance_at(spec, age) >= spec.reach:
-        return
-    samples = samples_for(spec, age, 1 / scale)
-    # La Y del plano va hacia arriba; la de la pantalla, hacia abajo.
-    points = [
-        center + Vector2(p.x, -p.y) * scale for p in trace_points(spec, age, samples)
-    ]
-    if len(points) > 1:
-        pygame.draw.lines(
-            surface,
-            palette.foreground,
-            True,
-            points,
-            viewport.width(spec.payload.width),
-        )
 
 
 def _draw_player_preview(
@@ -416,31 +380,23 @@ def _draw_player_preview(
         pygame.draw.circle(surface, palette.light.selection, point, max(2, units * 3))
 
 
-def weapon_formula(spec: WeaponSpec) -> str:
-    """La fórmula del arma, escrita desde sus términos (ADR 0029)."""
+def weapon_formula(spec: WeaponSpec, name: str) -> str:
+    """La fórmula del arma `name`, como `f₂(t) = p₀ + v·t·û`, escrita desde sus
+    términos (ADR 0029 y 0033)."""
     advance = ""
     if spec.advance.coefficient:
         advance = ("v·τ", "v·t", "v·t²/2τ")[spec.advance.degree]
-    if spec.kind == "trace":
-        # El trazo polar es una curva en θ, que crece hasta R (ADR 0029).
-        bounded = f"min({advance}, R)" if advance else ""
-        waves = " + ".join(
-            f"A{_sub(i)}·sin(k{_sub(i)}(θ − Ωt) + φ{_sub(i)})"
-            for i in range(1, len(spec.harmonics) + 1)
-        )
-        rho = " + ".join(term for term in (bounded, waves) if term) or "0"
-        return f"ρ(θ, t) = {rho}"
     waves = " + ".join(
         f"A{_sub(i)}·sin(k{_sub(i)}t + φ{_sub(i)})"
         for i in range(1, len(spec.harmonics) + 1)
     )
     if spec.frame == "polar":
         radius = " + ".join(term for term in (advance, waves) if term) or "0"
-        return f"p(t) = p₀ + ({radius})·(cos Ωt, sin Ωt)"
+        return f"{name}(t) = p₀ + ({radius})·(cos Ωt, sin Ωt)"
     terms = [f"{advance}·û"] if advance else []
     if waves:
         terms.append(f"({waves})·n̂")
-    return "p(t) = p₀ + " + " + ".join(terms) if terms else "p(t) = p₀"
+    return f"{name}(t) = p₀ + " + " + ".join(terms) if terms else f"{name}(t) = p₀"
 
 
 def number(value: float) -> str:
@@ -527,6 +483,10 @@ def _flatten(data: Json, prefix: str) -> dict[str, Json]:
     return flat
 
 
+SUBSCRIPTS = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
+"""Las cifras como subíndices, para `str.translate`."""
+
+
 def _sub(n: int) -> str:
     """`n` con subíndices: 12 → ₁₂."""
-    return "".join("₀₁₂₃₄₅₆₇₈₉"[int(d)] for d in str(n))
+    return str(n).translate(SUBSCRIPTS)

@@ -7,7 +7,7 @@ from circlebh.balance import PlayerSpec
 from circlebh.world.clock import STEP
 from circlebh.world.player import Player
 
-SPEC = PlayerSpec(speed=240.0, radius=12.0, charge=-14.0, start_weapon="point")
+SPEC = PlayerSpec(speed=240.0, radius=12.0, charge=-14.0)
 
 
 def test_jugador_nace_en_el_origen() -> None:
