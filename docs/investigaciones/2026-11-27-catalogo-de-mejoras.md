@@ -645,6 +645,196 @@ Las perillas que ya existen (`v`, `cooldown` y `reach`) son números y no se rep
 5. **Estado en la bala,** con integración paso a paso: V10 y V11. Es el cambio más grande: la posición deja de ser una función pura de `t`.
 6. **Un choque con radio:** V12.
 
-### Pega y Termina
+### Pega: qué pasa al golpear
 
-*(Pendientes: se llenan después de que el autor revise Viaja.)*
+Hoy, al cruzar una línea, la bala la quita y desaparece (`ProjectileWeapon._strike`). El golpe se mide en el marco del enemigo, así que se sabe qué línea fue, en qué punto y con qué dirección llegó la bala.
+
+| | Concepto | Ley o número | Se ve claro | Escala con el enjambre | Cabe en `WeaponSpec` |
+|---|---|---|---|---|---|
+| P1 | Atravesar | número que se ve | sí | más con filas | sí, `payload.pierce` |
+| P2 | Cortar las vecinas | número que se ve | sí | igual | sí, `payload.lines`, más una regla |
+| P3 | Dividirse al pegar | ley | sí | más con enjambres densos | campo nuevo |
+| P4 | Rebotar en la línea | ley | sí | más con enjambres densos | campo nuevo |
+| P5 | Saltar al vecino más cercano | ley | sí | más con enjambres densos | campo nuevo |
+| P6 | Refractarse | ley | a medias | más con filas | campo nuevo |
+| P7 | Empujar y hacer girar | ley | sí | igual | campo nuevo y una función del enemigo |
+| P8 | Quedarse orbitando al enemigo | ley | sí | menos con muchos | campo nuevo |
+| P9 | Polarizar al enemigo | ley | a medias | más con muchos | campo nuevo |
+| P10 | Cortar al enemigo en dos | ley | sí | igual | pide figuras nuevas |
+
+**Decisión del autor (2026-11-27):** entran todos menos P9 y P10. Claude no recomendaba P6 ni P10.
+
+#### P1. Atravesar
+
+- **Fórmula:** la bala sigue después de pegar, hasta `pierce + 1` enemigos distintos.
+- **Qué hace:** un disparo pasa a través de una fila.
+- **Cómo se ve:** `@ · → ◇ → ◇ → ◇`
+- **Ley o número:** número, pero se ve.
+- **Escala con el enjambre:** más con filas y formaciones.
+- **Decisión nueva:** ponerte en línea con la fila.
+- **Cómo apunta:** `intercept`.
+- **Precio o contra:** ninguno.
+- **Con qué choca:**
+  - Con P3, P4 y P5: ¿la bala sigue derecho, se divide o rebota? Se propone que atravesar se gaste primero.
+  - **Un mismo enemigo no cuenta dos veces:** la bala guarda a quién ya pegó, porque en el paso siguiente puede volver a cruzar otra línea del mismo.
+- **Cabe en `WeaponSpec`:** sí, `payload.pierce`. Hoy `check_weapons` lo rechaza. Pide guardar en la bala los enemigos ya golpeados.
+- **Fuente:** ADR 0029 (lo que viaja).
+
+#### P2. Cortar las vecinas
+
+- **Fórmula:** el golpe quita la línea que cruzó y `lines − 1` más, alternando entre sus vecinas en la figura (la siguiente y la anterior en el orden de las aristas).
+- **Qué hace:** un golpe arranca un trozo del polígono, no una línea.
+- **Cómo se ve:** al hexágono le falta un tramo de tres lados seguidos.
+- **Ley o número:** número, pero se ve.
+- **Escala con el enjambre:** igual; rinde más contra los de muchas líneas.
+- **Decisión nueva:** ninguna.
+- **Cómo apunta:** `intercept`.
+- **Precio o contra:** ninguno.
+- **Con qué choca:** con las figuras abiertas y con el giro (ADR 0027): quitar varias líneas corre el centro de masa más de una vez, en orden. Con P10.
+- **Cabe en `WeaponSpec`:** sí, `payload.lines`, más la regla de cuáles quita. Hoy `check_weapons` lo rechaza.
+- **Fuente:** ADR 0029 (lo que viaja).
+
+#### P3. Dividirse al pegar
+
+- **Fórmula:** al pegar, la bala suelta `m` hijas desde el punto del golpe, en `Cₘ` alrededor de su dirección: `ûⱼ = R(2πj/m)·û`. Cada hija es una bala nueva, con el mismo `spec` y `t = 0`. Con profundidad `d`, las hijas también se dividen, hasta `d` generaciones: a lo más `mᵈ` puntos por disparo.
+- **Qué hace:** cada golpe revienta en un abanico de puntos que siguen pegando.
+- **Cómo se ve:**
+  ```
+              ·
+     @ → ◇ ✕ ─ ·        m = 3
+              ·
+  ```
+- **Ley o número:** ley: cada golpe es un disparo nuevo.
+- **Escala con el enjambre:** más con enjambres densos, donde las hijas encuentran a otro enseguida. Es la forma más visible de "más enemigos, más ataques": crece porque pegó, no por un contador.
+- **Decisión nueva:** mantener al enjambre junto en vez de dispersarlo.
+- **Cómo apunta:** la madre con `intercept`; las hijas, a ciegas.
+- **Precio o contra:** presupuesto, porque crece como `mᵈ`.
+- **Con qué choca:**
+  - Con P1, P4 y P5: todos dicen qué sigue después del golpe.
+  - Con el rendimiento: `mᵈ` sin tope (ADR 0029). Es trabajo del #42, y un caso de foco como `n = 64` en `Cₙ`.
+  - Las hijas no deben pegarle al mismo enemigo en el paso en que nacen: nacen en la línea que la madre acaba de quitar.
+- **Cabe en `WeaponSpec`:** un campo nuevo, `split: (m, d)`. La bala guarda su generación.
+- **Fuentes:** Wikipedia, *Fractal canopy*, https://en.wikipedia.org/wiki/Fractal_canopy (2026-11-27): un árbol en que cada tramo se parte en dos al final. Que crezca como `mᵈ` lo deducimos nosotros. El "dividirse al pegar" es una idea de partida del plan (tarea 8b).
+
+#### P4. Rebotar en la línea
+
+- **Fórmula:** al pegar, la bala sale reflejada respecto de la línea que golpeó: `û' = û − 2(û·n̂)·n̂`, con `n̂` la normal de esa línea. Rebota hasta `b` veces.
+- **Qué hace:** el punto rebota como una bola de billar en los lados de los enemigos.
+- **Cómo se ve:**
+  ```
+     @ → ╲◇
+          ↘ ◇        el ángulo de salida es el de entrada
+  ```
+- **Ley o número:** ley, y usa la geometría de los enemigos: cómo rebota depende de qué lado golpeó.
+- **Escala con el enjambre:** más con enjambres densos.
+- **Decisión nueva:** buscar ángulos en que el rebote caiga sobre el grupo.
+- **Cómo apunta:** la primera con `intercept`; los rebotes, por la ley de la reflexión.
+- **Precio o contra:** ninguno.
+- **Con qué choca:** con P1, P3 y P5. Con el giro del enemigo: la normal se toma con la pose de ahora.
+- **Cabe en `WeaponSpec`:** un campo nuevo, `bounces`. La bala renace en el punto del golpe con `û'` (ver "Lo que Pega le pide a la estructura").
+- **Fuente:** Wikipedia, *Specular reflection*, https://en.wikipedia.org/wiki/Specular_reflection (2026-11-27): el ángulo de reflexión es igual al de incidencia, y en vectores, `d̂ₛ = d̂ᵢ − 2·d̂ₙ(d̂ₙ·d̂ᵢ)`.
+
+#### P5. Saltar al vecino más cercano
+
+- **Fórmula:** al pegar, la bala renace en el punto del golpe y apunta, con `intercept`, al enemigo más cercano a ese punto que todavía no golpeó. Salta hasta `c` veces, y solo si el vecino está a menos de `ρ`.
+- **Qué hace:** un disparo encadena enemigos, como un rayo.
+- **Cómo se ve:** `@ → ◇ ↗ ◇ → ◇ ↘ ◇` (la bala dibuja el camino entre vecinos).
+- **Ley o número:** ley.
+- **Escala con el enjambre:** más con enjambres densos; con enemigos sueltos, `ρ` la corta.
+- **Decisión nueva:** mantener al enjambre junto.
+- **Cómo apunta:** `intercept` en cada salto.
+- **Precio o contra:** ninguno.
+- **Con qué choca:** con N13 (origen en el último golpe), que hace algo parecido entre disparos y no dentro de uno. Con P1, P3 y P4.
+- **Cabe en `WeaponSpec`:** un campo nuevo, `chain: (c, ρ)`. La bala guarda a quién ya pegó, como en P1.
+- **Fuente:** Wikipedia, *Nearest neighbor graph*, https://en.wikipedia.org/wiki/Nearest_neighbor_graph (2026-11-27): cada punto va hacia el que tiene más cerca. El camino de la cadena es un recorrido de ese grafo, sin repetir.
+
+#### P6. Refractarse
+
+- **Fórmula:** la bala atraviesa la línea y se tuerce con la ley de Snell, `sin θ₂ = sin θ₁ / η`, con `θ` medido desde la normal de la línea y `η` de la tarjeta. Si `sin θ₂` pasara de 1, se refleja (reflexión total).
+- **Qué hace:** el punto cruza al enemigo y sale desviado, como la luz en el agua.
+- **Cómo se ve:** `@ ──◇╲` (entra derecho y sale torcido). Al ojo, se confunde con un rebote.
+- **Ley o número:** ley.
+- **Escala con el enjambre:** más con filas.
+- **Decisión nueva:** poca.
+- **Cómo apunta:** `intercept`.
+- **Precio o contra:** ninguno.
+- **Con qué choca:** con P1, de la que es una versión que tuerce, y con P4, que toma en la reflexión total.
+- **Cabe en `WeaponSpec`:** un campo nuevo, `refraction: η`.
+- **Fuente:** Wikipedia, *Snell's law*, https://en.wikipedia.org/wiki/Snell%27s_law (2026-11-27): `n₁·sin θ₁ = n₂·sin θ₂`, y la reflexión total cuando el seno tendría que pasar de 1.
+
+#### P7. Empujar y hacer girar
+
+- **Fórmula:** el golpe le da al enemigo un impulso `J = μ·v·û` en el punto del golpe: `Δv = J/M` y `Δω = (r × J)/I`, con `r` desde su centro de masa e `I` su momento de inercia.
+- **Qué hace:** los golpes empujan a los enemigos y, si pegan de lado, los hacen girar.
+- **Cómo se ve:** enemigos que retroceden y dan vueltas al recibir los golpes.
+- **Ley o número:** ley, y usa el cuerpo rígido del ADR 0027.
+- **Escala con el enjambre:** igual; con un enjambre denso, el empujado choca a los demás por la ley de cargas.
+- **Decisión nueva:** empujar al enjambre lejos o a un lado; pegar en el borde para hacerlo girar.
+- **Cómo apunta:** `intercept`.
+- **Precio o contra:** la contra viene adentro: un enemigo empujado lejos tarda más en morir.
+- **Con qué choca:** con los enemigos anclados (`anchored`) y las acciones que fijan la velocidad o el giro (`world/actions.py`): mandan ellas o el impulso.
+- **Cabe en `WeaponSpec`:** un campo nuevo, `push: μ`. `Enemy` necesita una función `apply_impulse` y un momento de inercia, que hoy no tiene.
+- **Fuentes:** Wikipedia, *Impulse (physics)*, https://en.wikipedia.org/wiki/Impulse_(physics) (2026-11-27): `J = Δp`. **(No verificado:** `Δω = (r × J)/I`, porque la página no habla del cuerpo rígido; es mecánica estándar).
+
+#### P8. Quedarse orbitando al enemigo
+
+- **Fórmula:** al pegar, la bala pasa a girar en torno al enemigo: `p(t) = c_enemigo(t) + ρ·(cos Ωt, sin Ωt)`, con `ρ` un poco mayor que su radio. En cada vuelta cruza sus líneas y le quita una, hasta que muere; después desaparece.
+- **Qué hace:** el disparo se pega al enemigo y lo muele.
+- **Cómo se ve:** un punto dando vueltas alrededor de un polígono que va perdiendo lados.
+- **Ley o número:** ley: es V6 con el ancla en el enemigo.
+- **Escala con el enjambre:** menos con muchos: una bala se dedica a uno. Rinde contra los grandes y el jefe.
+- **Decisión nueva:** dejar las balas en los grandes y esquivar al resto.
+- **Cómo apunta:** `intercept`.
+- **Precio o contra:** la contra viene adentro.
+- **Con qué choca:** con P1, P3, P4 y P5. Con V6 comparte el campo `anchor`.
+- **Cabe en `WeaponSpec`:** con el `anchor` de V6, más `"enemy"`.
+- **Fuente:** ninguna.
+
+#### P9. Polarizar al enemigo
+
+- **Fórmula:** el enemigo golpeado invierte el signo de su carga por `T` segundos. Con la ley del ADR 0021, atrae al enjambre en vez de repelerlo.
+- **Qué hace:** el golpeado se vuelve un imán, y el enjambre se amontona a su alrededor.
+- **Cómo se ve:** a medias: el enjambre se junta en torno a un enemigo; se lee mejor si el golpeado se marca.
+- **Ley o número:** ley, con la física del juego.
+- **Escala con el enjambre:** más con muchos.
+- **Decisión nueva:** polarizar y después usar P3 o P5, que rinden en grupos densos.
+- **Cómo apunta:** `intercept`.
+- **Precio o contra:** la contra viene adentro: un enjambre amontonado también es más peligroso.
+- **Con qué choca:** con la carga del jugador (ADR 0029, fuera del ataque).
+- **Cabe en `WeaponSpec`:** un campo nuevo, `polarize: T`. `Enemy` necesita guardar un signo con duración.
+- **Fuente:** ADR 0021.
+
+#### P10. Cortar al enemigo en dos
+
+- **Fórmula:** el camino de la bala, prolongado, parte al polígono: las líneas de cada lado de la recta pasan a ser dos enemigos, que se separan como cuerpos rígidos.
+- **Qué hace:** el disparo rebana.
+- **Cómo se ve:** un hexágono que se abre en dos mitades que salen girando.
+- **Ley o número:** ley.
+- **Escala con el enjambre:** igual; con enemigos grandes, multiplica a los chicos.
+- **Decisión nueva:** poca.
+- **Cómo apunta:** `intercept`.
+- **Precio o contra:** la contra viene adentro: deja más enemigos, aunque más chicos.
+- **Con qué choca:** con `split_into`, que ya parte a algunos al morir (decisión 71 de la spec de la 0.2.0), y con P2.
+- **Cabe en `WeaponSpec`:** el campo sí (`slice`), pero el mundo no: hoy un enemigo es un `EnemySpec` del balance, y las mitades serían figuras nuevas que no están en él. Es el concepto más caro de esta lista.
+- **Fuente:** ninguna.
+
+#### Lo que se revisó en Pega y quedó fuera
+
+- **La explosión en área:** un círculo que daña todo lo que toca no es un punto (ADR 0033). P3 con `m` grande y poco alcance da algo parecido con puntos.
+- **El contagio:** que los vecinos también pierdan una línea. Es daño en área, por la misma razón.
+- **Congelar o frenar al enemigo:** es un número con duración, y se ve poco. Queda como precio sobre el enemigo (M8), con el signo contrario.
+- **El crítico:** un golpe que al azar quita más líneas. Es un número y gasta `World.rng`.
+- **Elegir qué línea quita** (la opuesta, la que mira al jugador): no se ve qué cambió.
+- **La línea que sale disparada:** la línea quitada vuela y daña. Es un segmento, no un punto (ADR 0033).
+
+#### Lo que Pega le pide a la estructura
+
+1. **Renacer en el golpe.** P3, P4, P5 y P6 se escriben igual: al pegar, la bala muere y nacen una o más balas en el punto del golpe, con una dirección nueva y `t = 0`. Así la posición sigue siendo una función pura de `t` (`terms.py`), sin el estado de V10 y V11. La bala solo guarda su generación y a quién ya pegó.
+2. **Un orden fijo entre lo que sigue al golpe:** atravesar, después rebotar o refractarse, después saltar, y al final dividirse. Como los operadores del ADR 0029, el orden no depende de cuándo se tomó cada tarjeta.
+3. **Funciones nuevas del enemigo:** un impulso (P7), un signo de carga con duración (P9) y quitar varias líneas en orden (P2).
+4. **El ancla en el enemigo** (P8), que extiende el `anchor` de V6.
+5. **Figuras que no están en el balance** (P10).
+
+### Termina
+
+*(Pendiente: se llena después de que el autor revise Pega.)*
