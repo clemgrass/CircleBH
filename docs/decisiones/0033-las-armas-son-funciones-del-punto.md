@@ -1,5 +1,5 @@
 ---
-estado: aceptado
+estado: aceptado; la opción J (`WeaponSpec` como hoy) la reemplaza el ADR 0034
 fecha: 2026-11-27
 ---
 
